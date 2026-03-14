@@ -1,88 +1,174 @@
-### 10. Critical Fixes Required
+## AI Roadmap Generator System — JSON Based Workflow (FIX API ERROR)
 
-The following issues must be fixed in the application.
-
----
-
-### Cross-Device Timer Stop Synchronization
-
-Currently the timer starts correctly across devices, but stopping the timer does not synchronize properly.
-
-Requirements:
-
-* When the timer is stopped on **any device**, it must stop immediately on **all other logged-in devices**.
-* The stop action must update the timer state in Firebase.
-* All devices must listen to the timer state using a realtime listener.
-* When the timer state changes to **stopped**, the local timer must stop immediately.
-
-Important rule:
-
-The UI must stop the timer **locally first**, then update Firebase asynchronously.
-
-Example flow:
-
-```
-User presses STOP
-→ local timer stops instantly
-→ Firebase timer state updated
-→ other devices receive snapshot
-→ their timers stop
-```
-
-Do not wait for Firebase before stopping the timer locally.
-
-Ensure snapshot listeners correctly detect changes in timer state.
+Improve the AI Roadmap Generator system and fix the Gemini API request failure.
 
 ---
 
-### User-Specific Roadmaps
+## 1. Roadmap Output Format (STRICT JSON)
 
-Each user must have their **own independent roadmap**.
+All generated roadmaps must follow this JSON schema exactly.
 
-Requirements:
-
-* A user's roadmap must never be visible to other users.
-* Roadmap data must be stored using the logged-in user's ID.
-
-Example structure:
-
-```
-users/{user.uid}/roadmap
-```
-
-When a user logs in:
-
-* Load only the roadmap belonging to that user.
-* Never load or display another user's roadmap.
-
----
-
-### Roadmap Not Generated State
-
-If the user has not generated a roadmap yet, the application must clearly show:
-
-```
-Roadmap not generated yet
-```
-
-Requirements:
-
-* When no roadmap exists in Firebase for the user, display a placeholder message.
-* Show a button allowing the user to generate their roadmap using AI.
-* Do not show another user's roadmap.
-
----
-
-### Firebase Read/Write Optimization
-
-The system must continue to minimize Firebase usage.
+{
+"topic": "Analog IC Design",
+"modules": [
+{
+"moduleNumber": 1,
+"moduleTitle": "DIODES",
+"days": [
+{
+"day": 1,
+"title": "Basic Semiconductor Physics",
+"status": "completed"
+},
+{
+"day": 2,
+"title": "Different Models of Diodes",
+"status": "active"
+},
+{
+"day": 3,
+"title": "Operating Point & Small Signal Analysis of Diode",
+"status": "locked"
+}
+]
+}
+]
+}
 
 Rules:
 
-* Timer must write to Firebase **only on start and stop events**.
-* Do not write timer updates every second.
-* Calculate elapsed time locally.
-* Avoid unnecessary snapshot listeners.
-* Ensure roadmap and favorites sync do not trigger excessive reads.
+• Day 1 → completed
+• Day 2 → active
+• Remaining days → locked
+• Day numbers must continue sequentially across modules
 
-The application must remain efficient enough to run continuously (24×7) within Firebase free tier limits.
+AI must return **only JSON** without explanations.
+
+---
+
+## 2. Two Roadmap Creation Methods
+
+Add two buttons in UI.
+
+[ Generate with AI ]
+[ Import JSON Roadmap ]
+
+---
+
+## 3. Import JSON Roadmap (Manual)
+
+If user selects **Import JSON Roadmap**:
+
+1. Show a large text editor
+2. User pastes JSON roadmap
+3. Validate JSON structure
+4. If valid → save roadmap to database
+5. Render roadmap in roadmap console
+
+Validation rules:
+
+• topic must exist
+• modules must be array
+• moduleNumber must exist
+• each module must contain days array
+• each day must contain day, title, status
+
+---
+
+## 4. Database Storage
+
+Store roadmap JSON directly.
+
+users
+└── userId
+└── roadmaps
+└── roadmapId
+• topic
+• roadmapJSON
+• progress
+• type (ai or imported)
+• createdAt
+
+---
+
+## 5. Prevent Duplicate Roadmaps
+
+Before generating or saving roadmap:
+
+Check database.
+
+IF roadmap for topic exists → load existing roadmap
+
+ELSE → allow AI generation or JSON import
+
+---
+
+## 6. Fix Gemini API Request Failure
+
+The system currently shows:
+
+Error: API request failed. Check your key.
+
+Fix the Gemini API integration.
+
+### Use correct endpoint (even though i have used the correct one okay )
+
+POST
+https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
+
+### Pass API key in header OR query parameter
+
+Example request:
+
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=API_KEY
+
+### Correct request body
+
+{
+"contents": [
+{
+"parts": [
+{
+"text": "Generate a learning roadmap for {{TOPIC}} in the required JSON schema."
+}
+]
+}
+]
+}
+
+### Important Implementation Rules
+
+• Use model **gemini-1.5-flash**
+• Do NOT use deprecated model **gemini-pro**
+• Validate API key before request
+• Add try/catch error handling
+• Display clear error message if request fails
+
+Example errors:
+
+Invalid API key
+API quota exceeded
+Network request failed
+
+---
+
+## 7. Loading Indicators
+
+Add loading indicators.
+
+Checking existing roadmap...
+Generating roadmap using AI...
+Validating JSON roadmap...
+Saving roadmap...
+
+---
+
+## 8. Final Expected Behaviour
+
+• Users can generate roadmaps using Gemini AI
+• Users can import roadmap JSON manually
+• Roadmaps are stored permanently
+• Duplicate roadmaps are prevented
+• Roadmaps sync across devices
+• API request failures are handled correctly
+( and same firebase read and write limit it till now its okay)
