@@ -28,6 +28,8 @@ import {
   setDoc,
   collection,
   deleteDoc,
+  onSnapshot,
+  enableIndexedDbPersistence
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 // Central Firebase configuration for this app.
@@ -58,6 +60,15 @@ export function initializeFirebaseServices() {
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // Enable offline persistence
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === "failed-precondition") {
+      console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
+    } else if (err.code === "unimplemented") {
+      console.warn("The current browser does not support all of the features required to enable persistence.");
+    }
+  });
+
   return {
     app,
     auth,
@@ -78,6 +89,8 @@ export function initializeFirebaseServices() {
     setDoc,
     collection,
     deleteDoc,
+    onSnapshot,
+    enableIndexedDbPersistence
   };
 }
 

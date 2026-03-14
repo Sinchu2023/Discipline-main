@@ -1676,6 +1676,19 @@
                 <span></span><span></span><span></span>
               </div>
             </div>
+            
+            <!-- AI Roadmap Generator -->
+            <div class="ai-roadmap-generator" style="margin-bottom: 20px; padding: 15px; border: 1px solid var(--border); border-radius: 8px;">
+              <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.1em; color: var(--text-primary);"><i class="fas fa-magic"></i> AI Roadmap Generator</h3>
+              <p style="font-size: 0.9em; color: var(--text-secondary); margin-bottom: 10px;">Enter a topic and your Gemini API key to auto-generate a structured learning roadmap.</p>
+              <input type="password" id="gemini-api-key" placeholder="Enter Gemini API Key..." style="width: 100%; margin-bottom: 10px; padding: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px;" />
+              <div style="display: flex; gap: 10px;">
+                <input type="text" id="ai-roadmap-topic" placeholder="e.g. Analog IC Design" style="flex: 1; padding: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px;" />
+                <button class="btn btn-primary" id="generate-roadmap-btn"><i class="fas fa-magic"></i> Generate Roadmap</button>
+              </div>
+              <div id="ai-roadmap-status" style="margin-top: 10px; font-size: 0.9em; color: var(--text-secondary); display: none;"></div>
+            </div>
+
             <div class="trainer-overview" id="trainer-overview"></div>
             <div id="trainer-content"></div>
           </div>
@@ -2249,7 +2262,8 @@
               if (!user) return;
               try {
                 await this.bootstrapUserData();
-                await this.restoreTimerFromCloud();
+                this.listenToTimerState();
+                this.listenToUserState();
               } catch (error) {
                 console.error("Post-login bootstrap failed:", error);
                 alert(
@@ -2591,21 +2605,60 @@
           });
         }
 
-        async restoreTimerFromCloud() {
-          if (!this.isReady) return;
-          try {
-            const snap = await window.FirebaseServices.getDoc(this.timerDoc());
-            const timerState = snap.exists() ? snap.data() : null;
-            this.app.stopwatch.restoreFromCloud(timerState);
-          } catch (e) {
-            console.warn("Failed to restore timer state", e);
-          }
+        listenToTimerState() {
+          if (!this.isReady || !window.FirebaseServices.onSnapshot) return;
+          
+          this.detachTimerListener(); // Clean up existing
+          
+          this.timerUnsub = window.FirebaseServices.onSnapshot(
+            this.timerDoc(),
+            (snap) => {
+              const timerState = snap.exists() ? snap.data() : null;
+              this.app.stopwatch.syncFromCloud(timerState);
+            },
+            (e) => {
+              console.warn("Timer sync failed", e);
+            }
+          );
         }
 
         detachTimerListener() {
           if (!this.timerUnsub) return;
           this.timerUnsub();
           this.timerUnsub = null;
+        }
+
+        listenToUserState() {
+          if (!this.isReady || !window.FirebaseServices.onSnapshot) return;
+          
+          this.detachUserListener();
+          
+          this.userUnsub = window.FirebaseServices.onSnapshot(
+            this.userDoc(),
+            (snap) => {
+              if (this.isHydratingCloudState) return;
+              const data = snap.exists() ? snap.data() : null;
+              if (!data) return;
+              
+              if (data.roadmap && this.app.trainerEngine) {
+                const currentStr = JSON.stringify(this.app.trainerEngine.state.roadmap || {});
+                const newStr = JSON.stringify(data.roadmap);
+                if (currentStr !== newStr) {
+                  this.app.trainerEngine.state.roadmap = data.roadmap;
+                  // Update storage without triggering the SyncManager event loop
+                  localStorage.setItem(CONFIG.STORAGE_KEYS.ROADMAP_STATE, newStr);
+                  this.app.trainerEngine.refresh();
+                }
+              }
+            },
+            (e) => console.warn("User state sync failed", e)
+          );
+        }
+
+        detachUserListener() {
+          if (!this.userUnsub) return;
+          this.userUnsub();
+          this.userUnsub = null;
         }
 
         detachTasksListener() {
@@ -2702,6 +2755,10 @@
             "close-report",
             "open-trainer",
             "trainer-modal",
+            "ai-roadmap-topic",
+            "gemini-api-key",
+            "generate-roadmap-btn",
+            "ai-roadmap-status",
             "trainer-overview",
             "trainer-content",
             "close-trainer",
@@ -3190,21 +3247,33 @@
           this.reset();
         }
 
+        syncFromCloud(timerState) {
+          if (!timerState) return;
+          
+          if (timerState.status === "running") {
+            const activeTask = timerState.activeTask;
+            const startTime = Number(timerState.startTime);
+            if (!activeTask || !startTime) return;
+            
+            // If already running the EXACT same task, no action needed
+            if (this.isRunning && this.startTime === startTime) return;
+            
+            this.resumeRemoteMission({
+              ...activeTask,
+              startTime,
+              elapsedBeforePause: Number(timerState.elapsedBeforePause || 0),
+            });
+          } else if (timerState.status === "paused") {
+            // Local is running, but remote says paused/stopped
+            if (this.isRunning) {
+              this.stopFromRemote();
+            }
+          }
+        }
+
         restoreFromCloud(timerState) {
-          if (this.isRunning || !timerState || timerState.status !== "running")
-            return;
-          const activeTask = timerState.activeTask;
-          const startTime = Number(timerState.startTime);
-          if (!activeTask || !startTime) return;
-          this.resumeActiveTask({
-            ...activeTask,
-            startTime,
-            elapsedBeforePause: Number(timerState.elapsedBeforePause || 0),
-          });
-          this.app.saveToStorage(CONFIG.STORAGE_KEYS.ACTIVE_TASK, {
-            ...activeTask,
-            startTime,
-          });
+          // Keep this for backwards compatibility if needed elsewhere
+          this.syncFromCloud(timerState);
         }
       }
       class TaskManager {
@@ -5419,6 +5488,88 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           el.textContent = `Pending ${pending} task(s) • penalty countdown ${h}:${m}:${s} (applies if module is incomplete at deadline)`;
         }
 
+        async generateAIRoadmap() {
+          const topicEl = this.app.elements["ai-roadmap-topic"];
+          const keyEl = this.app.elements["gemini-api-key"];
+          const statusEl = this.app.elements["ai-roadmap-status"];
+          
+          const topic = topicEl?.value.trim();
+          const apiKey = keyEl?.value.trim();
+          
+          if (!topic || !apiKey) {
+            alert("Please provide both a topic and a Gemini API key.");
+            return;
+          }
+          
+          localStorage.setItem("gemini_api_key_saved", apiKey);
+          
+          if (statusEl) {
+            statusEl.style.display = "block";
+            statusEl.textContent = `Generating AI roadmap for "${topic}"... Please wait.`;
+            statusEl.style.color = "var(--text-secondary)";
+          }
+          
+          try {
+            const prompt = `Create a learning roadmap for the topic: "${topic}". 
+            Return ONLY valid JSON using this exact structure, with no markdown formatting around it:
+            {"modules":[{"module":"MODULE 1 NAME","days":[{"day":1,"topic":"Topic name","status":"active"},{"day":2,"topic":"Topic name","status":"locked"}]}]}
+            Requirements: multiple modules, multiple learning steps per module (each step is one day), day numbers MUST continue sequentially across all modules (1, 2, 3, 4...). Only day 1 status is active, rest locked.`;
+            
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+              })
+            });
+            
+            if (!response.ok) throw new Error("API request failed. Check your key.");
+            
+            const data = await response.json();
+            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (!textResponse) throw new Error("Invalid response from AI");
+            
+            let jsonStr = textResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+            const roadmapJson = JSON.parse(jsonStr);
+            console.log("Parsed AI Roadmap:", roadmapJson);
+            
+            if (!roadmapJson.modules || !Array.isArray(roadmapJson.modules)) throw new Error("Missing modules array in JSON");
+            
+            const internalRoadmap = {
+              modules: roadmapJson.modules.map(m => ({
+                name: m.module,
+                days: m.days.map(d => ({
+                  day: `Day ${d.day}`,
+                  text: d.topic,
+                  completed: false
+                }))
+              })),
+              editMode: false
+            };
+            
+            if (internalRoadmap.modules.length > 0) {
+                 this.state.roadmap = internalRoadmap;
+                 this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+                 this.refresh();
+
+                 if (statusEl) {
+                   statusEl.textContent = "Roadmap generated successfully!";
+                   statusEl.style.color = "var(--success)";
+                 }
+                 if (topicEl) topicEl.value = "";
+            } else {
+                 throw new Error("Generated roadmap was empty");
+            }
+          } catch (e) {
+            console.error(e);
+            if (statusEl) {
+               statusEl.textContent = "Error: " + e.message;
+               statusEl.style.color = "var(--danger)";
+            }
+          }
+        }
+
         renderRoadmap() {
           this.ensureRoadmap();
           const overview = this.app.elements["trainer-overview"];
@@ -6217,9 +6368,18 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.app.elements["view-report"].addEventListener("click", () =>
             this.app.uiManager.showReport(),
           );
-          this.app.elements["open-trainer"].addEventListener("click", () =>
-            this.app.trainerEngine.showWindow(),
-          );
+          this.app.elements["open-trainer"].addEventListener("click", () => {
+            this.app.trainerEngine.showWindow();
+            const keyInput = this.app.elements["gemini-api-key"];
+            if (keyInput && !keyInput.value) {
+                const savedKey = localStorage.getItem("gemini_api_key_saved");
+                if (savedKey) keyInput.value = savedKey;
+            }
+          });
+          const genBtn = this.app.elements["generate-roadmap-btn"];
+          if (genBtn) {
+              genBtn.addEventListener("click", () => this.app.trainerEngine.generateAIRoadmap());
+          }
           this.app.elements["export-data"].addEventListener("click", () =>
             (this.app.uiManager.exportData(), this.app.cloudManager.closeProfileMenu()),
           );
