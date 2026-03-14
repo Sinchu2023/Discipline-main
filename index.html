@@ -2365,7 +2365,7 @@
               try {
                 await this.bootstrapUserData();
                 this.listenToTimerState();
-                this.listenToRoadmap(); // Start listening to roadmap
+                this.listenToRoadmap();
               } catch (error) {
                 console.error("Post-login bootstrap failed:", error);
                 alert(
@@ -2755,6 +2755,14 @@
         listenToTimerState() {
           if (!this.isReady) return;
           this.detachTimerListener();
+          // Defensive guard: fall back to getDoc if onSnapshot not yet loaded
+          if (typeof window.FirebaseServices.onSnapshot !== "function") {
+            console.warn("onSnapshot not available — falling back to one-time timer restore");
+            window.FirebaseServices.getDoc(this.timerDoc()).then(snap => {
+              if (snap.exists()) this.app.stopwatch.restoreFromCloud(snap.data());
+            }).catch(e => console.warn("Timer restore failed", e));
+            return;
+          }
           this.timerUnsub = window.FirebaseServices.onSnapshot(
             this.timerDoc(),
             (snap) => {
@@ -2773,6 +2781,10 @@
         listenToRoadmap() {
           if (!this.isReady) return;
           this.detachRoadmapListener();
+          // Defensive guard: skip if onSnapshot not yet loaded
+          if (typeof window.FirebaseServices.onSnapshot !== "function") {
+            return;
+          }
           const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "roadmap", "main");
           this.roadmapUnsub = window.FirebaseServices.onSnapshot(
             ref,
