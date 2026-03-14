@@ -5977,14 +5977,36 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           }
 
           const colors = this.getColorScheme();
-          const shadowMinutes = Math.max(
-            0,
-            Number(this.app.shadowEngine?.shadowSevenDayAverage || 0),
-          );
-          const shadowHours = parseFloat((shadowMinutes / 60).toFixed(2));
-          const shadowData = Array.from({ length: labels.length }, () =>
-            shadowHours,
-          );
+
+          // Build a per-date map of productive minutes for rolling average calculation.
+          const dailyProductiveMap = new Map();
+          this.app.state.tasks.forEach((task) => {
+            if (!this.app.isProductiveCategory(task.category)) return;
+            dailyProductiveMap.set(
+              task.date,
+              (dailyProductiveMap.get(task.date) || 0) + task.duration,
+            );
+          });
+
+          // For each chart label date, compute the 7-day rolling average ending on that date.
+          const shadowData = labels.map((_, i) => {
+            const today = new Date();
+            const pointDate = new Date(today);
+            pointDate.setDate(today.getDate() - (days - 1 - i));
+            let rollingSum = 0;
+            let rollingCount = 0;
+            for (let w = 0; w < 7; w++) {
+              const wd = new Date(pointDate);
+              wd.setDate(pointDate.getDate() - w);
+              const wds = this.app.getDateString(wd);
+              if (dailyProductiveMap.has(wds)) {
+                rollingSum += dailyProductiveMap.get(wds);
+                rollingCount++;
+              }
+            }
+            if (rollingCount === 0) return null;
+            return parseFloat(((rollingSum / 7) / 60).toFixed(2));
+          });
           return {
             labels,
             datasets: [
