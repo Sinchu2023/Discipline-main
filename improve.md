@@ -283,3 +283,99 @@ User experience must prioritize:
 * responsiveness
 * synchronization reliability
 * stability during long running sessions
+
+### App Improvement Instructions
+
+Read the project files and implement the following improvements carefully.
+
+### 1. Private Discipline Journey
+
+This application is strictly for personal use. The user's discipline journey must remain completely private.
+
+Requirements:
+
+* Do not expose any user's data publicly.
+* Ensure that roadmap, tasks, productivity data, shadow stats, reports, and timer state are only visible to the logged-in user.
+* All Firebase reads and writes must be strictly scoped to `users/{user.uid}`.
+* Never load or display data belonging to any other user.
+
+### 2. Credits Section
+
+Add a **Credits section** inside the Login / Logout profile menu.
+
+Requirements:
+
+* Add a clickable link in the profile menu.
+* Display the text:
+  `Credits: Sinchan Chandrashekhar`
+* Link it to:
+
+https://www.linkedin.com/in/sinchan-chandrashekhar-180248263/
+
+The link should open in a new tab.
+
+### 3. Timer Stop Lag Fix
+
+The timer currently takes too long to stop or update.
+
+Fix this behavior.
+
+Requirements:
+
+* Timer must stop instantly in the UI.
+* Local timer must stop immediately without waiting for Firebase.
+* Firebase write should occur asynchronously after the UI stops.
+* Avoid blocking the UI thread.
+* Ensure the stopwatch logic is not dependent on network latency.
+
+### 4. Reduce UI Lag
+
+The application currently lags on both phone and laptop.
+
+Improve performance.
+
+Requirements:
+
+* Avoid unnecessary DOM re-renders.
+* Avoid heavy operations inside loops or timer ticks.
+* Ensure the stopwatch updates only the display element.
+* Ensure Firebase listeners do not trigger unnecessary UI refreshes.
+* Debounce expensive UI updates if needed.
+
+### 5. Fix Mobile Layout
+
+The mobile UI currently appears misaligned and stacked incorrectly.
+
+Improve the layout.
+
+Requirements:
+
+* Ensure responsive layout works correctly on phones.
+* Fix elements appearing “up-down” incorrectly.
+* Adjust flex/grid layouts to behave properly on small screens.
+* Ensure the stopwatch, tasks, and roadmap sections scale properly on mobile devices.
+
+### 6. Maintain Existing Architecture
+
+Do not rewrite the entire project.
+
+Modify only the necessary parts while preserving:
+
+* authentication
+* Firebase sync
+* roadmap system
+* stopwatch system
+* shadow system
+* task tracking
+
+### Goal
+
+The final application must:
+
+* remain fast
+* minimize Firebase reads/writes IMPORTANT ONE 
+
+  keep the discipline journey private
+* stop the timer instantly
+* work smoothly on mobile and desktop
+* include the Credits link in the profile menu

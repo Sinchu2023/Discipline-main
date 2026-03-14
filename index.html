@@ -1167,6 +1167,14 @@
         }
       }
       @media (max-width: 768px) {
+        .main-content {
+          display: flex;
+          flex-direction: column;
+        }
+        .graphs-container {
+          display: flex;
+          flex-direction: column;
+        }
         body {
           padding: 12px;
         }
@@ -1288,6 +1296,9 @@
               <div class="profile-name" id="auth-user-name"></div>
               <button class="btn" id="import-data" role="menuitem"><i class="fas fa-upload"></i> Import</button>
               <button class="btn" id="export-data" role="menuitem"><i class="fas fa-download"></i> Export</button>
+              <a href="https://www.linkedin.com/in/sinchan-chandrashekhar-180248263/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+                <button class="btn" style="color:var(--primary); font-size:0.8rem; margin:10px 0;"><i class="fab fa-linkedin"></i> Credits: Sinchan Chandrashekhar</button>
+              </a>
               <button class="btn btn-danger" id="google-logout-btn" role="menuitem">Logout</button>
             </div>
           </div>
@@ -2262,8 +2273,7 @@
               if (!user) return;
               try {
                 await this.bootstrapUserData();
-                this.listenToTimerState();
-                this.listenToUserState();
+                await this.restoreTimerFromCloud();
               } catch (error) {
                 console.error("Post-login bootstrap failed:", error);
                 alert(
@@ -2605,54 +2615,21 @@
           });
         }
 
-        listenToTimerState() {
-          if (!this.isReady || !window.FirebaseServices.onSnapshot) return;
-          
-          this.detachTimerListener(); // Clean up existing
-          
-          this.timerUnsub = window.FirebaseServices.onSnapshot(
-            this.timerDoc(),
-            (snap) => {
-              const timerState = snap.exists() ? snap.data() : null;
-              this.app.stopwatch.syncFromCloud(timerState);
-            },
-            (e) => {
-              console.warn("Timer sync failed", e);
-            }
-          );
+        async restoreTimerFromCloud() {
+          if (!this.isReady) return;
+          try {
+            const snap = await window.FirebaseServices.getDoc(this.timerDoc());
+            const timerState = snap.exists() ? snap.data() : null;
+            this.app.stopwatch.restoreFromCloud(timerState);
+          } catch (e) {
+            console.warn("Failed to restore timer state", e);
+          }
         }
 
         detachTimerListener() {
           if (!this.timerUnsub) return;
           this.timerUnsub();
           this.timerUnsub = null;
-        }
-
-        listenToUserState() {
-          if (!this.isReady || !window.FirebaseServices.onSnapshot) return;
-          
-          this.detachUserListener();
-          
-          this.userUnsub = window.FirebaseServices.onSnapshot(
-            this.userDoc(),
-            (snap) => {
-              if (this.isHydratingCloudState) return;
-              const data = snap.exists() ? snap.data() : null;
-              if (!data) return;
-              
-              if (data.roadmap && this.app.trainerEngine) {
-                const currentStr = JSON.stringify(this.app.trainerEngine.state.roadmap || {});
-                const newStr = JSON.stringify(data.roadmap);
-                if (currentStr !== newStr) {
-                  this.app.trainerEngine.state.roadmap = data.roadmap;
-                  // Update storage without triggering the SyncManager event loop
-                  localStorage.setItem(CONFIG.STORAGE_KEYS.ROADMAP_STATE, newStr);
-                  this.app.trainerEngine.refresh();
-                }
-              }
-            },
-            (e) => console.warn("User state sync failed", e)
-          );
         }
 
         detachUserListener() {
@@ -3056,6 +3033,7 @@
           this.tickIntervalId = null;
           this.isRunning = false;
           this.pendingMeta = null;
+          this.lastRenderedTime = null;
         }
         formatElapsed(ms) {
           const h = Math.floor(ms / 3600000);
@@ -3072,7 +3050,11 @@
         renderTime() {
           const elapsed = this.getElapsedNow();
           this.elapsedTime = elapsed;
-          this.app.elements["stopwatch"].textContent = this.formatElapsed(elapsed);
+          const newFormatted = this.formatElapsed(elapsed);
+          if (this.lastRenderedTime !== newFormatted) {
+            this.app.elements["stopwatch"].textContent = newFormatted;
+            this.lastRenderedTime = newFormatted;
+          }
         }
 
         startTicking() {
@@ -3196,12 +3178,18 @@
             date: this.app.getDateString(new Date(this.startTime)),
           });
           this.app.taskManager.addTask(entry);
-          this.app.cloudManager?.setTimerState?.({
-            status: "paused",
-            startTime: null,
-            elapsedBeforePause: 0,
-            activeTask: null,
-          });
+          
+          // Execute network update asynchronously, unblocking UI thread immediately
+          if (this.app.cloudManager?.setTimerState) {
+            setTimeout(() => {
+                this.app.cloudManager.setTimerState({
+                  status: "paused",
+                  startTime: null,
+                  elapsedBeforePause: 0,
+                  activeTask: null,
+                }).catch(e => console.warn("Timer stop cloud sync delayed", e));
+            }, 0);
+          }
           this.reset();
         }
         reset() {
@@ -3247,33 +3235,25 @@
           this.reset();
         }
 
-        syncFromCloud(timerState) {
-          if (!timerState) return;
-          
-          if (timerState.status === "running") {
-            const activeTask = timerState.activeTask;
-            const startTime = Number(timerState.startTime);
-            if (!activeTask || !startTime) return;
-            
-            // If already running the EXACT same task, no action needed
-            if (this.isRunning && this.startTime === startTime) return;
-            
-            this.resumeRemoteMission({
-              ...activeTask,
-              startTime,
-              elapsedBeforePause: Number(timerState.elapsedBeforePause || 0),
-            });
-          } else if (timerState.status === "paused") {
-            // Local is running, but remote says paused/stopped
-            if (this.isRunning) {
-              this.stopFromRemote();
-            }
-          }
-        }
-
         restoreFromCloud(timerState) {
-          // Keep this for backwards compatibility if needed elsewhere
-          this.syncFromCloud(timerState);
+          if (this.isRunning || !timerState || timerState.status !== "running")
+            return;
+          const activeTask = timerState.activeTask;
+          const startTime = Number(timerState.startTime);
+          if (!activeTask || !startTime) return;
+          
+          // Check if we are already perfectly synced
+          if (this.isRunning && this.startTime === startTime) return;
+
+          this.resumeActiveTask({
+            ...activeTask,
+            startTime,
+            elapsedBeforePause: Number(timerState.elapsedBeforePause || 0),
+          });
+          this.app.saveToStorage(CONFIG.STORAGE_KEYS.ACTIVE_TASK, {
+            ...activeTask,
+            startTime,
+          });
         }
       }
       class TaskManager {
