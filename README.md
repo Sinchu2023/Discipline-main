@@ -1,106 +1,60 @@
 # Discipline Tracker Pro
 
-A professional, feature-rich task and sleep tracking web application built with vanilla HTML, CSS, and JavaScript. Track your productivity, monitor sleep patterns, maintain daily discipline streaks, compete against your SHADOW, and seamlessly sync your data across devices using Firebase Cloud storage. 
+A professional, feature-rich productivity and discipline tracking web application built with vanilla HTML, CSS, and JavaScript — powered by Firebase for real-time cross-device sync.
+
+Track your time, compete against your personal SHADOW, follow an AI-generated learning roadmap, and maintain streaks — all for free with no backend required.
+
+---
 
 ## 🎯 Core Features
 
 ### ⏱️ Time Tracking
-- **Real-time Stopwatch**: Precise task duration tracking
-- **Start/Stop Controls**: Easy task logging with one click
-- **Sleep Tracking**: Dedicated sleep session logging
-- **Active Task Indicator**: Visual display of currently running tasks
-- **Auto-Save**: All data persists in browser localStorage and syncs to the cloud
+- **Real-time Stopwatch** with precise start/stop controls
+- **Sleep Tracking** — dedicated sleep session logging
+- **Active Task Indicator** — always visible while a session runs
+- **Auto-Save** — all data persists in localStorage and syncs to Firebase
 
 ### 📋 Task Management
-- Log tasks with automatic timestamps
-- Categorize activities as productive or sleep
-- **Quick-Start Favorites**: Save and reuse frequent tasks
-- **Task History**: View all today's activities with duration
-- **Delete Functionality**: Remove tasks if needed
-- **Color-Coded Display**: Green for productive, Purple for sleep
+- Log tasks with automatic timestamps and duration
+- Categorize as productive, sleep, or distraction
+- **Quick-Start Favorites** — save frequent tasks, sync across devices
+- **Task History** — view every session logged today
+- **Color-coded display** — Green = productive, Purple = sleep
+
+### ⭐ Quick Start Favorites — Cross-Device Sync
+- Favorites are stored in Firebase under `users/{uid}/state/favorites`
+- Adding or removing a favorite on one device updates all others **instantly** via `onSnapshot` listener
+- No page refresh required
 
 ### ☁️ Cloud Sync & Authentication
-- **Google Sign-in**: Secure authentication via Firebase
-- **Cross-Device Syncing**: Your tasks, streaks, and settings are automatically backed up and synced
-- **Offline Mode**: Full local functionality when offline, syncing automatically when connection is restored
+- **Google Sign-In** via Firebase Authentication
+- **Cross-device timer sync** — stopping a timer on one device stops it on all others instantly
+- **Offline Mode** — full local functionality, syncs when reconnected
+- **Login Gate** — app is locked behind authentication; anonymous access is blocked
 
 ### 📊 Statistics Dashboard
-- **Productive Time**: Hours spent on productive tasks today
-- **Sleep Time**: Total sleep duration tracked
-- **Total Tracked**: Combined productive + sleep time
-- **Day Streak**: Consecutive days with logged activity
-- Real-time updates as you log activities
+- Productive Time, Sleep Time, Total Tracked — all real-time
+- Day Streak with milestone notifications
 
 ### 🔥 Streak System
-- Automatic consecutive day counter
-- Beautiful popup notifications
-- Customized messages for milestones:
-  - Day 1: "Day one. This is where it begins."
-  - Day 7: "One week! Discipline is becoming a habit."
-  - Day 30: "One month of discipline. Elite status."
-  - Day 365: "One year. You've mastered yourself."
+- Tracks consecutive days with logged activity
+- Milestone messages at Day 1, 7, 30, 365
 
-### 📈 Analytics & Reporting
-- **Productivity Trend Graph**: Line chart with smooth curves
-  - View 7 days, 30 days, 3 months, 6 months, or 1 year
-  - Shaded area fill for visual clarity
-- **Sleep Analysis Chart**: Bar chart showing sleep patterns
-  - Same time range options as productivity
-- **Performance Report**: Monthly detailed breakdown
-  - Summary statistics (tasks, hours, streak)
-  - Daily breakdown table
-  - Print-ready formatting
-- **Export Data**: Download all data as CSV or JSON file
+---
 
-### 💡 Motivation & Flow Protocol
-- 20 rotating inspirational quotes
-- **Flow Engine**: Dedicated flow state tracking and protocol management
-- **War Mode**: High-focus tracking triggers
+## 🌑 SHADOW Engine
 
-## 🌑 SHADOW Engine (Competitive Tracking System)
+The SHADOW Engine is a competitive self-improvement system. Your SHADOW is your strongest historical 7-day rolling average — and every day you race to beat it.
 
-The SHADOW Engine is an innovative competitive system that tracks your performance against your personal best. It creates an internal competition where you battle against your own "SHADOW" - your strongest historical 7-day rolling average.
+### How It Works
+- **Shadow Average**: Best 7-day rolling average you've achieved
+- **Competitive Pressure**: Real-time gap vs your SHADOW shown in minutes and percent
+- **Momentum**: 📈 Growing / ➡️ Stable / 📉 Declining
 
-### ⚔ How SHADOW Works
+### Rank Tiers
 
-**The Shadow Concept**: Your SHADOW is calculated from your historical data - it's the best 7-day rolling average you've achieved. Every day, you're competing to match or exceed this benchmark.
-
-- **Shadow Average**: Your strongest historical 7-day average (dynamically updated as you improve)
-- **Current Performance**: Your actual productivity today and this week
-- **Competitive Metrics**: Real-time comparison showing how close you are to breaking your personal standard
-
-### 📊 SHADOW Metrics Dashboard
-
-#### Current You Card
-- **Weekly 7-Day Average**: Your actual average for the past 7 days
-- **Momentum**: 📈 Growing, ➡️ Stable, 📉 Declining
-- **Gap vs Shadow**: How far ahead (+) or behind (-) you are from your Shadow
-- **Weekly Delta**: Weekly gap analysis vs your SHADOW
-- **Today's Target**: Minimum minutes needed today to maintain/exceed Shadow
-- **Progress Percentage**: Real-time progress toward today's target
-
-#### The SHADOW Card
-- **SHADOW Average**: Your strongest historical 7-day average
-- **Rank Tier**: Current tier based on minutes tracked
-- **Monthly Wins**: Days this month you've met or exceeded your SHADOW
-- **Days Since Last Win**: How many days since you last beat your SHADOW
-- **Shadow Lead Streak**: How many consecutive days your SHADOW is winning
-
-### 🏆 Status Indicators
-
-Your daily status is determined by how close you are to breaking your SHADOW:
-
-- **🟢 STANDARD BROKEN** (100%+): You've exceeded your SHADOW! Victory!
-- **🔵 AT THE GATE** (90-99%): So close! Nearly there!
-- **🟡 TRAILING** (70-89%): Making progress but still behind
-- **🔴 OUT OF RANGE** (<70%): Significant gap to close
-
-### 🎖️ Ranking Tier System
-
-As you increase your SHADOW average, you unlock new ranks:
-
-| Tier | Minutes | Badge |
-|------|---------|-------|
+| Tier | Minutes/day | Badge |
+|------|-------------|-------|
 | Initiate | 0+ | Baseline |
 | Builder | 120+ | Builder |
 | Operator | 180+ | Operator |
@@ -109,101 +63,152 @@ As you increase your SHADOW average, you unlock new ranks:
 | Apex | 360+ | Apex |
 | Overdrive | 420+ | Legend |
 
-### 🎯 Monthly Win Tracking
+### Status Indicators
+- 🟢 **STANDARD BROKEN** (100%+): Exceeded your SHADOW
+- 🔵 **AT THE GATE** (90–99%): Almost there
+- 🟡 **TRAILING** (70–89%): Behind but in range
+- 🔴 **OUT OF RANGE** (<70%): Significant gap
 
-Track your competitive performance throughout the month:
+---
 
-- **My Wins**: Days you've met or exceeded your SHADOW
-- **Shadow Wins**: Days your SHADOW has beaten you
-- **Active Days**: Total days with logged productivity
-- **Win Percentage**: Your success rate for the month
+## 🗺️ AI Roadmap Generator
 
-## 🎨 Design & UI
+Generate a structured learning roadmap using the **Gemini 2.0 Flash** API (free tier), or import your own JSON roadmap manually.
 
-- **Dark Professional Theme**: Modern gradient background with glassmorphism effects
-- **Responsive Layout**: Optimized for desktop, tablet, and mobile devices
-- **Smooth Animations**: Fade transitions, hover effects, pulse animations
-- **Accessibility**: Font Awesome icons, high contrast text, semantic HTML
-- **Zero Dependencies**: Pure vanilla HTML/CSS/JavaScript (except Chart.js & Firebase App SDKs)
+### Two Creation Modes
 
-### Responsive Breakpoints
-- **Desktop** (1400px): Full featured layout with side graphs and SHADOW cards
-- **Tablet** (768px): Single column with stacked components
-- **Mobile** (480px): Optimized touch-friendly interface
+#### ✨ Generate with AI
+1. Open the **Roadmap Console** from the main toolbar
+2. Enter your **Gemini API key** (from [aistudio.google.com](https://aistudio.google.com)) — stored locally only
+3. Type a topic (e.g. "Analog IC Design")
+4. Click **Generate** — the app calls the Gemini API and builds your roadmap
+
+#### 📥 Import JSON Roadmap
+Paste a roadmap JSON manually using this exact schema:
+```json
+{
+  "topic": "Analog IC Design",
+  "modules": [
+    {
+      "moduleNumber": 1,
+      "moduleTitle": "DIODES",
+      "days": [
+        { "day": 1, "title": "Basic Semiconductor Physics", "status": "completed" },
+        { "day": 2, "title": "Diode Models", "status": "active" },
+        { "day": 3, "title": "Operating Point Analysis", "status": "locked" }
+      ]
+    }
+  ]
+}
+```
+Click **Example** inside the Import panel to prefill a sample.
+
+### Roadmap Features
+- **Duplicate prevention** — if a roadmap for the same topic already exists, you'll be asked before overwriting
+- **Cross-device sync** — roadmap stored in Firebase at `users/{uid}/roadmap/main`; changes sync across devices
+- **Empty state** — if no roadmap exists, app displays "Roadmap not generated yet" with generator access
+- **Delete button** — remove your roadmap permanently (with confirmation)
+- **Progress tracking** — mark days as complete, locked/active state auto-advances
+- **Edit mode** — rename modules and edit day topics inline
+- **SHADOW integration** — active roadmap day appears in daily mission goals
+
+### Loading Indicators
+The generator shows step-by-step status:
+- 🔍 Checking for existing roadmap...
+- ✨ Generating AI roadmap...
+- 📦 Parsing response...
+- 💾 Saving roadmap...
+- ✅ Done!
+
+### API Error Messages
+| Status | Message |
+|--------|---------|
+| 400/403 | Invalid API key — check at aistudio.google.com |
+| 404 | Model not found — check your key |
+| 429 | Rate limit hit — wait 60 seconds (quota is fine) |
+| 503 | Gemini temporarily unavailable |
+
+---
+
+## 📈 Analytics & Reporting
+- **Productivity Trend Graph** (7d / 30d / 3m / 6m / 1y)
+- **Sleep Analysis Chart** — bar chart with the same range options
+- **Performance Report** — monthly breakdown, daily table, print-ready
+- **Export Data** — download all data as CSV or JSON
+
+---
+
+## 💡 Flow Protocol Engine
+- **Flow State Tracking** — record when you enter productive flow
+- **War Mode** — high-focus task triggers
+- **Attention Stretch** — configurable focus intervals
+- **Kill Switch** — emergency reset of active session
+
+---
+
+## 🎨 Design
+
+- Dark professional theme with glassmorphism effects
+- Responsive: Desktop (1400px) → Tablet (768px) → Mobile (480px)
+- Smooth animations, hover effects, micro-transitions
+- Font Awesome 6.4.0 icons
+- Google Fonts (Inter / system-ui)
+- Zero build step — pure HTML/CSS/JS
+
+---
 
 ## 🚀 Quick Start
 
+### Requirements
+- A web server (e.g. Live Server, GitHub Pages, Vercel) — `file:///` protocol blocks Firebase Auth
+- A Firebase project with Firestore + Authentication enabled
+- A free Gemini API key from [aistudio.google.com](https://aistudio.google.com) (only needed for AI roadmap generation)
+
 ### Installation
-1. Clone or download this repository.
-2. Ensure you are running the files on a local or remote web server (e.g., Live Server, GitHub Pages, Vercel) to allow Firebase Google Sign-In to function properly. `file:///` protocol is not supported for authentication.
-3. Open `index.html` in your web browser.
+```bash
+git clone https://github.com/yourname/Discipline-main.git
+cd Discipline-main
+# Open with Live Server or deploy to Vercel/GitHub Pages
+```
 
-### Usage
+### Login
+The app opens a **login gate** — click "Sign in with Google" to access the app. All data is user-isolated.
 
-#### Starting a Task
-1. Enter a task name in the input field
-2. Click **Start** button (or press Enter)
-3. Watch the stopwatch timer count up
-4. Click **Stop** when finished
-5. Task automatically saves with timestamp and duration
+---
 
-#### Competing with Your SHADOW
-1. View the SHADOW section at the top of the app
-2. Check your current performance vs your SHADOW
-3. Track daily progress toward your target
-4. Watch your momentum and pressure indicators
-5. Aim to beat your SHADOW each day!
-6. Celebrate new rank tiers as you improve
+## 💾 Firebase Data Structure
 
-## 💾 Data Storage
+```
+users/
+└── {uid}/
+    ├── state/
+    │   ├── timer          # Active timer state (cross-device sync)
+    │   └── favorites      # Quick-start favorites list
+    ├── roadmap/
+    │   └── main           # User's AI or imported roadmap
+    └── (tasks, streak, user doc...)
+```
 
-All data is stored primarily in the cloud via **Firebase Firestore** (when authenticated), and mirrored in browser's **localStorage** for offline support:
-- `discipline_tracker_tasks`: All logged tasks with timestamps
-- `discipline_tracker_favorites`: Quick-start favorite tasks
-- `discipline_tracker_streak`: Current streak count
-- `discipline_tracker_last_activity`: Last activity date
-- `discipline_tracker_active_task`: Currently running task (survives page refresh)
-- `discipline_tracker_shadow_avg`: Your current SHADOW 7-day average
+All Firebase writes happen **only on meaningful events** (start, stop, save) — not on every second. Designed to stay within the free tier indefinitely.
 
-## 🔧 Technical Details
+---
 
-### Architecture
-Built with class-based JavaScript architecture for clean, maintainable code:
+## 🔧 Technical Architecture
 
-- **DisciplineTracker**: Main application controller
-- **StopwatchManager**: Timer logic and task recording
-- **TaskManager**: Task CRUD operations and rendering
-- **UIManager**: UI updates, reports, and motivation
-- **GraphManager**: Chart.js integration for analytics
-- **EventManager**: Event binding and user interactions
-- **ShadowEngine**: Competitive tracking system with historical analysis
-- **FirebaseCloudManager**: Handles authentication, sync state, and Firestore queries
-- **TrainerEngine**: Roadmap and guided training logic
-- **FlowProtocolEngine**: Advanced dynamic pacing and metrics
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for a full breakdown of the class system and module structure.
 
 ### Technologies
-- **HTML5**: Semantic markup
-- **CSS3**: Custom properties, gradients, animations, Grid/Flexbox
-- **Vanilla JavaScript (ES6+)**: Modular modern JS integration
-- **Firebase SDK**: Goole Auth & Firestore data synchronization
-- **Chart.js**: Data visualization library
-- **Font Awesome 6.4.0**: Icon library
+| Layer | Technology |
+|-------|-----------|
+| Structure | HTML5 semantic markup |
+| Styling | CSS3 (custom properties, Grid, Flexbox, animations) |
+| Logic | Vanilla JavaScript ES6+ (class-based modules) |
+| Auth & DB | Firebase SDK v10 (Auth + Firestore) |
+| Charts | Chart.js |
+| Icons | Font Awesome 6.4.0 |
+| AI | Google Gemini 2.0 Flash API |
 
-## 🎓 How to Master the SHADOW System
-
-1. **Week 1**: Build consistency by logging daily activities
-2. **Week 2-3**: Your SHADOW will stabilize around your average
-3. **Week 4+**: Challenge yourself to beat your SHADOW daily
-4. **Monthly**: Review your win rate and compete for new rank tiers
-5. **Ongoing**: Watch your SHADOW rise as you improve and achieve new personal bests
-
-## 🌟 Pro Tips
-
-- Log sleep to get accurate total productivity metrics
-- Use favorites for recurring tasks to speed up logging
-- Check momentum daily to adjust effort levels
-- Aim to beat your SHADOW 70%+ of the month for Elite status
-- Sign in with Google to protect your data with cloud backups across all your devices
+---
 
 ## 📄 License
 
@@ -211,6 +216,6 @@ Free to use, modify, and distribute. No attribution required.
 
 ---
 
-**Version**: 2.5 Pro (with SHADOW Engine, Firebase Auth & Flow Protocol)  
-**Last Updated**: March 2026  
+**Version**: 3.0 Pro (AI Roadmap · Cross-Device Sync · Login Gate · SHADOW Engine · Flow Protocol)
+**Last Updated**: March 2026
 **Built with ❤️ for discipline and personal mastery**
