@@ -2527,7 +2527,6 @@
           this.app.state.tasks = tasksSnap.docs
             .map((d) => this.app.normalizeTask({ id: d.id, ...(d.data() || {}) }))
             .sort((a, b) => a.startTime - b.startTime);
-          this.app.state.tasks = cloudTasks;
           this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASKS, this.app.state.tasks);
         }
 
