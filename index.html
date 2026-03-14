@@ -2357,7 +2357,8 @@
               this.stopLeaderLoop();
               this.detachTimerListener();
               this.detachTasksListener();
-              this.detachRoadmapListener(); // Detach roadmap listener
+              this.detachRoadmapListener();
+              this.detachFavoritesListener();
               this.user = user || null;
               if (user) sessionStorage.removeItem(this.redirectLoginKey);
               this.renderAuthState();
@@ -2366,6 +2367,7 @@
                 await this.bootstrapUserData();
                 this.listenToTimerState();
                 this.listenToRoadmap();
+                this.listenToFavorites();
               } catch (error) {
                 console.error("Post-login bootstrap failed:", error);
                 alert(
@@ -2674,12 +2676,23 @@
         }
 
         async hydrateFavoritesFromCloudIfNeeded() {
-          if (!this.isReady || this.app.state.favorites.length) return;
-          const favSnap = await window.FirebaseServices.getDocs(this.favoritesCollection());
-          this.app.state.favorites = favSnap.docs
-            .map((d) => d.data() || {})
-            .filter((f) => !!f.label);
-          this.app.saveToStorage(CONFIG.STORAGE_KEYS.FAVORITES, this.app.state.favorites);
+          if (!this.isReady) return;
+          // Read from the dedicated favorites doc
+          const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "state", "favorites");
+          const snap = await window.FirebaseServices.getDoc(ref);
+          if (snap.exists() && snap.data().list) {
+            this.app.state.favorites = snap.data().list.filter(f => !!f.label);
+            this.app.saveToStorage(CONFIG.STORAGE_KEYS.FAVORITES, this.app.state.favorites);
+          } else {
+            // Fall back to old subcollection for migration
+            const favSnap = await window.FirebaseServices.getDocs(this.favoritesCollection());
+            this.app.state.favorites = favSnap.docs
+              .map((d) => d.data() || {})
+              .filter((f) => !!f.label);
+            if (this.app.state.favorites.length) {
+              this.app.saveToStorage(CONFIG.STORAGE_KEYS.FAVORITES, this.app.state.favorites);
+            }
+          }
         }
 
         async hydrateRoadmapFromCloudIfNeeded() {
@@ -2714,8 +2727,12 @@
           const patch = {};
           // Keep cloud writes minimal to preserve Firestore quota.
           if (key === CONFIG.STORAGE_KEYS.TASKS) patch.tasks = value || [];
-          else if (key === CONFIG.STORAGE_KEYS.FAVORITES)
-            patch.favorites = value || [];
+          if (key === CONFIG.STORAGE_KEYS.FAVORITES) {
+            // Write favorites to dedicated doc for cross-device sync
+            const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "state", "favorites");
+            window.FirebaseServices.setDoc(ref, { list: value || [] }, { merge: false })
+              .catch(e => console.warn("Favorites sync failed", e));
+          }
           if (key === CONFIG.STORAGE_KEYS.ROADMAP_STATE) {
             // Write roadmap entirely separate from generic state
             const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "roadmap", "main");
@@ -2811,6 +2828,37 @@
           if (!this.roadmapUnsub) return;
           this.roadmapUnsub();
           this.roadmapUnsub = null;
+        }
+
+        listenToFavorites() {
+          if (!this.isReady) return;
+          this.detachFavoritesListener();
+          if (typeof window.FirebaseServices.onSnapshot !== "function") return;
+          const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "state", "favorites");
+          this.favoritesUnsub = window.FirebaseServices.onSnapshot(
+            ref,
+            (snap) => {
+              if (!snap.exists()) return;
+              const data = snap.data();
+              if (!data || !Array.isArray(data.list)) return;
+              // Only update if different from local state to avoid loops
+              const incoming = JSON.stringify(data.list);
+              const current = JSON.stringify(this.app.state.favorites);
+              if (incoming === current) return;
+              this.app.state.favorites = data.list.filter(f => !!f.label);
+              // Save to local storage WITHOUT triggering another cloud write
+              localStorage.setItem(CONFIG.STORAGE_KEYS.FAVORITES, JSON.stringify(this.app.state.favorites));
+              // Re-render favorites panel
+              this.app.taskManager?.renderFavorites();
+            },
+            (err) => console.warn("Favorites sync listener failed", err)
+          );
+        }
+
+        detachFavoritesListener() {
+          if (!this.favoritesUnsub) return;
+          this.favoritesUnsub();
+          this.favoritesUnsub = null;
         }
 
         detachUserListener() {
