@@ -2301,6 +2301,9 @@
           this.redirectLoginKey = "discipline_google_redirect_started";
           this.authButtonsBound = false;
           this.firebaseReadyListenerBound = false;
+          this.timerUnsubscribe = null;
+          this.tasksUnsubscribe = null;
+          this.roadmapUnsubscribe = null;
         }
 
         get isReady() {
@@ -2323,7 +2326,7 @@
               return original(...args);
             };
           };
-          ["setDoc", "getDoc", "getDocs", "deleteDoc"].forEach(wrap);
+          ["setDoc", "getDoc", "onSnapshot", "getDocs", "deleteDoc"].forEach(wrap);
           window.FirebaseServices.__instrumented = true;
         }
 
@@ -2354,13 +2357,15 @@
               this.stopLeaderLoop();
               this.detachTimerListener();
               this.detachTasksListener();
+              this.detachRoadmapListener(); // Detach roadmap listener
               this.user = user || null;
               if (user) sessionStorage.removeItem(this.redirectLoginKey);
               this.renderAuthState();
               if (!user) return;
               try {
                 await this.bootstrapUserData();
-                await this.restoreTimerFromCloud();
+                this.listenToTimerState();
+                this.listenToRoadmap(); // Start listening to roadmap
               } catch (error) {
                 console.error("Post-login bootstrap failed:", error);
                 alert(
@@ -2640,8 +2645,6 @@
           }
 
           const data = snap.exists() ? snap.data() || {} : {};
-          if (data.roadmap && this.app.trainerEngine?.state)
-            this.app.trainerEngine.state.roadmap = data.roadmap;
           if (data.flowProtocol) this.app.flowEngine.state = data.flowProtocol;
           if (data.trainerState)
             this.app.trainerEngine.state = {
@@ -2653,6 +2656,8 @@
 
           await this.hydrateTasksFromCloudIfNeeded();
           await this.hydrateFavoritesFromCloudIfNeeded();
+          await this.hydrateRoadmapFromCloudIfNeeded();
+          
           this.app.taskManager.initialize();
           this.app.shadowEngine.refresh(false);
           this.app.trainerEngine.refresh();
@@ -2677,6 +2682,20 @@
           this.app.saveToStorage(CONFIG.STORAGE_KEYS.FAVORITES, this.app.state.favorites);
         }
 
+        async hydrateRoadmapFromCloudIfNeeded() {
+          if (!this.isReady) return;
+          const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "roadmap", "main");
+          const snap = await window.FirebaseServices.getDoc(ref);
+          if (snap.exists() && snap.data().modules) {
+             this.app.trainerEngine.state.roadmap = snap.data();
+             this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, snap.data());
+          } else {
+             // Empty state: roadmap not generated yet
+             this.app.trainerEngine.state.roadmap = { modules: [], editMode: false };
+             this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.app.trainerEngine.state.roadmap);
+          }
+        }
+
         async writePatch(patch) {
           if (!this.isReady || this.isHydratingCloudState) return;
           try {
@@ -2697,8 +2716,12 @@
           if (key === CONFIG.STORAGE_KEYS.TASKS) patch.tasks = value || [];
           else if (key === CONFIG.STORAGE_KEYS.FAVORITES)
             patch.favorites = value || [];
-          if (key === CONFIG.STORAGE_KEYS.ROADMAP_STATE)
-            patch.roadmap = value || {};
+          if (key === CONFIG.STORAGE_KEYS.ROADMAP_STATE) {
+            // Write roadmap entirely separate from generic state
+            const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "roadmap", "main");
+            window.FirebaseServices.setDoc(ref, value || { modules: [], editMode: false }, { merge: true })
+              .catch(e => console.warn("Roadmap sync failed", e));
+          }
           if (key === CONFIG.STORAGE_KEYS.FLOW_PROTOCOL)
             patch.flowProtocol = value || { byDate: {} };
           if (key === CONFIG.STORAGE_KEYS.TRAINER_STATE)
@@ -2729,21 +2752,53 @@
           });
         }
 
-        async restoreTimerFromCloud() {
+        listenToTimerState() {
           if (!this.isReady) return;
-          try {
-            const snap = await window.FirebaseServices.getDoc(this.timerDoc());
-            const timerState = snap.exists() ? snap.data() : null;
-            this.app.stopwatch.restoreFromCloud(timerState);
-          } catch (e) {
-            console.warn("Failed to restore timer state", e);
-          }
+          this.detachTimerListener();
+          this.timerUnsub = window.FirebaseServices.onSnapshot(
+            this.timerDoc(),
+            (snap) => {
+              if (!snap.exists()) return;
+              const timerState = snap.data();
+              if (timerState.status === "paused") {
+                 this.app.stopwatch.stopFromRemote();
+              } else if (timerState.status === "running") {
+                 this.app.stopwatch.restoreFromCloud(timerState);
+              }
+            },
+            (err) => console.warn("Timer sync listener failed", err)
+          );
+        }
+
+        listenToRoadmap() {
+          if (!this.isReady) return;
+          this.detachRoadmapListener();
+          const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "roadmap", "main");
+          this.roadmapUnsub = window.FirebaseServices.onSnapshot(
+            ref,
+            (snap) => {
+              if (!snap.exists()) return;
+              const roadmapData = snap.data();
+              if (roadmapData && roadmapData.modules) {
+                 this.app.trainerEngine.state.roadmap = roadmapData;
+                 this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, roadmapData);
+                 this.app.trainerEngine.refresh();
+              }
+            },
+            (err) => console.warn("Roadmap sync listener failed", err)
+          );
         }
 
         detachTimerListener() {
           if (!this.timerUnsub) return;
           this.timerUnsub();
           this.timerUnsub = null;
+        }
+
+        detachRoadmapListener() {
+          if (!this.roadmapUnsub) return;
+          this.roadmapUnsub();
+          this.roadmapUnsub = null;
         }
 
         detachUserListener() {
@@ -5674,6 +5729,18 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const overview = this.app.elements["trainer-overview"];
           const content = this.app.elements["trainer-content"];
           if (!overview || !content) return;
+          
+          if (!this.state.roadmap || !this.state.roadmap.modules || this.state.roadmap.modules.length === 0) {
+             overview.innerHTML = ``;
+             content.innerHTML = `
+               <div style="text-align: center; padding: 40px 20px;">
+                 <h3 style="color: var(--text-accent); margin-bottom: 12px;">Roadmap not generated yet</h3>
+                 <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">Enter a topic and your Gemini API key above to generate your private AI roadmap.</p>
+               </div>
+             `;
+             return;
+          }
+
           const { moduleIndex, activeModule } = this.getRoadmapProgress();
           const completedModules = this.state.roadmap.modules.filter((m) =>
             m.days.every((d) => d.completed),
