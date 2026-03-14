@@ -1251,11 +1251,98 @@
         font-weight: 700;
         margin-bottom: 0.55rem;
       }
+
+      /* Login Gate */
+      #login-gate {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: linear-gradient(135deg, #0a0a0a 0%, #111118 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        padding: 24px;
+      }
+      #login-gate.hidden {
+        display: none;
+      }
+      .login-gate-logo {
+        font-size: 3.5rem;
+        margin-bottom: 4px;
+      }
+      .login-gate-title {
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: #f5f5f7;
+        text-align: center;
+      }
+      .login-gate-sub {
+        font-size: 1rem;
+        color: #a0a0a8;
+        text-align: center;
+        max-width: 380px;
+        line-height: 1.6;
+      }
+      .login-gate-card {
+        background: rgba(25,25,30,0.95);
+        border: 1px solid #2a2a2a;
+        border-radius: 20px;
+        padding: 2.5rem 2.5rem 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        max-width: 420px;
+        width: 100%;
+        box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      }
+      .login-gate-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 28px;
+        background: #fff;
+        color: #111;
+        border: none;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: box-shadow 0.2s, transform 0.15s;
+        width: 100%;
+        justify-content: center;
+      }
+      .login-gate-btn:hover {
+        box-shadow: 0 8px 24px rgba(255,255,255,0.15);
+        transform: translateY(-2px);
+      }
+      .login-gate-privacy {
+        font-size: 0.78rem;
+        color: #555;
+        text-align: center;
+        margin-top: -8px;
+      }
     </style>
   </head>
   <body>
+    <!-- Login Gate (shown by default until auth resolves) -->
+    <div id="login-gate">
+      <div class="login-gate-logo">⏱️</div>
+      <div class="login-gate-title">Discipline Tracker Pro</div>
+      <div class="login-gate-sub">Your private, personal discipline journey.<br>Sign in to access your data.</div>
+      <div class="login-gate-card">
+        <button class="login-gate-btn" id="login-gate-google-btn">
+          <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.3 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6C12.2 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.8-2.1 5.1-4.5 6.7l7 5.4C43.3 37 46.1 31.2 46.1 24.5z"/><path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7-5.4c-2 1.3-4.6 2.1-8.2 2.1-6.3 0-11.7-3.7-13.6-9.1l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
+          Sign in with Google
+        </button>
+        <div class="login-gate-privacy">🔒 Your data is private and only accessible to you.</div>
+      </div>
+    </div>
     <!-- Streak Popup -->
-    <div class="streak-popup-overlay" id="streak-popup">
+    <div class="streak-popup-overlay" id="streak-popup" style="display:none;">
       <div class="streak-popup">
         <div class="streak-icon">
           <i class="fas fa-fire"></i>
@@ -1267,14 +1354,14 @@
       </div>
     </div>
     <!-- Motivation -->
-    <div class="motivation-container">
+    <div class="motivation-container" id="motivation-container" style="display:none;">
       <div id="motivation-line">
         Excellence is not a singular act, but a habit. You are what you
         repeatedly do.
       </div>
     </div>
     <!-- Main App Container -->
-    <div class="app-container">
+    <div class="app-container" id="app-container" style="display:none;">
       <!-- Header -->
       <header>
         <h1 class="app-title">
@@ -2335,6 +2422,15 @@
         bindAuthButtons() {
           if (this.authButtonsBound) return;
           this.authButtonsBound = true;
+
+          // Wire the login gate button to the same handler as the header button
+          const gateBtn = document.getElementById("login-gate-google-btn");
+          if (gateBtn) {
+            gateBtn.addEventListener("click", () => {
+              this.app.elements["google-login-btn"]?.click();
+            });
+          }
+
           this.app.elements["google-login-btn"]?.addEventListener(
             "click",
             async () => {
@@ -2406,8 +2502,15 @@
           const logoutBtn = this.app.elements["google-logout-btn"];
           const nameEl = this.app.elements["auth-user-name"];
           const profileMenu = this.app.elements["profile-menu-container"];
+          const loginGate = document.getElementById("login-gate");
+          const appContainer = document.getElementById("app-container");
+          const motivationContainer = document.getElementById("motivation-container");
           if (!loginBtn || !logoutBtn || !nameEl || !profileMenu) return;
           if (this.user) {
+            // Hide login gate, show app
+            if (loginGate) loginGate.classList.add("hidden");
+            if (appContainer) appContainer.style.display = "block";
+            if (motivationContainer) motivationContainer.style.display = "block";
             loginBtn.style.display = "none";
             profileMenu.style.display = "block";
             logoutBtn.style.display = "inline-flex";
@@ -2419,11 +2522,22 @@
               displayName: this.user.displayName || "",
             });
           } else {
+            // Show login gate, hide app
+            if (loginGate) loginGate.classList.remove("hidden");
+            if (appContainer) appContainer.style.display = "none";
+            if (motivationContainer) motivationContainer.style.display = "none";
             loginBtn.style.display = "inline-flex";
             profileMenu.style.display = "none";
             logoutBtn.style.display = "none";
             nameEl.textContent = "";
             this.closeProfileMenu();
+            // Clear local app state for privacy
+            this.app.state.tasks = [];
+            this.app.state.favorites = [];
+            this.app.state.activeTask = null;
+            Object.keys(CONFIG.STORAGE_KEYS).forEach(k => {
+              if (k !== "FIREBASE_USER") localStorage.removeItem(CONFIG.STORAGE_KEYS[k]);
+            });
           }
         }
 
