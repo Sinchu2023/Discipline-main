@@ -2236,7 +2236,7 @@
               return original(...args);
             };
           };
-          ["setDoc", "getDoc", "onSnapshot", "getDocs", "deleteDoc"].forEach(wrap);
+          ["setDoc", "getDoc", "getDocs", "deleteDoc"].forEach(wrap);
           window.FirebaseServices.__instrumented = true;
         }
 
@@ -3144,12 +3144,17 @@
           this.app.elements["active-task-start"].textContent =
             this.app.formatTime(this.startTime);
           this.app.elements["active-task-indicator"].style.display = "block";
-          this.app.cloudManager?.setTimerState?.({
-            status: "running",
-            startTime: this.startTime,
-            elapsedBeforePause: 0,
-            activeTask: this.app.state.activeTask,
-          });
+          // Fire-and-forget to avoid blocking UI on network
+          if (this.app.cloudManager?.setTimerState) {
+            setTimeout(() => {
+              this.app.cloudManager.setTimerState({
+                status: "running",
+                startTime: this.startTime,
+                elapsedBeforePause: 0,
+                activeTask: this.app.state.activeTask,
+              }).catch(e => console.warn("Timer start cloud sync delayed", e));
+            }, 0);
+          }
           this.startTicking();
         }
         startSleep() {

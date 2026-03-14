@@ -28,7 +28,6 @@ import {
   setDoc,
   collection,
   deleteDoc,
-  onSnapshot,
   enableIndexedDbPersistence
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
@@ -89,7 +88,6 @@ export function initializeFirebaseServices() {
     setDoc,
     collection,
     deleteDoc,
-    onSnapshot,
     enableIndexedDbPersistence
   };
 }
