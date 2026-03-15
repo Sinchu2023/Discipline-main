@@ -5704,10 +5704,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const topic = (active.day.text || "").split("\n")[0].trim();
             const progress = this.getTopicProgress(topic);
             if (
-              !active.day.completed &&
+              active.day.status !== "completed" && !active.day.completed &&
               progress.minutes >= this.getThresholdForTopic(topic)
             ) {
-              active.day.completed = true;
+              this.setRoadmapDayStatus(active.moduleIndex, active.dayIndex, true);
               this.app.saveToStorage(
                 CONFIG.STORAGE_KEYS.ROADMAP_STATE,
                 this.state.roadmap,
@@ -5740,6 +5740,39 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           el.textContent = `Pending ${pending} task(s) • penalty countdown ${h}:${m}:${s} (applies if module is incomplete at deadline)`;
         }
 
+        // Helper: manage completion and auto-unlock explicitly
+        setRoadmapDayStatus(moduleIdx, dayIdx, isCompleted) {
+          const day = this.state.roadmap.modules[moduleIdx]?.days[dayIdx];
+          if (!day) return;
+
+          if (isCompleted) {
+            day.status = "completed";
+            day.completed = true; // For backwards compat
+
+            // Find next day and set to active
+            let nextDayFound = false;
+            for (let nextDi = dayIdx + 1; nextDi < this.state.roadmap.modules[moduleIdx].days.length; nextDi++) {
+              const nDay = this.state.roadmap.modules[moduleIdx].days[nextDi];
+              if (nDay.status !== "completed" && !nDay.completed) {
+                nDay.status = "active";
+                nextDayFound = true;
+                break;
+              }
+            }
+
+            // If no next day in module, check the next module
+            if (!nextDayFound && this.state.roadmap.modules[moduleIdx + 1]) {
+               const nDay = this.state.roadmap.modules[moduleIdx + 1].days[0];
+               if (nDay && nDay.status !== "completed" && !nDay.completed) {
+                 nDay.status = "active";
+               }
+            }
+          } else {
+             day.status = "active";
+             day.completed = false;
+          }
+        }
+
         // Helper: show status message in roadmap generator
         _showRoadmapStatus(msg, type = "info") {
           const el = document.getElementById("ai-roadmap-status");
@@ -5756,11 +5789,14 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         _normalizeRoadmapJson(rawJson, topic, type = "ai") {
           const modules = rawJson.modules.map((m, idx) => ({
             name: m.moduleTitle || m.module || m.name || `Module ${m.moduleNumber || idx + 1}`,
-            days: (m.days || []).map((d, di) => ({
-              day: `Day ${d.day || di + 1}`,
-              text: d.title || d.topic || d.text || `Day ${di + 1}`,
-              completed: d.status === "completed",
-            })),
+            days: (m.days || []).map((d, di) => {
+              const isCompleted = d.status === "completed" || d.completed;
+              return {
+                day: `Day ${d.day || di + 1}`,
+                text: d.title || d.topic || d.text || `Day ${di + 1}`,
+                status: isCompleted ? "completed" : "locked",
+              };
+            }),
           }));
           return {
             topic: topic || rawJson.topic || "Untitled",
@@ -5968,24 +6004,27 @@ Rules:
 
           const goals = [];
           
-          // Add up to 2 uncompleted active days as today's mission
-          let activeCount = 0;
+          // Add up to 2 active/recently completed days as today's mission
+          let addedCount = 0;
           for (let di = 0; di < activeModule.days.length; di++) {
              const day = activeModule.days[di];
-             if (!day.completed) {
+             // Either it's active right now, or it was recently completed. Let's show active or completed
+             if (day.status === "active" || day.status === "completed" || (!day.status && day.completed)) {
                 goals.push({
                    id: `roadmap_m${moduleIndex}_d${di}`,
                    label: `${activeModule.name} - ${day.text}`,
                    type: "checkbox",
-                   completed: day.completed
+                   completed: day.status === "completed" || day.completed
                 });
-                activeCount++;
-                if (activeCount >= 2) break; // Focus on maximum 2 items per day
+                if (day.status !== "completed" && !day.completed) {
+                   addedCount++;
+                   if (addedCount >= 1) break; // Focus on 1 uncompleted active item at a time
+                }
              }
           }
 
           // If the module is fully completed, we show a generic goal to review or move to next
-          if (goals.length === 0) {
+          if (goals.every(g => g.completed) && activeModule.days.every(d => d.status === "completed" || d.completed)) {
              const nextMod = this.state.roadmap.modules[moduleIndex + 1];
              if (nextMod) {
                  goals.push({
@@ -6038,22 +6077,24 @@ Rules:
           let html = "";
           this.state.roadmap.modules.forEach((mod, mi) => {
             const unlocked = mi <= moduleIndex;
-            const done = mod.days.every((d) => d.completed);
+            const done = mod.days.every((d) => d.status === "completed" || d.completed);
             const moduleTitle = this.state.roadmap.editMode
               ? `<input class="roadmap-module-edit" data-module="${mi}" value="${this.escapeHtml(mod.name)}"/>`
               : this.escapeHtml(mod.name);
             html += `<section class="trainer-section"><div class="trainer-section-title">${moduleTitle} ${done ? "✔" : ""}</div>`;
             mod.days.forEach((day, di) => {
-              const dayUnlocked =
-                unlocked && (di === 0 || mod.days[di - 1].completed);
-              const disabled = dayUnlocked ? "" : "disabled";
-              const checked = day.completed ? "checked" : "";
-              const stateIcon = day.completed ? "✔" : dayUnlocked ? "●" : "🔒";
-              const stateLabel = day.completed
-                ? "Completed"
-                : dayUnlocked
-                  ? "Active"
-                  : "Locked";
+              // Backward comp logic for old 'completed' boolean vs new 'status' string
+              let status = day.status;
+              if (!status) status = day.completed ? "completed" : "locked";
+
+              // Map unlocked to first locked item or already active items
+              const dayUnlocked = unlocked && (status === "active" || (di === 0 && !status) || (di === 0 && status === "locked") || (di > 0 && (mod.days[di - 1].status === "completed" || mod.days[di - 1].completed)));
+              if (status === "locked" && dayUnlocked) status = "active";
+
+              const disabled = status === "locked" ? "disabled" : "";
+              const checked = status === "completed" ? "checked" : "";
+              const stateIcon = status === "completed" ? "✔" : status === "active" ? "●" : "🔒";
+              const stateLabel = status === "completed" ? "Completed" : status === "active" ? "Active" : "Locked";
               if (this.state.roadmap.editMode) {
                 html += `<div class="trainer-row"><div class="trainer-key">${day.day} ${stateIcon}</div><div class="trainer-val"><textarea data-module="${mi}" data-day="${di}" class="roadmap-edit">${this.escapeHtml(day.text)}</textarea></div><label><input type="checkbox" data-module="${mi}" data-day="${di}" class="roadmap-check" ${checked} ${disabled}/> ${stateLabel}</label></div>`;
               } else {
@@ -6068,9 +6109,7 @@ Rules:
             cb.addEventListener("change", (e) => {
               const m = Number(e.target.getAttribute("data-module"));
               const d = Number(e.target.getAttribute("data-day"));
-              const day = this.state.roadmap.modules[m]?.days[d];
-              if (!day) return;
-              day.completed = !!e.target.checked;
+              this.setRoadmapDayStatus(m, d, !!e.target.checked);
               this.app.saveToStorage(
                 CONFIG.STORAGE_KEYS.ROADMAP_STATE,
                 this.state.roadmap,

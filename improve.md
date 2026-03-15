@@ -132,3 +132,137 @@ Logout → Clear local state → Login new user → Load new user's data.
 • Switching accounts loads different data.
 • No data is shared across users.
 • Productivity graphs update based on each user's activity.
+
+### Fix Roadmap Progress Logic (Auto Unlock Next Day)
+
+We need to implement automatic roadmap progression.
+
+When a user completes a day in the roadmap, the next day must automatically become active.
+
+---
+
+### 1. Roadmap Status Rules
+
+Each day has a status field:
+
+completed
+active
+locked
+
+Rules:
+
+Day 1 → completed
+Day 2 → active
+Day 3+ → locked
+
+When the user marks a day as completed:
+
+• That day becomes **completed**
+• The next day becomes **active**
+• Remaining days stay **locked**
+
+Example before completion:
+
+Day 1 → active
+Day 2 → locked
+Day 3 → locked
+
+After completing Day 1:
+
+Day 1 → completed
+Day 2 → active
+Day 3 → locked
+
+---
+
+### 2. Update JSON After Completion
+
+When user checks a task:
+
+Update roadmap JSON.
+
+Example update logic:
+
+Find current day
+Set status → completed
+
+Then find next day:
+
+Set status → active
+
+---
+
+### 3. Example Roadmap JSON
+
+Example after completing Day 1:
+
+{
+"topic": "Analog IC Design",
+"modules": [
+{
+"moduleNumber": 1,
+"moduleTitle": "DIODES",
+"days": [
+{
+"day": 1,
+"title": "Basic Semiconductor Physics",
+"status": "completed"
+},
+{
+"day": 2,
+"title": "Different Models of Diodes",
+"status": "active"
+},
+{
+"day": 3,
+"title": "Operating Point & Small Signal Analysis of Diode",
+"status": "locked"
+}
+]
+}
+]
+}
+
+---
+
+### 4. Algorithm
+
+When checkbox is clicked:
+
+1. Find clicked day
+2. Set status = completed
+3. Find next day
+4. Set status = active
+5. Save roadmap to database
+6. Re-render roadmap UI
+
+Pseudo code:
+
+currentDay.status = "completed"
+
+nextDay = getNextDay(currentDay)
+
+if nextDay exists:
+nextDay.status = "active"
+
+saveRoadmap()
+
+---
+
+### 5. Database Update
+
+Save updated roadmap under:
+
+users/{uid}/roadmap
+
+so progress is stored per user.
+
+---
+
+### Expected Final Behaviour
+
+• Completing Day 1 unlocks Day 2
+• Completing Day 2 unlocks Day 3
+• Only one day remains active at a time
+• Progress is saved for each user
+• UI updates instantly
