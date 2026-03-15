@@ -4418,10 +4418,12 @@
 
           goals.forEach((goal) => {
             progress[goal.id] = {
+              type: goal.type || "time",
               minutes: 0,
               sessions: 0,
               minutesTarget: goal.minutesTarget || 0,
               sessionsTarget: goal.sessionsTarget || 0,
+              completed: goal.completed || false,
             };
           });
 
@@ -4436,6 +4438,7 @@
             const haystack =
               `${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`.toLowerCase();
             goals.forEach((goal) => {
+              if (goal.type === "checkbox") return;
               if (!goal.keywords?.some((word) => haystack.includes(word)))
                 return;
               progress[goal.id].minutes += task.duration;
@@ -4447,51 +4450,24 @@
         }
 
         calculateMissionScore(progress) {
-          const nptel = progress.nptel || {
-            minutes: 0,
-            sessions: 0,
-            minutesTarget: 120,
-            sessionsTarget: 2,
-          };
-          const yt = progress.yt || {
-            minutes: 0,
-            sessions: 0,
-            minutesTarget: 120,
-            sessionsTarget: 2,
-          };
-          const project = progress.project || {
-            minutes: 0,
-            sessions: 0,
-            minutesTarget: 180,
-            sessionsTarget: 0,
-          };
+          const keys = Object.keys(progress);
+          if (keys.length === 0) return 100;
 
-          const nptelMinutesRatio = Math.min(
-            1,
-            nptel.minutes / Math.max(1, nptel.minutesTarget),
-          );
-          const nptelSessionsRatio = Math.min(
-            1,
-            nptel.sessions / Math.max(1, nptel.sessionsTarget),
-          );
-          const ytMinutesRatio = Math.min(
-            1,
-            yt.minutes / Math.max(1, yt.minutesTarget),
-          );
-          const ytSessionsRatio = Math.min(
-            1,
-            yt.sessions / Math.max(1, yt.sessionsTarget),
-          );
-          const projectRatio = Math.min(
-            1,
-            project.minutes / Math.max(1, project.minutesTarget),
-          );
+          const weightPerGoal = 100 / keys.length;
+          let totalScore = 0;
 
-          const nptelScore =
-            (nptelMinutesRatio * 0.5 + nptelSessionsRatio * 0.5) * 30;
-          const ytScore = (ytMinutesRatio * 0.5 + ytSessionsRatio * 0.5) * 30;
-          const projectScore = projectRatio * 40;
-          return Math.round(Math.min(100, nptelScore + ytScore + projectScore));
+          keys.forEach((key) => {
+            const goal = progress[key];
+            if (goal.type === "checkbox") {
+              totalScore += goal.completed ? weightPerGoal : 0;
+            } else {
+              const minRatio = Math.min(1, goal.minutes / Math.max(1, goal.minutesTarget));
+              const sesRatio = goal.sessionsTarget > 0 ? Math.min(1, goal.sessions / goal.sessionsTarget) : minRatio;
+              totalScore += (minRatio * 0.6 + sesRatio * 0.4) * weightPerGoal;
+            }
+          });
+
+          return Math.round(Math.min(100, totalScore));
         }
 
         getTodayDistractionMinutes(
@@ -5939,6 +5915,59 @@ Rules:
           }
         }
 
+
+        syncMissionFromRoadmap() {
+          if (!this.state.roadmap || !this.state.roadmap.modules || !this.state.roadmap.modules.length) {
+            CONFIG.DAILY_GOALS = []; 
+            return;
+          }
+
+          const { moduleIndex, activeModule } = this.getRoadmapProgress();
+          if (!activeModule) {
+            CONFIG.DAILY_GOALS = [];
+            return;
+          }
+
+          const goals = [];
+          
+          // Add up to 2 uncompleted active days as today's mission
+          let activeCount = 0;
+          for (let di = 0; di < activeModule.days.length; di++) {
+             const day = activeModule.days[di];
+             if (!day.completed) {
+                goals.push({
+                   id: `roadmap_m${moduleIndex}_d${di}`,
+                   label: `${activeModule.name} - ${day.text}`,
+                   type: "checkbox",
+                   completed: day.completed
+                });
+                activeCount++;
+                if (activeCount >= 2) break; // Focus on maximum 2 items per day
+             }
+          }
+
+          // If the module is fully completed, we show a generic goal to review or move to next
+          if (goals.length === 0) {
+             const nextMod = this.state.roadmap.modules[moduleIndex + 1];
+             if (nextMod) {
+                 goals.push({
+                    id: `roadmap_m${moduleIndex+1}_preview`,
+                    label: `Preview ${nextMod.name}`,
+                    type: "checkbox",
+                    completed: false
+                 });
+             } else {
+                 goals.push({
+                    id: `roadmap_done`,
+                    label: `Roadmap Complete! Set new goals.`,
+                    type: "checkbox",
+                    completed: true
+                 });
+             }
+          }
+
+          CONFIG.DAILY_GOALS = goals;
+        }
 
         renderRoadmap() {
           this.ensureRoadmap();
