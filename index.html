@@ -5560,7 +5560,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           let moduleIndex = 0;
           while (moduleIndex < this.state.roadmap.modules.length) {
             const mod = this.state.roadmap.modules[moduleIndex];
-            if (!mod.days.every((d) => d.completed)) break;
+            if (!mod.days.every((d) => d.status === "completed" || d.completed)) break;
             moduleIndex += 1;
           }
           const activeModule =
@@ -5574,7 +5574,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const { moduleIndex } = this.getRoadmapProgress();
           const module = this.state.roadmap.modules[moduleIndex];
           if (!module) return null;
-          const dayIndex = module.days.findIndex((d) => !d.completed);
+          const dayIndex = module.days.findIndex((d) => d.status !== "completed" && !d.completed);
           if (dayIndex < 0) return null;
           return { moduleIndex, dayIndex, day: module.days[dayIndex], module };
         }
@@ -5623,7 +5623,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const moduleDays = active.module.days;
             for (let i = 0; i <= active.dayIndex; i++) {
               const day = moduleDays[i];
-              if (!day.completed) learning.push(day);
+              const isDone = day.status === "completed" || day.completed;
+              if (!isDone) learning.push(day);
             }
             if (!learning.length) learning.push(active.day);
           }
@@ -5666,52 +5667,100 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         }
 
         syncMissionFromRoadmap() {
+          // ── 1. Build DAILY_GOALS from roadmap state ──────────────────
+          if (!this.state.roadmap?.modules?.length) {
+            CONFIG.DAILY_GOALS = [];
+          } else {
+            const { moduleIndex, activeModule } = this.getRoadmapProgress();
+            if (!activeModule) {
+              CONFIG.DAILY_GOALS = [];
+            } else {
+              const goals = [];
+              let addedUncompleted = 0;
+
+              for (let di = 0; di < activeModule.days.length; di++) {
+                const day = activeModule.days[di];
+                const isDone = day.status === "completed" || day.completed;
+                const isActive = day.status === "active";
+
+                if (isDone || isActive) {
+                  goals.push({
+                    id: `roadmap_m${moduleIndex}_d${di}`,
+                    label: `${activeModule.name}: ${(day.text || "").split("\n")[0].trim()}`,
+                    type: "checkbox",
+                    completed: isDone,
+                  });
+                  if (!isDone) {
+                    addedUncompleted++;
+                    if (addedUncompleted >= 1) break; // one active task at a time
+                  }
+                }
+              }
+
+              // If module is fully done, hint at next module
+              const moduleDone = activeModule.days.every(d => d.status === "completed" || d.completed);
+              if (moduleDone) {
+                const nextMod = this.state.roadmap.modules[moduleIndex + 1];
+                goals.push(nextMod
+                  ? { id: `roadmap_m${moduleIndex+1}_preview`, label: `Start ${nextMod.name}`, type: "checkbox", completed: false }
+                  : { id: `roadmap_done`, label: `Roadmap Complete! 🎉`, type: "checkbox", completed: true }
+                );
+              }
+
+              CONFIG.DAILY_GOALS = goals;
+            }
+          }
+
+          // ── 2. Render the shadow-goal-list DOM from roadmap tasks ────
           const tasks = this.getDailyMissionTasks();
           const container = document.querySelector(".shadow-goal-list");
           if (!container) return;
 
-          const taskIds = [
-            "mission-task-1",
-            "mission-task-2",
-            "mission-task-3",
-            "mission-task-4",
-          ];
+          const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4"];
           const checks = this.getTodayManualMissionChecks();
-          container.innerHTML = tasks
-            .map((item, idx) => {
-              const autoDone = !!item.done;
-              const checkId = this.getMissionCheckId(item.topic);
-              const manualDone = !!checks[checkId];
-              const done = autoDone || manualDone;
-              const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
-              const doneCls = done ? " shadow-goal-done" : "";
-              return `<div class="shadow-goal-item${doneCls}"><span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span><input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} /></div>`;
-            })
-            .join("");
 
-          container.querySelectorAll(".mission-check").forEach((checkbox) => {
+          container.innerHTML = tasks.map((item, idx) => {
+            const autoDone = !!item.done;
+            const checkId = this.getMissionCheckId(item.topic);
+            const manualDone = !!checks[checkId];
+            const done = autoDone || manualDone;
+            const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
+            const doneCls = done ? " shadow-goal-done" : "";
+            return `<div class="shadow-goal-item${doneCls}"><span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span><input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} /></div>`;
+          }).join("");
+
+          container.querySelectorAll(".mission-check").forEach(checkbox => {
             checkbox.addEventListener("change", (e) => {
               const checkId = e.target.getAttribute("data-mission-check-id");
               if (!checkId) return;
               checks[checkId] = !!e.target.checked;
               e.target.closest(".shadow-goal-item")?.classList.toggle("shadow-goal-done", !!e.target.checked);
+              // Also mark on the roadmap day if this matches the active day
+              if (this.state.roadmap?.modules?.length) {
+                const { moduleIndex, activeModule } = this.getRoadmapProgress();
+                if (activeModule) {
+                  const activeDayIdx = activeModule.days.findIndex(d => d.status === "active" && this.getMissionCheckId((d.text||"").split("\n")[0].trim()) === checkId);
+                  if (activeDayIdx >= 0 && e.target.checked) {
+                    this.setRoadmapDayStatus(moduleIndex, activeDayIdx, true);
+                    this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+                  }
+                }
+              }
               this.saveTrainerState();
+              // Refresh scores after manual check
+              if (this.app.shadowEngine) this.app.shadowEngine.refresh(false);
             });
           });
 
+          // ── 3. Auto-complete via time tracking ───────────────────────
           const active = this.getActiveRoadmapDay();
           if (active) {
             const topic = (active.day.text || "").split("\n")[0].trim();
             const progress = this.getTopicProgress(topic);
-            if (
-              active.day.status !== "completed" && !active.day.completed &&
-              progress.minutes >= this.getThresholdForTopic(topic)
-            ) {
+            if (active.day.status !== "completed" && !active.day.completed &&
+                progress.minutes >= this.getThresholdForTopic(topic)) {
               this.setRoadmapDayStatus(active.moduleIndex, active.dayIndex, true);
-              this.app.saveToStorage(
-                CONFIG.STORAGE_KEYS.ROADMAP_STATE,
-                this.state.roadmap,
-              );
+              this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
               this.normalizeRoadmapDays();
             }
           }
@@ -5725,7 +5774,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             el.textContent = "No active penalty";
             return;
           }
-          const pending = activeModule.days.filter((d) => !d.completed).length;
+          const pending = activeModule.days.filter((d) => d.status !== "completed" && !d.completed).length;
           if (!pending) {
             el.textContent = "Module complete • no penalty";
             return;
@@ -5990,62 +6039,6 @@ Rules:
         }
 
 
-        syncMissionFromRoadmap() {
-          if (!this.state.roadmap || !this.state.roadmap.modules || !this.state.roadmap.modules.length) {
-            CONFIG.DAILY_GOALS = []; 
-            return;
-          }
-
-          const { moduleIndex, activeModule } = this.getRoadmapProgress();
-          if (!activeModule) {
-            CONFIG.DAILY_GOALS = [];
-            return;
-          }
-
-          const goals = [];
-          
-          // Add up to 2 active/recently completed days as today's mission
-          let addedCount = 0;
-          for (let di = 0; di < activeModule.days.length; di++) {
-             const day = activeModule.days[di];
-             // Either it's active right now, or it was recently completed. Let's show active or completed
-             if (day.status === "active" || day.status === "completed" || (!day.status && day.completed)) {
-                goals.push({
-                   id: `roadmap_m${moduleIndex}_d${di}`,
-                   label: `${activeModule.name} - ${day.text}`,
-                   type: "checkbox",
-                   completed: day.status === "completed" || day.completed
-                });
-                if (day.status !== "completed" && !day.completed) {
-                   addedCount++;
-                   if (addedCount >= 1) break; // Focus on 1 uncompleted active item at a time
-                }
-             }
-          }
-
-          // If the module is fully completed, we show a generic goal to review or move to next
-          if (goals.every(g => g.completed) && activeModule.days.every(d => d.status === "completed" || d.completed)) {
-             const nextMod = this.state.roadmap.modules[moduleIndex + 1];
-             if (nextMod) {
-                 goals.push({
-                    id: `roadmap_m${moduleIndex+1}_preview`,
-                    label: `Preview ${nextMod.name}`,
-                    type: "checkbox",
-                    completed: false
-                 });
-             } else {
-                 goals.push({
-                    id: `roadmap_done`,
-                    label: `Roadmap Complete! Set new goals.`,
-                    type: "checkbox",
-                    completed: true
-                 });
-             }
-          }
-
-          CONFIG.DAILY_GOALS = goals;
-        }
-
         renderRoadmap() {
           this.ensureRoadmap();
           const overview = this.app.elements["trainer-overview"];
@@ -6065,7 +6058,7 @@ Rules:
 
           const { moduleIndex, activeModule } = this.getRoadmapProgress();
           const completedModules = this.state.roadmap.modules.filter((m) =>
-            m.days.every((d) => d.completed),
+            m.days.every((d) => d.status === "completed" || d.completed),
           ).length;
           overview.innerHTML = `
           <div class="trainer-overview-card"><div class="trainer-overview-label">Active Module</div><div class="trainer-overview-value">${this.escapeHtml(activeModule?.name || "Completed")}</div></div>
