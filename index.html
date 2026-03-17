@@ -1801,7 +1801,7 @@
           <!-- GAP Card -->
           <div class="sd-hero-card">
             <div class="sd-hero-label gap">GAP</div>
-            <div class="sd-hero-value sd-num gap" id="shadow-gap" class="shadow-gap-equal">+0h 00m</div>
+            <div class="sd-hero-value sd-num gap" id="shadow-gap">+0h 00m</div>
             <div class="sd-hero-sub">to tie: <span id="shadow-needed-tie" class="sd-num">0h 00m</span></div>
             
             <!-- Hidden elements preserved for JS logic -->
@@ -1833,14 +1833,13 @@
           <div class="sd-duel-panel left">
             <div class="sd-duel-header left">
               <div class="sd-duel-label you">YOU</div>
-              <!-- Reusing the shadow-current-minutes value here visually via JS mapping if needed, or static -->
-              <div class="sd-duel-value sd-num you" style="font-size: 1.8rem;">0h 00m</div>
-              <div class="sd-duel-sub you" id="shadow-percent-duplicate" style="display:none;">0% reached</div>
+              <div class="sd-duel-value sd-num you" id="sd-duel-you-time" style="font-size: 1.8rem;">0h 00m</div>
+              <div class="sd-duel-sub you" id="sd-duel-you-pct">0% reached</div>
             </div>
             <div class="sd-duel-rows">
               <div class="sd-duel-row">
                 <span class="sd-row-label">gap vs shadow</span>
-                <span class="sd-row-value sd-num green" id="shadow-weekly-gap-dup">+0h 00m</span>
+                <span class="sd-row-value sd-num" id="sd-duel-gap">+0h 00m</span>
               </div>
               <div class="sd-duel-row">
                 <span class="sd-row-label">need to tie</span>
@@ -1856,13 +1855,13 @@
               </div>
               <div class="sd-duel-row">
                 <span class="sd-row-label">monthly score</span>
-                <span class="sd-row-value sd-num" id="shadow-score-val">0 days</span>
+                <span class="sd-row-value sd-num" id="sd-duel-monthly-score">0 days</span>
                 <!-- Hidden original to keep JS unbroken -->
                 <span id="shadow-score" style="display:none;"></span>
               </div>
               <div class="sd-duel-row">
                 <span class="sd-row-label">win rate</span>
-                <span class="sd-row-value sd-num red" id="shadow-trend-val">0%</span>
+                <span class="sd-row-value sd-num" id="sd-duel-win-rate">0%</span>
                 <!-- Hidden original -->
                 <span id="shadow-trend" style="display:none;"></span>
               </div>
@@ -1878,8 +1877,7 @@
           <div class="sd-duel-panel right">
             <div class="sd-duel-header right">
               <div class="sd-duel-label shadow">SHADOW</div>
-              <!-- Reusing the shadow-average visually via JS mapping if needed, or static -->
-              <div class="sd-duel-value sd-num shadow" style="font-size: 1.8rem;">0h 00m</div>
+              <div class="sd-duel-value sd-num shadow" id="sd-duel-shadow-time" style="font-size: 1.8rem;">0h 00m</div>
               <div class="sd-duel-sub">today's target: <span class="sd-num" id="shadow-target">0h 00m</span></div>
             </div>
             <div class="sd-duel-rows">
@@ -2004,12 +2002,12 @@
               <div class="sd-battle-score">
                 <div class="sd-battle-side">
                   <span class="sd-battle-label you">YOU</span>
-                  <span class="sd-battle-num sd-num you">0</span>
+                  <span class="sd-battle-num sd-num you" id="sd-battle-you">0</span>
                 </div>
                 <div class="sd-battle-vs">days won</div>
                 <div class="sd-battle-side">
                   <span class="sd-battle-label shadow">SHADOW</span>
-                  <span class="sd-battle-num sd-num shadow">0</span>
+                  <span class="sd-battle-num sd-num shadow" id="sd-battle-shadow">0</span>
                 </div>
               </div>
               
@@ -5305,12 +5303,24 @@
             this.app.formatDuration(neededLead);
           this.app.elements["shadow-defense-target"].textContent =
             this.app.formatDuration(defenseTarget);
+          // Fix 5: Concise penalty text
           this.app.elements["shadow-penalty"].textContent =
-            `-${this.app.formatDuration(penalty.minutes)} (${penalty.points}pt)`;
-          this.app.elements["shadow-penalty-reason"].textContent = penalty
-            .reasons.length
-            ? penalty.reasons.join(" • ")
-            : "No active penalty triggers";
+            `-${this.app.formatDuration(penalty.minutes)}`;
+
+          // Fix 2: Penalty reason — concise, lowercase
+          const reasonMap = {
+            "Monthly win-rate under 50%": "win-rate <50%",
+            "High untracked time today (5h+)": "untracked >5h",
+            "Untracked time today (2h+)": "untracked >2h",
+            "Behind daily shadow target": "below shadow target",
+            "Weekly average below shadow standard": "weekly avg low",
+            "Mission score below 60/100": "mission <60",
+          };
+          const shortReasons = penalty.reasons.map(r => reasonMap[r] || r.toLowerCase());
+          this.app.elements["shadow-penalty-reason"].textContent = shortReasons.length
+            ? shortReasons.join(" · ")
+            : "no active penalty triggers";
+
           const expiryEl = this.app.elements["shadow-penalty-expiry"];
           if (penalty.points > 0) {
             const updateCountdown = () => {
@@ -5319,15 +5329,10 @@
               end.setHours(23, 59, 59, 999);
               const ms = Math.max(0, end - now);
               const h = String(Math.floor(ms / 3600000)).padStart(2, "0");
-              const m = String(Math.floor((ms % 3600000) / 60000)).padStart(
-                2,
-                "0",
-              );
-              const s = String(Math.floor((ms % 60000) / 1000)).padStart(
-                2,
-                "0",
-              );
-              expiryEl.textContent = `Active today only • carries to next day only if today is a loss • resets in ${h}:${m}:${s}`;
+              const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, "0");
+              const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, "0");
+              // Fix 5: Short expiry text
+              expiryEl.textContent = `${h}:${m}:${s}`;
             };
             if (this.penaltyCountdownTimer)
               clearInterval(this.penaltyCountdownTimer);
@@ -5336,58 +5341,41 @@
           } else {
             if (this.penaltyCountdownTimer)
               clearInterval(this.penaltyCountdownTimer);
-            expiryEl.textContent =
-              "No active penalty • carry-over applies only if today ends as a loss";
+            expiryEl.textContent = "--:--:--";
           }
 
           const budgetEl = this.app.elements["shadow-distraction-budget"];
-          budgetEl.textContent = `${this.app.formatDuration(penalty.distractionMinutes)} / ${this.app.formatDuration(penalty.budget)}${penalty.overBudget > 0 ? ` (+${this.app.formatDuration(penalty.overBudget)} over)` : ""}`;
-          budgetEl.className =
-            penalty.overBudget > 0 ? "shadow-overbudget" : "";
+          budgetEl.textContent = `${this.app.formatDuration(penalty.distractionMinutes)} / ${this.app.formatDuration(penalty.budget)}`;
+          budgetEl.className = penalty.overBudget > 0 ? "shadow-overbudget" : "";
+
           this.app.elements["shadow-win-ladder"].textContent =
-            `3/5: ${ladder.status3in5}${ladder.clear3in5 ? " ✓" : ""} • 5/7: ${ladder.status5in7}${ladder.clear5in7 ? " ✓" : ""}`;
-          this.app.elements["shadow-mission-score"].textContent =
-            `${missionScore}/100`;
+            `3/5: ${ladder.status3in5}${ladder.clear3in5 ? " ✓" : ""} · 5/7: ${ladder.status5in7}${ladder.clear5in7 ? " ✓" : ""}`;
+          this.app.elements["shadow-mission-score"].textContent = `${missionScore}/100`;
           this.app.elements["shadow-weekly-gap"].textContent =
             `${weeklyGap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(weeklyGap))}`;
           this.app.elements["shadow-weekly-gap"].className =
-            weeklyGap > 0
-              ? "shadow-gap-positive"
-              : weeklyGap < 0
-                ? "shadow-gap-negative"
-                : "shadow-gap-equal";
+            weeklyGap > 0 ? "sd-row-value sd-num red"
+              : weeklyGap < 0 ? "sd-row-value sd-num green"
+              : "sd-row-value sd-num";
 
-          const momentum = this.getMomentum(
-            currentAvg,
-            previousAvg,
-            hasMomentumBaseline,
-          );
+          const momentum = this.getMomentum(currentAvg, previousAvg, hasMomentumBaseline);
           const momentumEl = this.app.elements["shadow-momentum"];
           momentumEl.textContent = momentum.label;
           momentumEl.className = momentum.cls;
 
-          this.app.elements["shadow-percent"].textContent =
-            `${percentage.toFixed(1)}%`;
+          // Hero cards
+          this.app.elements["shadow-percent"].textContent = `${percentage.toFixed(1)}% reached`;
           const gapEl = this.app.elements["shadow-gap"];
           gapEl.textContent = `${gap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(gap))}`;
-          gapEl.className =
-            gap > 0
-              ? "shadow-gap-positive"
-              : gap < 0
-                ? "shadow-gap-negative"
-                : "shadow-gap-equal";
+          gapEl.className = gap > 0 ? "sd-hero-value sd-num gap red"
+            : gap < 0 ? "sd-hero-value sd-num gap green"
+            : "sd-hero-value sd-num gap";
 
-          this.app.elements["shadow-status"].textContent =
-            this.getCurrentStatus(percentage);
-          const pressure = this.getPressure(
-            percentage,
-            weeklyGap,
-            competition.recentWinRate,
-            missionScore,
-          );
+          this.app.elements["shadow-status"].textContent = this.getCurrentStatus(percentage);
+          const pressure = this.getPressure(percentage, weeklyGap, competition.recentWinRate, missionScore);
           const pressureEl = this.app.elements["shadow-pressure"];
-          pressureEl.textContent = pressure.label;
-          pressureEl.className = `shadow-badge ${pressure.cls}`;
+          pressureEl.textContent = pressure.label.toLowerCase();
+          pressureEl.className = `sd-strip-badge amber`;
 
           const rank = this.getShadowRank(shadowAvg);
           this.app.elements["shadow-rank"].textContent = `Rank: ${rank.title}`;
@@ -5395,13 +5383,14 @@
           this.app.elements["shadow-score"].textContent =
             `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
           this.app.elements["shadow-duel"].textContent =
-            scoreDiff > 0
-              ? `Leader: You (+${scoreDiff})`
-              : scoreDiff < 0
-                ? `Leader: Shadow (+${Math.abs(scoreDiff)})`
-                : "Leader: Even";
-          this.app.elements["shadow-lead-margin"].textContent =
-            `Lead Margin: ${Math.abs(scoreDiff)}`;
+            scoreDiff > 0 ? `Leader: You (+${scoreDiff})`
+              : scoreDiff < 0 ? `Leader: Shadow (+${Math.abs(scoreDiff)})`
+              : "Leader: Even";
+
+          // Fix 4: Lead margin — value + days, red if losing
+          const leadMarginEl = this.app.elements["shadow-lead-margin"];
+          leadMarginEl.textContent = `Lead Margin: ${Math.abs(scoreDiff)}`;
+
           this.app.elements["shadow-trend"].textContent =
             `Monthly trend: ${(competition.recentWinRate * 100).toFixed(0)}% win rate`;
           this.app.elements["shadow-verdict"].textContent =
@@ -5409,6 +5398,49 @@
               ? `You lead monthly by ${Math.abs(scoreDiff)} day-win(s); hold at least ${this.app.formatDuration(defenseTarget)} tomorrow. Mission ${missionScore}/100.`
               : `You are behind by ${this.app.formatDuration(neededTie)} today and ${Math.abs(scoreDiff)} monthly day-win(s). Mission ${missionScore}/100.`;
 
+          // Fix 2: VS Duel YOU panel — bind to computed shadow values
+          const duelYouTimeEl = document.getElementById('sd-duel-you-time');
+          if (duelYouTimeEl) duelYouTimeEl.textContent = this.app.formatDuration(todayMinutes);
+          const duelYouPctEl = document.getElementById('sd-duel-you-pct');
+          if (duelYouPctEl) duelYouPctEl.textContent = `${percentage.toFixed(1)}% reached`;
+          const duelGapEl = document.getElementById('sd-duel-gap');
+          if (duelGapEl) {
+            duelGapEl.textContent = `${gap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(gap))}`;
+            duelGapEl.className = gap < 0 ? 'sd-row-value sd-num green' : gap > 0 ? 'sd-row-value sd-num red' : 'sd-row-value sd-num';
+          }
+          const duelTieDupEl = document.getElementById('shadow-needed-tie-dup');
+          if (duelTieDupEl) duelTieDupEl.textContent = this.app.formatDuration(neededTie);
+          const duelDefDupEl = document.getElementById('shadow-defense-target-dup');
+          if (duelDefDupEl) duelDefDupEl.textContent = this.app.formatDuration(defenseTarget);
+
+          // Fix 3: Monthly score in VS Duel
+          const duelMonthlyEl = document.getElementById('sd-duel-monthly-score');
+          if (duelMonthlyEl) duelMonthlyEl.textContent = `${competition.myWins} days`;
+
+          // Fix: Win rate in VS Duel
+          const duelWinRateEl = document.getElementById('sd-duel-win-rate');
+          if (duelWinRateEl) {
+            const wr = (competition.recentWinRate * 100).toFixed(0);
+            duelWinRateEl.textContent = `${wr}%`;
+            duelWinRateEl.className = competition.recentWinRate < 0.5 ? 'sd-row-value sd-num red' : 'sd-row-value sd-num green';
+          }
+
+          // VS Duel SHADOW header
+          const duelShadowTimeEl = document.getElementById('sd-duel-shadow-time');
+          if (duelShadowTimeEl) duelShadowTimeEl.textContent = this.app.formatDuration(shadowAvg);
+
+          // Fix 3: Monthly Battle big scores
+          const battleYouEl = document.getElementById('sd-battle-you');
+          if (battleYouEl) battleYouEl.textContent = competition.myWins;
+          const battleShadowEl = document.getElementById('sd-battle-shadow');
+          if (battleShadowEl) battleShadowEl.textContent = competition.shadowWins;
+
+          // Fix 4: Lead margin in VS Duel
+          const leadMarginDupEl = document.getElementById('shadow-lead-margin-val');
+          if (leadMarginDupEl) {
+            leadMarginDupEl.textContent = `${scoreDiff >= 0 ? '+' : ''}${scoreDiff} days`;
+            leadMarginDupEl.className = scoreDiff < 0 ? 'sd-row-value sd-num red' : 'sd-row-value sd-num green';
+          }
 
           if (this.app.trainerEngine?.syncMissionFromRoadmap)
             this.app.trainerEngine.syncMissionFromRoadmap();
@@ -6704,7 +6736,7 @@ Rules:
         }
 
         getFlowCycleStatus() {
-          if (!this.app.stopwatch?.isRunning) return "Recovery / Reset";
+          if (!this.app.stopwatch?.isRunning) return "recovery / reset";
           const elapsedMin = Math.max(
             0,
             Math.round(
@@ -6712,10 +6744,10 @@ Rules:
                 60000,
             ),
           );
-          if (elapsedMin < 10) return "Struggle phase (persist)";
-          if (elapsedMin < 15) return "Release phase";
-          if (elapsedMin < 90) return "Flow phase";
-          return "Recovery needed";
+          if (elapsedMin < 10) return "struggle (persist)";
+          if (elapsedMin < 15) return "release";
+          if (elapsedMin < 90) return "flow";
+          return "recovery needed";
         }
 
         getBlockersStatus() {
@@ -6724,21 +6756,19 @@ Rules:
             today,
             this.app.state.tasks,
           );
-          if (untracked >= 240) return "High blockers";
-          if (untracked >= 90) return "Moderate blockers";
-          return "Low blockers";
+          if (untracked >= 240) return "high";
+          if (untracked >= 90) return "moderate";
+          return "low";
         }
 
         getPronenessStatus() {
           const r = this.getTodayRecord();
           if (r.wakeAt && r.firstActionAt) {
             const delta = Math.round((r.firstActionAt - r.wakeAt) / 60000);
-            if (delta < 0)
-              return "Invalid timing detected (re-log wake/first action)";
-            if (delta <= 90) return `High (${delta}m from wake)`;
-            return `Medium (${delta}m from wake)`;
+            if (delta < 0) return "error";
+            return `${delta}m from wake`;
           }
-          return "Set wake + first action";
+          return "set wake + first action";
         }
 
         getTriggersStatus() {
@@ -6746,9 +6776,9 @@ Rules:
             this.app.shadowEngine?.getTodayGoalProgress?.() || {};
           const missionScore =
             this.app.shadowEngine?.calculateMissionScore?.(goalProgress) || 0;
-          if (missionScore >= 80) return "Strong (clear goals active)";
-          if (missionScore >= 50) return "Moderate (add challenge +4%)";
-          return "Weak (define clear goal + feedback)";
+          if (missionScore >= 80) return "strong";
+          if (missionScore >= 50) return "moderate +4%";
+          return "weak + focus needed";
         }
 
         getActionSteps() {
@@ -6776,7 +6806,7 @@ Rules:
               `Complete at least ${3 - war.done} more war-mode ritual(s) to hit minimum daily pressure training.`,
             );
           const triggers = this.getTriggersStatus();
-          if (triggers.startsWith("Weak"))
+          if (triggers === "weak + focus needed")
             steps.push(
               "Define one clear output for current block and set immediate feedback checkpoint at 25 minutes.",
             );
