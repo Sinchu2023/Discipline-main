@@ -572,7 +572,7 @@
       min-width: 100px;
       text-align: right;
       font-weight: 600;
-      color: #98f5a7;
+      color: var(--success);
       letter-spacing: 0.3px;
     }
     @keyframes graphFadeIn {
@@ -857,7 +857,7 @@
 
     #kpi-productivity .graph-kpi-value { color: var(--success); }
     #kpi-total-distraction .graph-kpi-value { color: var(--danger); }
-    #kpi-logged-distraction .graph-kpi-value { color: #ff7b7b; }
+    #kpi-logged-distraction .graph-kpi-value { color: var(--danger); }
 
     .flow-lab-section {
       margin: 0 0 2rem;
@@ -920,7 +920,6 @@
     }
 
     #kill-switch-countdown {
-      font-family: 'Courier New', monospace;
       font-size: 1.1rem;
       color: var(--warning);
       margin-top: 6px;

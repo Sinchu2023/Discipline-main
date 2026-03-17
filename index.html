@@ -739,7 +739,6 @@
       }
       .sd-strip-percent {
         font-size: 0.85rem;
-        font-family: 'IBM Plex Mono', monospace;
       }
 
       /* VS Duel */
@@ -983,7 +982,6 @@
         border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.2);
         font-size: 0.85rem;
-        font-family: 'IBM Plex Mono', monospace;
       }
       /* Graphs Container */
       .graphs-container {
@@ -1077,8 +1075,7 @@
         min-width: 100px;
         text-align: right;
         font-weight: 600;
-        color: #98f5a7;
-        font-family: "Courier New", monospace;
+        color: var(--success);
         letter-spacing: 0.3px;
       }
       @keyframes graphFadeIn {
@@ -1474,7 +1471,6 @@
       }
 
       #kill-switch-countdown {
-        font-family: "Courier New", monospace;
         font-size: 1.1rem;
         color: var(--warning);
         margin-top: 6px;
@@ -2093,8 +2089,8 @@
               </div>
               <div class="graph-controls">
                 <select class="range-select" id="prod-range">
-                  <option value="weekly">7 Days</option>
-                  <option value="7d">Weekly Avg</option>
+                  <option value="7d">7 Days</option>
+                  <option value="weekly">Weekly Avg</option>
                   <option value="30d">30 Days</option>
                   <option value="3m">3 Months</option>
                   <option value="6m">6 Months</option>
@@ -2208,7 +2204,7 @@
               <!-- Import JSON Panel -->
               <div id="import-json-panel" style="display:none;">
                 <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:8px;">Paste your roadmap JSON below. Must follow the required schema.</p>
-                <textarea id="json-import-input" rows="8" placeholder='{ "topic": "My Topic", "modules": [ ... ] }' style="width:100%; padding:10px; background:var(--bg-dark); color:var(--text-primary); border:1px solid var(--border); border-radius:6px; font-family:monospace; font-size:0.82rem; resize:vertical;"></textarea>
+                <textarea id="json-import-input" rows="8" placeholder='{ "topic": "My Topic", "modules": [ ... ] }' style="width:100%; padding:10px; background:var(--bg-dark); color:var(--text-primary); border:1px solid var(--border); border-radius:6px; font-size:0.82rem; resize:vertical;"></textarea>
                 <div style="display:flex; gap:8px; margin-top:8px;">
                   <button class="btn btn-primary" id="import-roadmap-btn" style="flex:1;"><i class="fas fa-check-circle"></i> Validate &amp; Save</button>
                   <button class="btn" id="import-json-example-btn"><i class="fas fa-code"></i> Example</button>
