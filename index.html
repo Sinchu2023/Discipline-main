@@ -3635,10 +3635,15 @@
         }
         formatDuration(minutes) {
           const h = Math.floor(minutes / 60),
-            m = Math.floor(minutes % 60);
+            m = Math.round(minutes % 60);
           return `${h}h ${String(m).padStart(2, "0")}m`;
         }
-        formatTime(ts) {
+        formatDecimalTime(h) {
+          const hr = Math.floor(h);
+          const min = Math.round((h - hr) * 60);
+          return `${hr}h ${String(min).padStart(2, "0")}m`;
+        }
+        formatTimestamp(ts) {
           return new Date(ts).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -3837,7 +3842,7 @@
           this.app.elements["active-task-name"].textContent =
             `${this.app.state.activeTask.category} • ${this.app.state.activeTask.subcategory}`;
           this.app.elements["active-task-start"].textContent =
-            this.app.formatTime(this.startTime);
+            this.app.formatTimestamp(this.startTime);
           this.app.elements["active-task-indicator"].style.display = "block";
           // Fire-and-forget to avoid blocking UI on network
           if (this.app.cloudManager?.setTimerState) {
@@ -3919,7 +3924,7 @@
           this.app.elements["active-task-name"].textContent =
             `${activeTask.category || "Productive Work"} • ${activeTask.subcategory || "General"}`;
           this.app.elements["active-task-start"].textContent =
-            this.app.formatTime(activeTask.startTime);
+            this.app.formatTimestamp(activeTask.startTime);
           this.app.elements["active-task-indicator"].style.display = "block";
           this.startTicking();
         }
@@ -4084,7 +4089,7 @@
             const el = document.createElement("div");
             const isSleep = task.category === "Sleep";
             el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
-            el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${task.category} • ${task.subcategory}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${task.description || ""}</div><div class="task-actions">${isSleep ? `<button class="btn edit-sleep-btn" data-id="${task.id}"><i class="fas fa-pen"></i> Edit Sleep</button>` : ""}<button class="btn delete-task-btn" data-id="${task.id}"><i class="fas fa-trash"></i> Delete</button></div>`;
+            el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${task.category} • ${task.subcategory}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTimestamp(task.startTime)} - ${this.app.formatTimestamp(task.endTime)}</div><div class="task-time">${task.description || ""}</div><div class="task-actions">${isSleep ? `<button class="btn edit-sleep-btn" data-id="${task.id}"><i class="fas fa-pen"></i> Edit Sleep</button>` : ""}<button class="btn delete-task-btn" data-id="${task.id}"><i class="fas fa-trash"></i> Delete</button></div>`;
             c.appendChild(el);
           });
           document
@@ -6990,7 +6995,7 @@ Rules:
                   intersect: false,
                   callbacks: {
                     label: (ctx) =>
-                      `${ctx.dataset.label}: ${Number(ctx.parsed.y || 0).toFixed(2)}h`,
+                      `${ctx.dataset.label}: ${this.app.formatDecimalTime(ctx.parsed.y || 0)}`,
                   },
                 },
               },
@@ -7171,10 +7176,7 @@ Rules:
 
         formatHoursForTooltip(hours = 0) {
           const safe = Math.max(0, Number(hours) || 0);
-          const minutes = Math.round(safe * 60);
-          const h = Math.floor(minutes / 60);
-          const m = minutes % 60;
-          return `${h}h ${String(m).padStart(2, "0")}m (${safe.toFixed(2)}h)`;
+          return this.app.formatDecimalTime(safe);
         }
 
         buildShadowSeries(labels, rangeDates) {
