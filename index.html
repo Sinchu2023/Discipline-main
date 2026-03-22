@@ -5110,12 +5110,14 @@
           const year = now.getFullYear();
           const monthDays = [];
           let myWins = 0;
-          const activeDays = now.getDate(); // elapsed days in current month
+          let activeDays = 0; // only days with actual productive data
 
-          for (let day = 1; day <= activeDays; day++) {
+          for (let day = 1; day <= now.getDate(); day++) {
             const d = new Date(year, month, day);
             const date = this.app.getDateString(d);
             const minutes = dailyMap.get(date) || 0;
+            if (minutes === 0) continue; // skip unlogged / rest days
+            activeDays++;
             const isWin = minutes >= shadowAvg;
             if (isWin) myWins++;
             monthDays.push({ date, isWin });
