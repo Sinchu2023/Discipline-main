@@ -1,221 +1,209 @@
 # Discipline Tracker Pro
 
-A professional, feature-rich productivity and discipline tracking web application built with vanilla HTML, CSS, and JavaScript — powered by Firebase for real-time cross-device sync.
+Discipline Tracker Pro is a **single-page productivity system** built with plain HTML/CSS/JavaScript and Firebase.
 
-Track your time, compete against your personal SHADOW, follow an AI-generated learning roadmap, and maintain streaks — all for free with no backend required.
+It combines:
+- session-based time tracking,
+- daily and long-range analytics,
+- a competitive SHADOW performance system,
+- a Flow Protocol routine system,
+- and an AI/imported learning roadmap.
 
----
-
-## 🎯 Core Features
-
-### ⏱️ Time Tracking
-- **Real-time Stopwatch** with precise start/stop controls
-- **Sleep Tracking** — dedicated sleep session logging
-- **Active Task Indicator** — always visible while a session runs
-- **Auto-Save** — all data persists in localStorage and syncs to Firebase
-
-### 📋 Task Management
-- Log tasks with automatic timestamps and duration
-- Categorize as productive, sleep, or distraction
-- **Quick-Start Favorites** — save frequent tasks, sync across devices
-- **Task History** — view every session logged today
-- **Color-coded display** — Green = productive, Purple = sleep
-
-### ⭐ Quick Start Favorites — Cross-Device Sync
-- Favorites are stored in Firebase under `users/{uid}/state/favorites`
-- Adding or removing a favorite on one device updates all others **instantly** via `onSnapshot` listener
-- No page refresh required
-
-### ☁️ Cloud Sync & Authentication
-- **Google Sign-In** via Firebase Authentication
-- **Cross-device timer sync** — stopping a timer on one device stops it on all others instantly
-- **Offline Mode** — full local functionality, syncs when reconnected
-- **Login Gate** — app is locked behind authentication; anonymous access is blocked
-
-### 📊 Statistics Dashboard
-- Productive Time, Sleep Time, Total Tracked — all real-time
-- Day Streak with milestone notifications
-
-### 🔥 Streak System
-- Tracks consecutive days with logged activity
-- Milestone messages at Day 1, 7, 30, 365
+The app is intentionally framework-free, so it can run on static hosting (GitHub Pages, Vercel static, Firebase Hosting) while still supporting real-time cross-device sync through Firestore.
 
 ---
 
-## 🌑 SHADOW Engine
+## What this app is (and is not)
 
-The SHADOW Engine is a competitive self-improvement system. Your SHADOW is your strongest historical 7-day rolling average — and every day you race to beat it.
+### ✅ What it is
+- A personal discipline tracker centered on **minutes, consistency, and execution pressure**.
+- A local-first app that stores state in `localStorage` and mirrors key state to Firebase when authenticated.
+- A class-based JavaScript system split across focused manager/engine files under `js/`.
 
-### How It Works
-- **Shadow Average**: Best 7-day rolling average you've achieved
-- **Competitive Pressure**: Real-time gap vs your SHADOW shown in minutes and percent
-- **Momentum**: 📈 Growing / ➡️ Stable / 📉 Declining
-
-### Rank Tiers
-
-| Tier | Minutes/day | Badge |
-|------|-------------|-------|
-| Initiate | 0+ | Baseline |
-| Builder | 120+ | Builder |
-| Operator | 180+ | Operator |
-| Executor | 240+ | Executor |
-| Elite | 300+ | Elite |
-| Apex | 360+ | Apex |
-| Overdrive | 420+ | Legend |
-
-### Status Indicators
-- 🟢 **STANDARD BROKEN** (100%+): Exceeded your SHADOW
-- 🔵 **AT THE GATE** (90–99%): Almost there
-- 🟡 **TRAILING** (70–89%): Behind but in range
-- 🔴 **OUT OF RANGE** (<70%): Significant gap
+### ⚠️ What it is not
+- Not a calendar replacement.
+- Not a collaborative team tool.
+- Not a backend-heavy app with custom server APIs (except optional SyncManager endpoint if you configure one).
 
 ---
 
-## 🗺️ AI Roadmap Generator
+## Core capabilities
 
-Generate a structured learning roadmap using the **Gemini 2.0 Flash** API (free tier), or import your own JSON roadmap manually.
+## 1) Time tracking
+- Start/stop stopwatch sessions.
+- Special one-click Sleep session start.
+- Category + subcategory classification for each logged session.
+- Active-task indicator and persistent running state.
+- Timer state is synced to Firestore (`users/{uid}/state/timer`) for cross-device continuity.
 
-### Two Creation Modes
+## 2) Task log + favorites
+- Every completed session becomes a task entry with start/end/duration/date metadata.
+- Quick-start favorites let you launch repeat activities quickly.
+- Favorites sync in real-time across devices (`users/{uid}/state/favorites`).
 
-#### ✨ Generate with AI
-1. Open the **Roadmap Console** from the main toolbar
-2. Enter your **Gemini API key** (from [aistudio.google.com](https://aistudio.google.com)) — stored locally only
-3. Type a topic (e.g. "Analog IC Design")
-4. Click **Generate** — the app calls the Gemini API and builds your roadmap
+## 3) Real-time analytics
+- Daily KPI cards (productive, sleep, total).
+- Chart.js graphs for productivity and sleep.
+- Multiple time ranges (`7d`, `30d`, `3m`, `6m`, `1y`, plus weekly view in code path).
+- Monthly report generation via `AnalyticsService`.
+- Data export/import through UI manager flows.
 
-#### 📥 Import JSON Roadmap
-Paste a roadmap JSON manually using this exact schema:
-```json
-{
-  "topic": "Analog IC Design",
-  "modules": [
-    {
-      "moduleNumber": 1,
-      "moduleTitle": "DIODES",
-      "days": [
-        { "day": 1, "title": "Basic Semiconductor Physics", "status": "completed" },
-        { "day": 2, "title": "Diode Models", "status": "active" },
-        { "day": 3, "title": "Operating Point Analysis", "status": "locked" }
-      ]
-    }
-  ]
-}
+## 4) SHADOW engine
+The SHADOW system turns your historical performance into a daily competitive target.
+
+It computes:
+- rolling baselines,
+- duel status vs. your previous standard,
+- pressure and target metrics,
+- momentum/trend signals,
+- anti-sandbag style penalties/signals,
+- mission alignment from roadmap state.
+
+## 5) Flow Protocol engine
+Daily behavioral protocol tracking, including:
+- wake timestamp + first action timestamp,
+- flow-before-phone toggle,
+- war-mode checklist,
+- attention stretch controls,
+- kill-switch flow reset helpers,
+- status summaries based on live app/task context.
+
+## 6) AI Roadmap (Trainer engine)
+Two creation paths:
+- Generate with Gemini API key.
+- Import structured JSON roadmap manually.
+
+Roadmap state is saved per user at `users/{uid}/roadmap/main` and reflected in SHADOW mission goals.
+
+## 7) Authentication and cloud sync
+- Google sign-in (popup with redirect fallback; redirect-first behavior for mobile-like clients).
+- Login gate UI management.
+- Firebase readiness event wiring (`firebase-services-ready`).
+- Auth-aware bootstrap that hydrates local state and attaches Firestore listeners.
+
+---
+
+## Current project structure
+
+```text
+Discipline-main/
+├── index.html
+├── styles/
+│   └── main.css
+├── js/
+│   ├── config.js
+│   ├── constants.js
+│   ├── discipline-tracker.js
+│   ├── stopwatch-manager.js
+│   ├── task-manager.js
+│   ├── ui-manager.js
+│   ├── event-manager.js
+│   ├── graph-manager.js
+│   ├── analytics-service.js
+│   ├── shadow-engine.js
+│   ├── flow-protocol-engine.js
+│   ├── trainer-engine.js
+│   ├── firebase-cloud-manager.js
+│   ├── sync-manager.js
+│   ├── activity-classifier.js
+│   └── boot.js
+├── firebase-service.js
+├── google-auth.js
+├── app.js
+├── update-check.js
+├── ARCHITECTURE.md
+└── README.md
 ```
-Click **Example** inside the Import panel to prefill a sample.
 
-### Roadmap Features
-- **Duplicate prevention** — if a roadmap for the same topic already exists, you'll be asked before overwriting
-- **Cross-device sync** — roadmap stored in Firebase at `users/{uid}/roadmap/main`; changes sync across devices
-- **Empty state** — if no roadmap exists, app displays "Roadmap not generated yet" with generator access
-- **Delete button** — remove your roadmap permanently (with confirmation)
-- **Progress tracking** — mark days as complete, locked/active state auto-advances
-- **Edit mode** — rename modules and edit day topics inline
-- **SHADOW integration** — active roadmap day appears in daily mission goals
-
-### Loading Indicators
-The generator shows step-by-step status:
-- 🔍 Checking for existing roadmap...
-- ✨ Generating AI roadmap...
-- 📦 Parsing response...
-- 💾 Saving roadmap...
-- ✅ Done!
-
-### API Error Messages
-| Status | Message |
-|--------|---------|
-| 400/403 | Invalid API key — check at aistudio.google.com |
-| 404 | Model not found — check your key |
-| 429 | Rate limit hit — wait 60 seconds (quota is fine) |
-| 503 | Gemini temporarily unavailable |
+> Note: The project still has substantial inline style/markup in `index.html`, but runtime logic is now primarily split into `js/*.js` manager/engine files and bootstrapped from `js/boot.js`.
 
 ---
 
-## 📈 Analytics & Reporting
-- **Productivity Trend Graph** (7d / 30d / 3m / 6m / 1y)
-- **Sleep Analysis Chart** — bar chart with the same range options
-- **Performance Report** — monthly breakdown, daily table, print-ready
-- **Export Data** — download all data as CSV or JSON
+## Runtime architecture at a glance
+
+1. Static scripts in `index.html` load core config/constants/managers.
+2. `js/boot.js` creates `window.app = new DisciplineTracker()`.
+3. On `DOMContentLoaded`, `window.app.initialize()` runs.
+4. `FirebaseCloudManager.initialize()` waits for Firebase services and auth state.
+5. On login, cloud manager bootstraps user data and binds Firestore listeners.
+6. Managers/engines render and update UI based on app state.
+
+For the full architecture details, see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
 
 ---
 
-## 💡 Flow Protocol Engine
-- **Flow State Tracking** — record when you enter productive flow
-- **War Mode** — high-focus task triggers
-- **Attention Stretch** — configurable focus intervals
-- **Kill Switch** — emergency reset of active session
+## Data model summary
+
+### Local storage (selected keys)
+- `discipline_tracker_tasks`
+- `discipline_tracker_favorites`
+- `discipline_tracker_streak`
+- `discipline_tracker_active_task`
+- `discipline_tracker_flow_protocol`
+- `discipline_tracker_roadmap_state`
+- `discipline_tracker_client_version`
+
+### Firestore (authenticated path)
+```text
+users/{uid}
+├── tasks/{taskId}
+├── state/timer
+├── state/favorites
+└── roadmap/main
+```
+
+The app is local-first: local state updates are immediate; cloud writes/listeners reconcile state across devices.
 
 ---
 
-## 🎨 Design
+## Setup (development)
 
-- Dark professional theme with glassmorphism effects
-- Responsive: Desktop (1400px) → Tablet (768px) → Mobile (480px)
-- Smooth animations, hover effects, micro-transitions
-- Font Awesome 6.4.0 icons
-- Google Fonts (Inter / system-ui)
-- Zero build step — pure HTML/CSS/JS
+## Requirements
+- A static web host or local web server (do not use `file://` for Firebase auth).
+- A Firebase project with:
+  - Authentication (Google provider enabled)
+  - Cloud Firestore
+- (Optional) Gemini API key for AI roadmap generation.
 
----
-
-## 🚀 Quick Start
-
-### Requirements
-- A web server (e.g. Live Server, GitHub Pages, Vercel) — `file:///` protocol blocks Firebase Auth
-- A Firebase project with Firestore + Authentication enabled
-- A free Gemini API key from [aistudio.google.com](https://aistudio.google.com) (only needed for AI roadmap generation)
-
-### Installation
+## Run locally
 ```bash
-git clone https://github.com/yourname/Discipline-main.git
+git clone <your-fork-or-repo-url>
 cd Discipline-main
-# Open with Live Server or deploy to Vercel/GitHub Pages
+# serve with any static server, e.g.:
+python -m http.server 8080
+# then open http://localhost:8080
 ```
 
-### Login
-The app opens a **login gate** — click "Sign in with Google" to access the app. All data is user-isolated.
+## Firebase configuration
+Firebase config is currently defined directly in `firebase-service.js`.
+For production forks, use your own Firebase project and update this file.
 
 ---
 
-## 💾 Firebase Data Structure
+## Operational safeguards built into code
 
-```
-users/
-└── {uid}/
-    ├── state/
-    │   ├── timer          # Active timer state (cross-device sync)
-    │   └── favorites      # Quick-start favorites list
-    ├── roadmap/
-    │   └── main           # User's AI or imported roadmap
-    └── (tasks, streak, user doc...)
-```
-
-All Firebase writes happen **only on meaningful events** (start, stop, save) — not on every second. Designed to stay within the free tier indefinitely.
+- Firestore write throttling/debounce values are centralized under `CONFIG.FIREBASE_PROTECTION`.
+- Timer cloud writes are event-driven (start/stop state transitions), not 1Hz ticking.
+- Cloud listeners are attached on authenticated bootstrap and detached on auth changes.
+- IndexedDB persistence is enabled with defensive error handling for multi-tab/device constraints.
 
 ---
 
-## 🔧 Technical Architecture
+## Known architecture realities
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for a full breakdown of the class system and module structure.
+- The app is modular but still browser-global in parts (`window.app`, `window.FirebaseServices`, `window.GoogleAuthModule`).
+- `app.js` is intentionally minimal and acts mostly as a bridge module.
+- Some legacy fallback paths remain (e.g., optional SyncManager endpoint).
 
-### Technologies
-| Layer | Technology |
-|-------|-----------|
-| Structure | HTML5 semantic markup |
-| Styling | CSS3 (custom properties, Grid, Flexbox, animations) |
-| Logic | Vanilla JavaScript ES6+ (class-based modules) |
-| Auth & DB | Firebase SDK v10 (Auth + Firestore) |
-| Charts | Chart.js |
-| Icons | Font Awesome 6.4.0 |
-| AI | Google Gemini 2.0 Flash API |
+These are intentional transitional choices to keep deployment simple while supporting incremental refactoring.
 
 ---
 
-## 📄 License
+## License
 
-Free to use, modify, and distribute. No attribution required.
+Free to use and modify.
 
 ---
 
-**Version**: 3.0 Pro (AI Roadmap · Cross-Device Sync · Login Gate · SHADOW Engine · Flow Protocol)
-**Last Updated**: March 2026
-**Built with ❤️ for discipline and personal mastery**
+**Version label in config:** `2026.03.12.3`  
+**Documentation refresh:** March 22, 2026
