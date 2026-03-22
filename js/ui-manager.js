@@ -18,19 +18,25 @@ class UIManager {
         updateDateTime() {
           const updateTime = () => {
             const now = new Date();
-            this.app.elements["current-date"].textContent =
-              now.toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              });
-            this.app.elements["current-time"].textContent =
-              now.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              });
+            const dEl = this.app.elements["current-date"];
+            if (dEl) {
+              dEl.textContent =
+                now.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                });
+            }
+            const tEl = this.app.elements["current-time"];
+            if (tEl) {
+              tEl.textContent =
+                now.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                });
+            }
           };
           updateTime();
           setInterval(updateTime, 1000);
@@ -44,7 +50,7 @@ class UIManager {
         }
         updateMotivation() {
           const e = this.app.elements["motivation-line"];
-          e.style.opacity = "0";
+          if (e) e.style.opacity = "0";
           setTimeout(() => {
             let n;
             do {
@@ -54,19 +60,26 @@ class UIManager {
               MOTIVATION_LINES.length > 1
             );
             this.currentMotivationIndex = n;
-            e.textContent = MOTIVATION_LINES[n];
-            e.style.opacity = "1";
+            if (e) {
+              e.textContent = MOTIVATION_LINES[n];
+              e.style.opacity = "1";
+            }
           }, 500);
         }
         showStreakPopup() {
           const streak = this.app.state.streak;
-          this.app.elements["streak-count"].textContent = streak;
-          this.app.elements["streak-message"].textContent =
-            STREAK_MESSAGES[streak] || `${streak} days strong. Keep going.`;
-          this.app.elements["streak-popup"].style.display = "flex";
+          const countEl = this.app.elements["streak-count"];
+          if (countEl) countEl.textContent = streak;
+          
+          const msgEl = this.app.elements["streak-message"];
+          if (msgEl) msgEl.textContent = STREAK_MESSAGES[streak] || `${streak} days strong. Keep going.`;
+          
+          const popup = this.app.elements["streak-popup"];
+          if (popup) popup.style.display = "flex";
         }
         hideStreakPopup() {
-          this.app.elements["streak-popup"].style.display = "none";
+          const popup = this.app.elements["streak-popup"];
+          if (popup) popup.style.display = "none";
         }
         showReport() {
           const now = new Date();
@@ -157,22 +170,28 @@ class UIManager {
                 `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);font-weight:600;">${label}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${value}</td></tr>`,
             )
             .join("");
-          this.app.elements["report-content"].innerHTML = `
-          <h3 style="margin-bottom:1rem;">${monthName} ${r.year} Monthly Report</h3>
-          <h4 style="margin-top:1rem;">Summary</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><tbody>${summaryRows}</tbody></table></div>
-          <h4 style="margin-top:1rem;">Category Totals</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Category</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Share</th></tr></thead><tbody>${catRows}</tbody></table></div>
-          <h4 style="margin-top:1rem;">Productive Work Breakdown</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div>
-          <h4 style="margin-top:1rem;">Physical Training Breakdown</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div>
-          <h4>Daily Breakdown</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-          this.app.elements["report-modal"].style.display = "flex";
+          const contentEl = this.app.elements["report-content"];
+          if (contentEl) {
+            contentEl.innerHTML = `
+            <h3 style="margin-bottom:1rem;">${monthName} ${r.year} Monthly Report</h3>
+            <h4 style="margin-top:1rem;">Summary</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><tbody>${summaryRows}</tbody></table></div>
+            <h4 style="margin-top:1rem;">Category Totals</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Category</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Share</th></tr></thead><tbody>${catRows}</tbody></table></div>
+            <h4 style="margin-top:1rem;">Productive Work Breakdown</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div>
+            <h4 style="margin-top:1rem;">Physical Training Breakdown</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div>
+            <h4>Daily Breakdown</h4>
+            <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+          }
+          
+          const modal = this.app.elements["report-modal"];
+          if (modal) modal.style.display = "flex";
         }
         hideReport() {
-          this.app.elements["report-modal"].style.display = "none";
+          const modal = this.app.elements["report-modal"];
+          if (modal) modal.style.display = "none";
         }
         exportData() {
           const now = new Date();

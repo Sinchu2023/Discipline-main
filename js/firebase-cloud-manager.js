@@ -74,6 +74,7 @@ class FirebaseCloudManager {
                 this.listenToTimerState();
                 this.listenToRoadmap();
                 this.listenToFavorites();
+                this.listenToTasks();
               } catch (error) {
                 console.error("Post-login bootstrap failed:", error);
                 alert(
@@ -461,7 +462,6 @@ class FirebaseCloudManager {
           if (!this.isReady) return;
           const patch = {};
           // Keep cloud writes minimal to preserve Firestore quota.
-          if (key === CONFIG.STORAGE_KEYS.TASKS) patch.tasks = value || [];
           if (key === CONFIG.STORAGE_KEYS.FAVORITES) {
             // Write favorites to dedicated doc for cross-device sync
             const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "state", "favorites");
@@ -615,6 +615,30 @@ class FirebaseCloudManager {
           if (!this.tasksUnsub) return;
           this.tasksUnsub();
           this.tasksUnsub = null;
+        }
+
+        listenToTasks() {
+          if (!this.isReady) return;
+          this.detachTasksListener();
+          if (typeof window.FirebaseServices.onSnapshot !== "function") return;
+          this.tasksUnsub = window.FirebaseServices.onSnapshot(
+            this.tasksCollection(),
+            (snap) => {
+              if (snap.empty && !snap.docChanges().length) return;
+              
+              // Only process changes dynamically to avoid resetting local state blindly
+              const changes = snap.docChanges().map(change => ({
+                 type: change.type, 
+                 id: change.doc.id, 
+                 data: change.doc.data() 
+              }));
+              
+              if (changes.length > 0) {
+                 this.app.taskManager.applyRemoteTaskChanges(changes);
+              }
+            },
+            (err) => console.warn("Tasks sync listener failed", err)
+          );
         }
 
         async syncTaskUpsert(task) {

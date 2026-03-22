@@ -455,34 +455,23 @@ class ShadowEngine {
           const slope = den ? num / den : 0;
           const growthTrend = slope > 2 ? "UP" : slope < -2 ? "DOWN" : "STABLE";
 
-          this.app.elements["shadow-current-minutes"].textContent =
-            this.app.formatDuration(todayMinutes);
-          this.app.elements["shadow-average"].textContent =
-            this.app.formatDuration(shadowAvg);
-          this.app.elements["shadow-weekly-average"].textContent =
-            this.app.formatDuration(currentAvg);
-          if (this.app.elements["shadow-standard-metric"])
-            this.app.elements["shadow-standard-metric"].textContent =
-              this.app.formatDuration(shadowStandard);
-          if (this.app.elements["shadow-momentum-score"])
-            this.app.elements["shadow-momentum-score"].textContent =
-              `${momentumScore.toFixed(2)}x`;
-          if (this.app.elements["shadow-consistency-index"])
-            this.app.elements["shadow-consistency-index"].textContent =
-              consistencyIndex;
-          if (this.app.elements["shadow-growth-trend"])
-            this.app.elements["shadow-growth-trend"].textContent = growthTrend;
-          this.app.elements["shadow-target"].textContent =
-            this.app.formatDuration(targetToday);
-          this.app.elements["shadow-needed-tie"].textContent =
-            this.app.formatDuration(neededTie);
-          this.app.elements["shadow-needed-lead"].textContent =
-            this.app.formatDuration(neededLead);
-          this.app.elements["shadow-defense-target"].textContent =
-            this.app.formatDuration(defenseTarget);
+          const setText = (id, text) => { if (this.app.elements[id]) this.app.elements[id].textContent = text; };
+          const setClass = (id, cls) => { if (this.app.elements[id]) this.app.elements[id].className = cls; };
+          const setStyle = (id, prop, val) => { if (this.app.elements[id]) this.app.elements[id].style[prop] = val; };
+
+          setText("shadow-current-minutes", this.app.formatDuration(todayMinutes));
+          setText("shadow-average", this.app.formatDuration(shadowAvg));
+          setText("shadow-weekly-average", this.app.formatDuration(currentAvg));
+          setText("shadow-standard-metric", this.app.formatDuration(shadowStandard));
+          setText("shadow-momentum-score", `${momentumScore.toFixed(2)}x`);
+          setText("shadow-consistency-index", consistencyIndex);
+          setText("shadow-growth-trend", growthTrend);
+          setText("shadow-target", this.app.formatDuration(targetToday));
+          setText("shadow-needed-tie", this.app.formatDuration(neededTie));
+          setText("shadow-needed-lead", this.app.formatDuration(neededLead));
+          setText("shadow-defense-target", this.app.formatDuration(defenseTarget));
           // Fix 5: Concise penalty text
-          this.app.elements["shadow-penalty"].textContent =
-            `-${this.app.formatDuration(penalty.minutes)}`;
+          setText("shadow-penalty", `-${this.app.formatDuration(penalty.minutes)}`);
 
           // Fix 2: Penalty reason — concise, lowercase
           const reasonMap = {
@@ -494,9 +483,7 @@ class ShadowEngine {
             "Mission score below 60/100": "mission <60",
           };
           const shortReasons = penalty.reasons.map(r => reasonMap[r] || r.toLowerCase());
-          this.app.elements["shadow-penalty-reason"].textContent = shortReasons.length
-            ? shortReasons.join(" · ")
-            : "no active penalty triggers";
+          setText("shadow-penalty-reason", shortReasons.length ? shortReasons.join(" · ") : "no active penalty triggers");
 
           const expiryEl = this.app.elements["shadow-penalty-expiry"];
           if (penalty.points > 0) {
@@ -525,55 +512,36 @@ class ShadowEngine {
           budgetEl.textContent = `${this.app.formatDuration(penalty.distractionMinutes)} / ${this.app.formatDuration(penalty.budget)}`;
           budgetEl.className = penalty.overBudget > 0 ? "shadow-overbudget" : "";
 
-          this.app.elements["shadow-win-ladder"].textContent =
-            `3/5: ${ladder.status3in5}${ladder.clear3in5 ? " ✓" : ""} · 5/7: ${ladder.status5in7}${ladder.clear5in7 ? " ✓" : ""}`;
-          this.app.elements["shadow-mission-score"].textContent = `${missionScore}/100`;
-          this.app.elements["shadow-weekly-gap"].textContent =
-            `${weeklyGap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(weeklyGap))}`;
-          this.app.elements["shadow-weekly-gap"].className =
-            weeklyGap > 0 ? "sd-row-value sd-num red"
-              : weeklyGap < 0 ? "sd-row-value sd-num green"
-              : "sd-row-value sd-num";
+          setText("shadow-win-ladder", `3/5: ${ladder.status3in5}${ladder.clear3in5 ? " ✓" : ""} · 5/7: ${ladder.status5in7}${ladder.clear5in7 ? " ✓" : ""}`);
+          setText("shadow-mission-score", `${missionScore}/100`);
+          setText("shadow-weekly-gap", `${weeklyGap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(weeklyGap))}`);
+          setClass("shadow-weekly-gap", weeklyGap > 0 ? "sd-row-value sd-num red" : weeklyGap < 0 ? "sd-row-value sd-num green" : "sd-row-value sd-num");
 
           const momentum = this.getMomentum(currentAvg, previousAvg, hasMomentumBaseline);
-          const momentumEl = this.app.elements["shadow-momentum"];
-          momentumEl.textContent = momentum.label;
-          momentumEl.className = momentum.cls;
+          setText("shadow-momentum", momentum.label);
+          setClass("shadow-momentum", momentum.cls);
 
           // Hero cards
-          this.app.elements["shadow-percent"].textContent = `${percentage.toFixed(1)}% reached`;
-          const gapEl = this.app.elements["shadow-gap"];
-          gapEl.textContent = `${gap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(gap))}`;
-          gapEl.className = gap > 0 ? "sd-hero-value sd-num gap red"
-            : gap < 0 ? "sd-hero-value sd-num gap green"
-            : "sd-hero-value sd-num gap";
+          setText("shadow-percent", `${percentage.toFixed(1)}% reached`);
+          setText("shadow-gap", `${gap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(gap))}`);
+          setClass("shadow-gap", gap > 0 ? "sd-hero-value sd-num gap red" : gap < 0 ? "sd-hero-value sd-num gap green" : "sd-hero-value sd-num gap");
 
-          this.app.elements["shadow-status"].textContent = this.getCurrentStatus(percentage);
+          setText("shadow-status", this.getCurrentStatus(percentage));
           const pressure = this.getPressure(percentage, weeklyGap, competition.recentWinRate, missionScore);
-          const pressureEl = this.app.elements["shadow-pressure"];
-          pressureEl.textContent = pressure.label.toLowerCase();
-          pressureEl.className = `sd-strip-badge amber`;
+          setText("shadow-pressure", pressure.label.toLowerCase());
+          setClass("shadow-pressure", `sd-strip-badge amber`);
 
           const rank = this.getShadowRank(shadowAvg);
-          this.app.elements["shadow-rank"].textContent = `Rank: ${rank.title}`;
-          this.app.elements["shadow-badge"].textContent = rank.badge;
-          this.app.elements["shadow-score"].textContent =
-            `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
-          this.app.elements["shadow-duel"].textContent =
-            scoreDiff > 0 ? `Leader: You (+${scoreDiff})`
-              : scoreDiff < 0 ? `Leader: Shadow (+${Math.abs(scoreDiff)})`
-              : "Leader: Even";
+          setText("shadow-rank", `Rank: ${rank.title}`);
+          setText("shadow-badge", rank.badge);
+          setText("shadow-score", `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`);
+          setText("shadow-duel", scoreDiff > 0 ? `Leader: You (+${scoreDiff})` : scoreDiff < 0 ? `Leader: Shadow (+${Math.abs(scoreDiff)})` : "Leader: Even");
 
           // Fix 4: Lead margin — value + days, red if losing
-          const leadMarginEl = this.app.elements["shadow-lead-margin"];
-          leadMarginEl.textContent = `Lead Margin: ${Math.abs(scoreDiff)}`;
+          setText("shadow-lead-margin", `Lead Margin: ${Math.abs(scoreDiff)}`);
 
-          this.app.elements["shadow-trend"].textContent =
-            `Monthly trend: ${(competition.recentWinRate * 100).toFixed(0)}% win rate`;
-          this.app.elements["shadow-verdict"].textContent =
-            scoreDiff >= 0
-              ? `You lead monthly by ${Math.abs(scoreDiff)} day-win(s); hold at least ${this.app.formatDuration(defenseTarget)} tomorrow. Mission ${missionScore}/100.`
-              : `You are behind by ${this.app.formatDuration(neededTie)} today and ${Math.abs(scoreDiff)} monthly day-win(s). Mission ${missionScore}/100.`;
+          setText("shadow-trend", `Monthly trend: ${(competition.recentWinRate * 100).toFixed(0)}% win rate`);
+          setText("shadow-verdict", scoreDiff >= 0 ? `You lead monthly by ${Math.abs(scoreDiff)} day-win(s); hold at least ${this.app.formatDuration(defenseTarget)} tomorrow. Mission ${missionScore}/100.` : `You are behind by ${this.app.formatDuration(neededTie)} today and ${Math.abs(scoreDiff)} monthly day-win(s). Mission ${missionScore}/100.`);
 
           // Fix 2: VS Duel YOU panel — bind to computed shadow values
           const duelYouTimeEl = document.getElementById('sd-duel-you-time');
@@ -624,12 +592,9 @@ class ShadowEngine {
           if (this.app.trainerEngine?.updatePenaltyTimer)
             this.app.trainerEngine.updatePenaltyTimer();
 
-          this.app.elements["shadow-duel-you-fill"].style.width =
-            `${youShare}%`;
-          this.app.elements["shadow-duel-shadow-fill"].style.width =
-            `${shadowShare}%`;
-          this.app.elements["shadow-note"].textContent =
-            "Calculated from real historical data only";
+          setStyle("shadow-duel-you-fill", "width", `${youShare}%`);
+          setStyle("shadow-duel-shadow-fill", "width", `${shadowShare}%`);
+          setText("shadow-note", "Calculated from real historical data only");
 
           const fill = this.app.elements["shadow-progress-fill"];
           const cappedWidth = Math.min(130, Math.max(0, percentage));

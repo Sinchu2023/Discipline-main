@@ -1,180 +1,100 @@
-### Instruction:
-You are tasked with refactoring a monolithic web application (single index.html containing HTML, CSS, and JavaScript) into a clean, modular architecture. The refactor must preserve 100% functional and visual equivalence. No change in output, behavior, or user experience is allowed.
+You are an expert senior software architect and performance engineer.
 
-### Objective:
-Improve internal structure, maintainability, and debuggability while ensuring that small errors are isolated and cannot propagate into larger failures.
+Your task is to perform a deep static audit of a modular JavaScript codebase and identify hidden architectural issues, performance bottlenecks, and long-term scalability risks.
 
----
-
-### Phase 1: Planning (MANDATORY — DO NOT SKIP)
-1. Read and analyze:
-   - ARCHITECTURE.md
-   - firebase-service.js
-   - app.js
-   - core/ and services/ directories
-
-2. Identify and map:
-   - All classes inside index.html (with approximate line references)
-   - CONFIG block
-   - Script execution order and dependencies
-
-3. Produce:
-   - A clear implementation plan
-   - A dependency/load-order map
-
-4. STOP and wait for approval before proceeding.
+### CONTEXT:
+- The codebase is already modularized (js/ directory structure).
+- It is a frontend-heavy app using:
+  - localStorage for persistence
+  - Firebase for sync
+  - Multiple services (GraphManager, ShadowEngine, AnalyticsService, etc.)
+- The app tracks tasks and performs analytics (daily/weekly stats, streaks, graphs).
 
 ---
 
-### Phase 2: Task Tracking
-Create a task.md file containing a complete checklist of all refactoring steps. Update it as tasks are completed.
+### OBJECTIVE:
+Identify **non-obvious, high-impact issues** that may not break immediately but will degrade performance, maintainability, or correctness over time.
 
 ---
 
-### Phase 3: CSS Extraction
-1. Extract all <style> content into:
-   → styles/main.css
+### ANALYSIS REQUIREMENTS:
 
-2. Update index.html:
-   - Remove inline styles
-   - Add:
-     <link rel="stylesheet" href="styles/main.css">
+1. **Performance Analysis**
+   - Detect nested loops, repeated iterations, redundant computations
+   - Identify O(n²), O(n log n), or unnecessary full-array scans
+   - Flag synchronous blocking operations (e.g., JSON.stringify, DOM updates)
 
-Constraint:
-- No visual changes allowed.
+2. **State Management Issues**
+   - Look for:
+     - Unbounded growth
+     - Mutation risks
+     - Lack of normalization
+   - Identify "multiple sources of truth"
 
----
+3. **Data Integrity Risks**
+   - Missing validation
+   - Corruptible data structures
+   - NaN propagation risks
+   - Schema inconsistency
 
-### Phase 4: Configuration & Constants Extraction
-1. Extract CONFIG object into:
-   → js/config.js
+4. **Concurrency & Sync Problems**
+   - Race conditions (local vs Firebase)
+   - Overwrites
+   - Lack of conflict resolution (CRDT patterns, timestamps, etc.)
 
-2. Extract the following into:
-   → js/constants.js
-   - ANALOG_IC_ROADMAP_TEMPLATE
-   - MISSION_THRESHOLDS
-   - CATEGORY_DEFINITIONS
-   - CATEGORY_ALIASES
-   - PRODUCTIVE_CATEGORIES
-   - MOTIVATION_LINES
-   - STREAK_MESSAGES
+5. **DOM & UI Fragility**
+   - Hardcoded selectors
+   - Missing element handling
+   - Tight coupling between logic and UI
 
-Constraint:
-- Preserve exact values and structure.
+6. **Architecture & Design Flaws**
+   - Violations of separation of concerns
+   - Tight coupling between modules
+   - Redundant logic across services
+   - Lack of central computation layer
 
----
-
-### Phase 5: Class Modularization (One File Per Class)
-
-Extract each class into its own file:
-
-- ActivityClassifier → js/activity-classifier.js
-- SyncManager → js/sync-manager.js
-- FirebaseCloudManager → js/firebase-cloud-manager.js
-- DisciplineTracker → js/discipline-tracker.js
-- StopwatchManager → js/stopwatch-manager.js
-- TaskManager → js/task-manager.js
-- AnalyticsService → js/analytics-service.js
-- UIManager → js/ui-manager.js
-- ShadowEngine → js/shadow-engine.js
-- TrainerEngine → js/trainer-engine.js
-- FlowProtocolEngine → js/flow-protocol-engine.js
-- GraphManager → js/graph-manager.js
-- EventManager → js/event-manager.js
-
-Additional:
-- TrainerRecommendationEngine → js/trainer-recommendation-engine.js
-
-Constraints:
-- Do NOT modify internal logic
-- Preserve method signatures and behavior
-- Keep classes globally accessible (no module system)
+7. **Scalability Risks**
+   - What breaks at:
+     - 1,000 tasks
+     - 10,000 tasks
+     - Multi-device usage
+   - Memory + CPU impact
 
 ---
 
-### Phase 6: Script Wiring
+### OUTPUT FORMAT (STRICT):
 
-Replace inline <script> with ordered script includes in index.html:
+For each issue:
 
-Order (STRICT):
-1. js/config.js
-2. js/constants.js
-3. helper files (if any)
-4. manager/class files
-5. js/boot.js
-
-Constraints:
-- DO NOT use type="module"
-- Maintain correct dependency order
+1. **Issue Title**
+2. **Root Cause**
+3. **Where it occurs (module / pattern)**
+4. **Why it is dangerous (technical explanation)**
+5. **Real-world failure scenario**
+6. **Recommended Fix (practical + scalable)**
+7. **Severity Level (Low / Medium / High / Critical)**
 
 ---
 
-### Phase 7: Bootstrapping
+### EXTRA REQUIREMENTS:
 
-Create:
-→ js/boot.js
-
-Move application initialization logic:
-- Example:
-  window.app = new DisciplineTracker();
-
-Keep boot logic minimal and isolated.
+- Focus on **deep issues**, not superficial linting
+- Avoid generic advice
+- Prioritize **real-world failure conditions**
+- Suggest **production-grade fixes**, not hacks
 
 ---
 
-### Phase 8: Error Containment & Stability
+### BONUS (Optional but Valuable):
 
-Enhance robustness WITHOUT altering outputs:
-
-1. Wrap each class initialize() in try/catch
-2. Add null guards for:
-   - this.app
-   - this.app.elements
-
-3. Add structured console logging:
-   - Use console.group per class initialization
-
-4. Prevent silent failures and cascading errors
-
-Constraint:
-- No behavioral change visible to user
+- Suggest architectural improvements (e.g., caching layer, memoization, state indexing)
+- Identify opportunities for:
+  - IndexedDB migration
+  - Web Workers
+  - Data normalization
+  - Event-driven design
 
 ---
 
-### Phase 9: Verification (STRICT)
-
-Validate all of the following:
-
-1. Application loads with zero console errors
-2. UI and behavior are identical
-
-Test flows:
-- Stopwatch start/stop
-- Task creation
-- Favorites handling
-- Shadow engine refresh
-- Roadmap generation
-
-If ANY deviation is detected:
-→ Identify cause
-→ Fix without altering intended functionality
-
----
-
-### Rules (CRITICAL)
-
-- ZERO change in output (strict equivalence required)
-- NO feature additions or removals
-- NO logic rewrites unless required for structural isolation
-- DO NOT introduce frameworks or external dependencies
-- Maintain global scope compatibility
-
----
-
-### Expected Result:
-
-A modular, well-structured codebase that:
-- Produces identical results
-- Is easier to debug and maintain
-- Prevents accumulation of small errors
-- Has clear separation of concerns
+Act like you are reviewing a production app expected to scale to thousands of users and large datasets.
+Be precise, critical, and practical.

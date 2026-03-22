@@ -109,12 +109,14 @@ class TaskManager {
             (t, task) => t + task.duration,
             0,
           );
-          this.app.elements["productive-time"].textContent =
-            this.app.formatDuration(productiveTime);
-          this.app.elements["sleep-time"].textContent =
-            this.app.formatDuration(sleepTime);
-          this.app.elements["total-time"].textContent =
-            this.app.formatDuration(totalTime);
+          const pEl = this.app.elements["productive-time"];
+          if (pEl) pEl.textContent = this.app.formatDuration(productiveTime);
+          
+          const sEl = this.app.elements["sleep-time"];
+          if (sEl) sEl.textContent = this.app.formatDuration(sleepTime);
+          
+          const tEl = this.app.elements["total-time"];
+          if (tEl) tEl.textContent = this.app.formatDuration(totalTime);
 
           if (this.app.shadowEngine) this.app.shadowEngine.refresh();
           if (this.app.flowEngine) this.app.flowEngine.refresh();
@@ -124,6 +126,11 @@ class TaskManager {
           const tasks = this.app.state.tasks
             .filter((task) => task.date === today)
             .sort((a, b) => b.startTime - a.startTime);
+            
+          const fingerprint = tasks.map(t => `${t.id}-${t.updatedAt || t.endTime}`).join("|");
+          if (this.lastTasksFingerprint === fingerprint) return;
+          this.lastTasksFingerprint = fingerprint;
+
           const c = this.app.elements["tasks-list"];
           c.innerHTML = "";
           if (!tasks.length) {
@@ -217,6 +224,11 @@ class TaskManager {
         }
         renderFavorites() {
           const container = this.app.elements["favorites-grid"];
+          
+          const fingerprint = JSON.stringify(this.app.state.favorites);
+          if (this.lastFavFingerprint === fingerprint) return;
+          this.lastFavFingerprint = fingerprint;
+
           container.innerHTML = "";
           if (!this.app.state.favorites.length) {
             container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="far fa-star" style="font-size: 2rem; margin-bottom: 0.5rem;"></i><p>No favorites yet</p><p style="font-size: 0.9rem;">Add tasks to favorites for quick start</p></div>`;

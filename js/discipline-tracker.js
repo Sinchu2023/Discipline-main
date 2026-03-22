@@ -1,5 +1,6 @@
 class DisciplineTracker {
         constructor() {
+          this.saveTimers = {};
           this.state = {
             tasks: (this.loadFromStorage(CONFIG.STORAGE_KEYS.TASKS) || []).map(
               (t) => this.normalizeTask(t),
@@ -154,7 +155,15 @@ class DisciplineTracker {
             return null;
           }
         }
-        saveToStorage(key, data) {
+        saveToStorage(key, data, immediate = false) {
+          if (immediate) {
+            this._executeSave(key, data);
+            return;
+          }
+          if (this.saveTimers[key]) clearTimeout(this.saveTimers[key]);
+          this.saveTimers[key] = setTimeout(() => this._executeSave(key, data), 2000);
+        }
+        _executeSave(key, data) {
           try {
             localStorage.setItem(key, JSON.stringify(data));
           } catch (e) {
@@ -188,14 +197,19 @@ class DisciplineTracker {
           const subcategory =
             task.subcategory || (isLegacySleep ? "Night Sleep" : fallbackSub);
           const description = task.description || task.name || "";
-          const startTime = Number(task.startTime || Date.now());
-          const endTime = Number(task.endTime || startTime);
-          const rawDuration =
-            task.duration ?? Math.round((endTime - startTime) / 60000);
-          const duration = Math.min(
-            24 * 60,
-            Math.max(0, Number.isFinite(rawDuration) ? rawDuration : 0),
-          );
+          const parsedStart = Number(task.startTime);
+          const startTime = Number.isFinite(parsedStart) ? parsedStart : Date.now();
+          const parsedEnd = Number(task.endTime);
+          const endTime = Number.isFinite(parsedEnd) ? parsedEnd : startTime;
+          
+          let duration = 0;
+          if (task.duration !== undefined && task.duration !== null && !Number.isNaN(Number(task.duration))) {
+              duration = Number(task.duration);
+          } else {
+              duration = Math.round((endTime - startTime) / 60000);
+          }
+          
+          duration = Math.min(24 * 60, Math.max(0, Number.isFinite(duration) ? duration : 0));
 
           const classifierInput = (task.description || task.name || "").trim();
           const classification = ActivityClassifier.classify(classifierInput);
@@ -314,6 +328,9 @@ class DisciplineTracker {
         async initialize() {
     try {
       console.group('DisciplineTracker Initialization');
+      if (this.state.tasks.length > 0) {
+          this.saveToStorage(CONFIG.STORAGE_KEYS.TASKS, this.state.tasks, true);
+      }
 
     } catch (error) {
       console.error('[DisciplineTracker] Initialization failed:', error);
