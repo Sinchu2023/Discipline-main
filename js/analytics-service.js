@@ -69,7 +69,13 @@ class AnalyticsService {
           const sleepMinutes = totals["Sleep"] || 0;
           const wasteMinutes = totals["Time Waste / Distraction"] || 0;
           const awakeMinutes = Math.max(0, totalMinutes - sleepMinutes);
-          const activeDays = Math.max(1, daysInMonth);
+          const activeDays = (() => {
+            const now = new Date();
+            if (now.getFullYear() === year && now.getMonth() === month) {
+              return Math.max(1, now.getDate()); // elapsed days this month
+            }
+            return Math.max(1, daysInMonth);
+          })();
           const productivityRatio = awakeMinutes
             ? productiveMinutes / awakeMinutes
             : 0;

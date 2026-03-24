@@ -14,9 +14,18 @@ class SyncManager {
           return id;
         }
         queue(change) {
-          const q =
-            this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SYNC_QUEUE) || [];
+          let q = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SYNC_QUEUE) || [];
           q.push(change);
+          // Deduplicate by task ID (keep latest op), then cap at 500 to avoid localStorage overflow
+          const seen = new Map();
+          for (const item of q) {
+            if (item.entry?.id || item.id) {
+              seen.set(item.entry?.id || item.id, item);
+            } else {
+              seen.set(Symbol(), item); // non-task items kept as-is
+            }
+          }
+          q = [...seen.values()].slice(-500);
           this.app.saveToStorage(CONFIG.STORAGE_KEYS.SYNC_QUEUE, q);
         }
         async flushQueue() {
@@ -47,8 +56,10 @@ class SyncManager {
             if (!res.ok) return;
             const payload = await res.json();
             if (!Array.isArray(payload.entries)) return;
+            // fromCloud=true: skip re-uploading these tasks back to cloud
             this.app.taskManager.mergeTasks(
               payload.entries.map((t) => this.app.normalizeTask(t)),
+              true,
             );
           } catch (e) {
             console.warn("Cloud pull failed:", e);

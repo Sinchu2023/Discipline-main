@@ -150,6 +150,12 @@ class FirebaseCloudManager {
       async () => {
         const loginBtn = this.app.elements["google-login-btn"];
 
+        // file:// is not a valid OAuth redirect URI — fail fast and clearly
+        if (location.protocol === "file:") {
+          alert("Google login requires the app to be served over HTTPS or http://localhost — not from a local file. Please deploy or use a local server.");
+          return;
+        }
+
         if (!this.auth || !window.FirebaseServices) {
           alert("Login service is still initializing. Please try again in a moment.");
           return;

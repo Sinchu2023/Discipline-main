@@ -144,9 +144,14 @@ class StopwatchManager {
           const totalElapsed = this.getElapsedNow();
           this.elapsedBeforePause = totalElapsed;
           this.isRunning = false;
-          const endTime = Date.now();
+          // Guard against system clock jumps (NTP, sleep/wake) — endTime must be >= startTime
+          const endTime = Math.max(this.startTime + 1000, Date.now());
+          // Use crypto.randomUUID when available to eliminate same-millisecond ID collisions
+          const taskId = (typeof crypto !== "undefined" && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : `${endTime}-${Math.random().toString(36).slice(2, 10)}`;
           const entry = this.app.normalizeTask({
-            id: `${Date.now()}`,
+            id: taskId,
             ...this.app.state.activeTask,
             startTime: this.startTime,
             endTime,

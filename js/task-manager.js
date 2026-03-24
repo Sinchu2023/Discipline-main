@@ -15,13 +15,16 @@ class TaskManager {
       console.groupEnd();
     }
         }
-        mergeTasks(incoming) {
+        mergeTasks(incoming, fromCloud = false) {
           const map = new Map(this.app.state.tasks.map((t) => [t.id, t]));
           incoming.forEach((t) => map.set(t.id, this.app.normalizeTask(t)));
           this.app.state.tasks = [...map.values()].sort(
             (a, b) => a.startTime - b.startTime,
           );
-          incoming.forEach((t) => this.app.cloudManager?.syncTaskUpsert?.(t));
+          // Skip re-upload if data came from cloud — prevents write loop
+          if (!fromCloud) {
+            incoming.forEach((t) => this.app.cloudManager?.syncTaskUpsert?.(t));
+          }
           this.app.saveToStorage(
             CONFIG.STORAGE_KEYS.TASKS,
             this.app.state.tasks,

@@ -1,100 +1,151 @@
-You are an expert senior software architect and performance engineer.
+You are a senior debugging engineer fixing a real production system.
 
-Your task is to perform a deep static audit of a modular JavaScript codebase and identify hidden architectural issues, performance bottlenecks, and long-term scalability risks.
+MODE: FIX + EXPLAIN CLEARLY (LOW-MODEL SAFE)
 
-### CONTEXT:
-- The codebase is already modularized (js/ directory structure).
-- It is a frontend-heavy app using:
-  - localStorage for persistence
-  - Firebase for sync
-  - Multiple services (GraphManager, ShadowEngine, AnalyticsService, etc.)
-- The app tracks tasks and performs analytics (daily/weekly stats, streaks, graphs).
+MISSION:
+Fix ALL issues in the system AND explain them in SIMPLE terms.
 
----
+You are given:
+1. Codebase
+2. Audit summary (list of problems)
 
-### OBJECTIVE:
-Identify **non-obvious, high-impact issues** that may not break immediately but will degrade performance, maintainability, or correctness over time.
+-----------------------------------
+STEP 1: UNDERSTAND SYSTEM FLOW
+-----------------------------------
 
----
+Before fixing:
 
-### ANALYSIS REQUIREMENTS:
+- Identify how data flows:
+  UI → State → Storage → Cloud → UI
+- Identify:
+  - Where state is stored
+  - Where sync happens
+  - Where updates happen
 
-1. **Performance Analysis**
-   - Detect nested loops, repeated iterations, redundant computations
-   - Identify O(n²), O(n log n), or unnecessary full-array scans
-   - Flag synchronous blocking operations (e.g., JSON.stringify, DOM updates)
+-----------------------------------
+STEP 2: FIX ALL ISSUES (MANDATORY)
+-----------------------------------
 
-2. **State Management Issues**
-   - Look for:
-     - Unbounded growth
-     - Mutation risks
-     - Lack of normalization
-   - Identify "multiple sources of truth"
+Fix ALL these categories:
 
-3. **Data Integrity Risks**
-   - Missing validation
-   - Corruptible data structures
-   - NaN propagation risks
-   - Schema inconsistency
+1. Data loss (saving issues)
+2. Cloud sync mismatch
+3. Infinite sync loop
+4. Timestamp conflict (updatedAt bug)
+5. Timer overwrite bug
+6. Performance issues (repeated loops)
+7. Memory leaks (intervals)
+8. Security issues
+9. Storage overflow
+10. Authentication issues (Google OAuth)
+11. Device compatibility issues
+12. UI not updating issues (CRITICAL)
 
-4. **Concurrency & Sync Problems**
-   - Race conditions (local vs Firebase)
-   - Overwrites
-   - Lack of conflict resolution (CRDT patterns, timestamps, etc.)
+-----------------------------------
+STEP 3: SPECIAL DEBUG (VERY IMPORTANT)
+-----------------------------------
 
-5. **DOM & UI Fragility**
-   - Hardcoded selectors
-   - Missing element handling
-   - Tight coupling between logic and UI
+You MUST debug these specifically:
 
-6. **Architecture & Design Flaws**
-   - Violations of separation of concerns
-   - Tight coupling between modules
-   - Redundant logic across services
-   - Lack of central computation layer
+A. DEVICE COMPATIBILITY:
+- Does app behave differently on:
+  - mobile vs desktop?
+  - different browsers?
+- Check:
+  - localStorage availability
+  - sessionStorage usage
+  - popup blockers
+  - HTTPS requirements
 
-7. **Scalability Risks**
-   - What breaks at:
-     - 1,000 tasks
-     - 10,000 tasks
-     - Multi-device usage
-   - Memory + CPU impact
+B. AUTH (GOOGLE LOGIN):
+- Fix:
+  - localhost login failure
+  - cross-device login failure
+  - file:// failure
+- Ensure:
+  - proper domain config
+  - correct redirect handling
 
----
+C. MONTHLY BATTLE NOT UPDATING:
+Find EXACT reason why this is not updating:
 
-### OUTPUT FORMAT (STRICT):
+{{MONTHLY BATTLE
+YOU: 3 days
+SHADOW: 3
+Leader: Even
+win ladder
+}}
 
-For each issue:
+Check:
 
-1. **Issue Title**
-2. **Root Cause**
-3. **Where it occurs (module / pattern)**
-4. **Why it is dangerous (technical explanation)**
-5. **Real-world failure scenario**
-6. **Recommended Fix (practical + scalable)**
-7. **Severity Level (Low / Medium / High / Critical)**
+- Is data computed correctly?
+- Is state updated?
+- Is UI re-render triggered?
+- Is data overwritten by sync?
+- Is stale cache used?
 
----
+You MUST:
 
-### EXTRA REQUIREMENTS:
+- Identify root cause
+- Fix it
+- Ensure UI updates immediately
 
-- Focus on **deep issues**, not superficial linting
-- Avoid generic advice
-- Prioritize **real-world failure conditions**
-- Suggest **production-grade fixes**, not hacks
+-----------------------------------
+STEP 4: OUTPUT FIXED CODE
+-----------------------------------
 
----
+- Provide corrected code (only changed parts if large)
+- Ensure:
+  - no broken logic
+  - no missing dependencies
+  - consistent behavior
 
-### BONUS (Optional but Valuable):
+-----------------------------------
+STEP 5: SIMPLE ERROR EXPLANATION
+-----------------------------------
 
-- Suggest architectural improvements (e.g., caching layer, memoization, state indexing)
-- Identify opportunities for:
-  - IndexedDB migration
-  - Web Workers
-  - Data normalization
-  - Event-driven design
+For each problem:
 
----
+- Problem:
+- Why it happened (simple words)
+- Fix applied:
 
-Act like you are reviewing a production app expected to scale to thousands of users and large datasets.
-Be precise, critical, and practical.
+Keep explanation SHORT and CLEAR.
+
+-----------------------------------
+STEP 6: FINAL VERIFICATION
+-----------------------------------
+
+Check:
+
+- No infinite loops
+- No stale state
+- No data loss
+- Sync works across devices
+- Auth works in:
+  - localhost
+  - production
+- UI updates correctly (especially Monthly Battle)
+
+If ANY issue remains → FIX before output
+
+-----------------------------------
+STRICT RULES
+-----------------------------------
+
+- Do NOT skip any issue
+- Do NOT give vague answers
+- Do NOT explain before fixing
+- Always ensure UI reflects state
+- Always ensure state reflects cloud
+
+-----------------------------------
+THINK LIKE:
+-----------------------------------
+
+- Debugging a broken real app
+- Fixing user-facing bugs
+- Ensuring reliability across devices
+
+GOAL:
+Make the app STABLE, SYNCED, and CORRECT.

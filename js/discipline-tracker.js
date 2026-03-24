@@ -156,7 +156,9 @@ class DisciplineTracker {
           }
         }
         saveToStorage(key, data, immediate = false) {
-          if (immediate) {
+          // Always save critical keys immediately — debounce loses them if tab closes
+          const criticalKeys = [CONFIG.STORAGE_KEYS.SHADOW_AVG, CONFIG.STORAGE_KEYS.ACTIVE_TASK, CONFIG.STORAGE_KEYS.TASKS];
+          if (immediate || criticalKeys.includes(key)) {
             this._executeSave(key, data);
             return;
           }
@@ -257,7 +259,8 @@ class DisciplineTracker {
             sourceDevice:
               task.sourceDevice || this.syncManager?.getDeviceId?.() || "local",
             createdAt: task.createdAt || Date.now(),
-            updatedAt: Date.now(),
+            // Preserve original updatedAt — overwriting it breaks the cloud dedup guard in applyRemoteTaskChanges
+            updatedAt: task.updatedAt || Date.now(),
             growth_category: growthCategory,
             confidence,
             waste_level: wasteLevel,

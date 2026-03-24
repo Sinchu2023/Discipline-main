@@ -290,19 +290,36 @@ class ShadowEngine {
           const now = new Date();
           const month = now.getMonth();
           const year = now.getFullYear();
+          const todayStr = this.app.getDateString(now);
           const monthDays = [];
+          
           let myWins = 0;
-          let activeDays = 0; // only days with actual productive data
+          let activeDays = 0;
+          let shadowWins = 0;
 
           for (let day = 1; day <= now.getDate(); day++) {
             const d = new Date(year, month, day);
             const date = this.app.getDateString(d);
             const minutes = dailyMap.get(date) || 0;
+            
             if (minutes === 0) continue; // skip unlogged / rest days
-            activeDays++;
+            
+            const isToday = (date === todayStr);
             const isWin = minutes >= shadowAvg;
-            if (isWin) myWins++;
-            monthDays.push({ date, isWin });
+            
+            if (isWin) {
+              myWins++;
+              activeDays++;
+            } else if (!isToday) {
+              // Only count as a loss if the day is in the past!
+              shadowWins++;
+              activeDays++;
+            }
+            
+            // Only add to recent history if the day's result is finalized or won
+            if (isWin || !isToday) {
+              monthDays.push({ date, isWin });
+            }
           }
 
           monthDays.sort((a, b) => a.date.localeCompare(b.date));
@@ -310,7 +327,6 @@ class ShadowEngine {
           const recentWins = recent.filter((d) => d.isWin).length;
           const recentWinRate = recent.length ? recentWins / recent.length : 0;
 
-          const shadowWins = Math.max(0, activeDays - myWins);
           return { myWins, shadowWins, activeDays, recentWinRate };
         }
 
@@ -486,6 +502,11 @@ class ShadowEngine {
           setText("shadow-penalty-reason", shortReasons.length ? shortReasons.join(" · ") : "no active penalty triggers");
 
           const expiryEl = this.app.elements["shadow-penalty-expiry"];
+          // Always clear before potentially creating a new one — prevents interval stacking
+          if (this.penaltyCountdownTimer) {
+            clearInterval(this.penaltyCountdownTimer);
+            this.penaltyCountdownTimer = null;
+          }
           if (penalty.points > 0) {
             const updateCountdown = () => {
               const now = new Date();
@@ -498,13 +519,9 @@ class ShadowEngine {
               // Fix 5: Short expiry text
               expiryEl.textContent = `${h}:${m}:${s}`;
             };
-            if (this.penaltyCountdownTimer)
-              clearInterval(this.penaltyCountdownTimer);
             updateCountdown();
             this.penaltyCountdownTimer = setInterval(updateCountdown, 1000);
           } else {
-            if (this.penaltyCountdownTimer)
-              clearInterval(this.penaltyCountdownTimer);
             expiryEl.textContent = "--:--:--";
           }
 

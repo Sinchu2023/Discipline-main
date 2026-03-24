@@ -617,6 +617,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         }
 
         syncMissionFromRoadmap() {
+          try {
           // ── 1. Build DAILY_GOALS from roadmap state ──────────────────
           if (!this.state.roadmap?.modules?.length) {
             CONFIG.DAILY_GOALS = [];
@@ -713,6 +714,11 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
               this.normalizeRoadmapDays();
             }
+          }
+          } catch (err) {
+            // Safety net: if anything throws, ensure DAILY_GOALS is never undefined
+            console.error("[syncMissionFromRoadmap] failed:", err);
+            if (!Array.isArray(CONFIG.DAILY_GOALS)) CONFIG.DAILY_GOALS = [];
           }
         }
 
