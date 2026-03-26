@@ -343,8 +343,11 @@ class ShadowEngine {
 
 
   getWinLadder(dailyMap, shadowAvg) {
+    const cascade = this.app.trainerEngine?.ensureCascadeState();
+    const anchorDate = cascade?.date || this.app.getDateString(new Date());
     const days = [];
-    const today = new Date(this.app.getDateString());
+    const today = new Date(anchorDate);
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -602,12 +605,14 @@ class ShadowEngine {
     const targetToday = shadowAvg > 0 ? Math.ceil(shadowAvg + 1) : 0;
     const neededTie = Math.max(0, shadowAvg - todayMinutes);
     const neededLead = Math.max(0, shadowAvg - todayMinutes + 1);
-    const todayDate = this.app.getDateString(new Date());
-    
-    // PERFORMANCE: Use pre-filtered todayTasks passed from refresh()
-    const goalProgress = this.getTodayGoalProgress(todayDate, todayTasks);
+    const targetDate = this.app.trainerEngine?.ensureCascadeState()?.date || this.app.getDateString(new Date());
+    const isFutureDay = targetDate > this.app.getDateString(new Date());
+
+    const goalProgress = this.getTodayGoalProgress(targetDate, todayTasks);
+
     const missionScore = this.calculateMissionScore(goalProgress);
-    const distractionMinutes = this.getTodayDistractionMinutes(todayDate, todayTasks);
+    const distractionMinutes = this.getTodayDistractionMinutes(targetDate, todayTasks);
+
 
     const penalty = this.getPenalty(
       todayMinutes,
@@ -625,9 +630,10 @@ class ShadowEngine {
 
     const last7 = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
+      const d = new Date(targetDate);
       d.setDate(d.getDate() - i);
       const ds = this.app.getDateString(d);
+
       last7.push(dailyMap.get(ds) || 0);
     }
     const sorted7 = [...last7].sort((a, b) => a - b);

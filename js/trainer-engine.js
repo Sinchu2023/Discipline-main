@@ -1442,6 +1442,24 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     footer.innerHTML = `<span>roadmap penalty • ${pending} tasks pending</span><span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">${h}:${m}:${s}</span>`;
   }
 
+  getFullRoadmapQueue() {
+    const queue = [];
+    if (!this.state.roadmap?.modules) return queue;
+    
+    this.state.roadmap.modules.forEach((mod, mIdx) => {
+      mod.days.forEach((day, dIdx) => {
+        if (day.status !== "completed" && !day.completed) {
+          queue.push({
+            moduleIndex: mIdx,
+            dayIndex: dIdx,
+            text: day.text
+          });
+        }
+      });
+    });
+    return queue;
+  }
+
   // Helper: manage completion and auto-unlock explicitly
   setRoadmapDayStatus(moduleIdx, dayIdx, isCompleted) {
     const day = this.state.roadmap.modules[moduleIdx]?.days[dayIdx];
@@ -1904,6 +1922,7 @@ Rules:
     // 3. UI update
     this.app.uiManager.showStreakPopup(this.app.state.streak);
     this.refresh();
+    this.app.shadowEngine?.refresh(false);
   }
 
   // SE2: ADVANCE TO NEXT DAY (manual trigger from Roadmap Console)
