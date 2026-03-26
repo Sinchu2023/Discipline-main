@@ -14,15 +14,16 @@ class TrainerEngine {
   }
 
   loadState() {
-    return (
-      this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE) || {
-        penaltyMinutes: 0,
-        shadowBuffDays: 0,
-        userBuffDays: 0,
-        lastProcessedDate: null,
-        manualMissionChecks: {},
-      }
-    );
+    const saved = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE) || {};
+    return {
+      penaltyMinutes: saved.penaltyMinutes || 0,
+      shadowBuffDays: saved.shadowBuffDays || 0,
+      userBuffDays: saved.userBuffDays || 0,
+      lastProcessedDate: saved.lastProcessedDate || null,
+      manualMissionChecks: saved.manualMissionChecks || {},
+      // SE2: Persist the evolving standard (TIMETABLE_LOGIC)
+      timetable: saved.timetable || JSON.parse(JSON.stringify(TIMETABLE_LOGIC)),
+    };
   }
 
   initialize() {
@@ -163,9 +164,11 @@ class TrainerEngine {
   // Reads last 7 days of actual task start times per slot category and
   // progressively shifts TIMETABLE_LOGIC times toward IDEAL_TIMETABLE.
   // Formula: next_time = current + (ideal - current) * LR, clamped ≤ 30 min.
-  shiftTimetableTimes(behavioralState) {
+  shiftTimetableTimes(behavioralState, targetTimetable = null) {
     try {
-      if (typeof IDEAL_TIMETABLE === "undefined" || !TIMETABLE_LOGIC) return;
+      const timetable = targetTimetable || this.state.timetable;
+      if (typeof IDEAL_TIMETABLE === "undefined" || !timetable) return;
+      
       const { SE2 } = CONFIG;
       const today = new Date();
       const last7Dates = [];
@@ -175,19 +178,17 @@ class TrainerEngine {
         last7Dates.push(this.app.getDateString(d));
       }
 
-      // Helper: "HH:MM" string ↔ minutes (wraps to 24h)
       const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
       const toTime = (m) => {
         const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
         return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
 
-      TIMETABLE_LOGIC.forEach((slot, idx) => {
+      timetable.forEach((slot, idx) => {
         const ideal = IDEAL_TIMETABLE[idx];
         if (!ideal) return;
-        if (slot.mapsTo === "static") return; // don't shift static slots generally
+        if (slot.mapsTo === "static") return; 
 
-        // Gather actual start times matching this slot
         const actualMins = [];
         last7Dates.forEach((dateStr) => {
           this.app.state.tasks.forEach((task) => {
@@ -216,16 +217,15 @@ class TrainerEngine {
       });
 
       // Special handling for Sleep/Rest (Midnight Wrapping)
-      const sleepSlotIdx = TIMETABLE_LOGIC.findIndex(s => s.label?.toLowerCase() === "sleep" || s.label?.toLowerCase() === "rest");
+      const sleepSlotIdx = timetable.findIndex(s => s.label?.toLowerCase() === "sleep" || s.label?.toLowerCase() === "rest");
       if (sleepSlotIdx >= 0 && IDEAL_TIMETABLE[sleepSlotIdx]) {
-        const slot = TIMETABLE_LOGIC[sleepSlotIdx];
+        const slot = timetable[sleepSlotIdx];
         const ideal = IDEAL_TIMETABLE[sleepSlotIdx];
         const sleepMins = [];
         last7Dates.forEach((dateStr) => {
           this.app.state.tasks.forEach((task) => {
             if (task.date !== dateStr || task.category !== "Sleep" || !task.startTime) return;
             let m = new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes();
-            // Wrap early morning sleep (0-8 AM) to +24 hours for correct night-time averaging
             if (m < 480) m += 1440; 
             sleepMins.push(m);
           });
@@ -234,13 +234,13 @@ class TrainerEngine {
         if (sleepMins.length > 0) {
           const avgSleep = sleepMins.reduce((s, v) => s + v, 0) / sleepMins.length;
           let idealMin = toMin(ideal.time);
-          if (idealMin < 480) idealMin += 1440; // treat 11:45 PM as high or wrap
+          if (idealMin < 480) idealMin += 1440; 
           
           let currentMin = toMin(slot.time);
           if (currentMin < 480) currentMin += 1440;
 
-          const isRecovery = behavioralState === "RECOVERY";
           const lr = SE2.LEARNING_RATE_STABLE;
+          const isRecovery = behavioralState === "RECOVERY";
           const maxShift = isRecovery ? SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT : SE2.MAX_DAILY_SHIFT_LIMIT;
 
           const raw = avgSleep + (idealMin - avgSleep) * lr;
@@ -583,8 +583,15 @@ class TrainerEngine {
     };
   }
 
-  buildTrainerSnapshot() {
-    const metrics = this.app.shadowEngine.computeRollingMetrics();
+  buildTrainerSnapshot(targetDate = null) {
+    const cascade = this.ensureCascadeState();
+    const todayDate = targetDate || cascade.date || this.app.getDateString(new Date());
+    
+    // Step 2: analyzeBehavior — reads from BehaviorStore + shadowEngine
+    const behaviorSnapshot = this.analyzeBehavior();
+    const behavioralState = behaviorSnapshot.state;
+
+    const metrics = this.app.shadowEngine.computeRollingMetrics(todayDate);
     const shadow7DayAverage = Math.max(
       this.app.shadowEngine.shadowSevenDayAverage || 0,
       metrics.bestAvg || 0,
@@ -593,11 +600,15 @@ class TrainerEngine {
     const competition = this.app.shadowEngine.countShadowWinsThisMonth(
       map,
       shadow7DayAverage,
+      todayDate
     );
     const now = new Date();
+    // If it's a future logical date, timeRemaining is 0 or 24h? Use 0 for safety.
+    const isFuture = todayDate > this.app.getDateString(now);
+    
     const dayEnd = new Date(now);
     dayEnd.setHours(23, 59, 59, 999);
-    const timeRemainingToday = Math.max(
+    const timeRemainingToday = isFuture ? 0 : Math.max(
       0,
       Math.round((dayEnd - now) / 60000),
     );
@@ -612,7 +623,6 @@ class TrainerEngine {
     const lossChainBuffPct = this.state.shadowBuffDays > 0 ? 0.05 : 0;
     let adaptiveBuffPct = antiSandbag.adaptivePressure.buffPct;
 
-    const todayDate = this.app.getDateString(new Date());
     const timetable = this.evaluateTimetable(this.app.state.tasks, todayDate);
 
     if (timetable.sleepStatus === "COMPROMISED_OK") {
@@ -1098,10 +1108,10 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     // Use dynamic times from TIMETABLE_LOGIC
     const SLOT_MAP = [];
     if (typeof TIMETABLE_LOGIC !== "undefined") {
-      TIMETABLE_LOGIC.forEach((slot, idx) => {
+      this.state.timetable.forEach((slot, idx) => {
         let finalKey;
         if (slot.mapsTo === "learning") {
-           const learningSlots = TIMETABLE_LOGIC.filter(s => s.mapsTo === "learning");
+           const learningSlots = this.state.timetable.filter(s => s.mapsTo === "learning");
            const lIdx = learningSlots.indexOf(slot);
            finalKey = `slot${lIdx + 1}`;
         } else {
@@ -1280,7 +1290,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
       if (typeof TIMETABLE_LOGIC !== "undefined") {
         let learningCount = 1;
-        TIMETABLE_LOGIC.forEach((slot, idx) => {
+        this.state.timetable.forEach((slot, idx) => {
           const type = slot.mapsTo === "learning" ? "learning" : "static";
           SLOT_CONFIG.push({
             slotKey: type === "learning" ? `slot${learningCount++}` : `static${idx}`,
@@ -1310,15 +1320,17 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         if (isLearning) {
           const taskObj = cascade.activeSlots[slot.slotKey];
           if (taskObj) {
+            const itemFilter = isExp ? "grayscale(1) brightness(0.7)" : filter;
+            const itemOpacity = isExp ? 0.4 : opacity;
             html += `
-              <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}; transition: all 0.3s ease;">
+              <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.3s ease;">
                 <div style="display:flex; align-items:center;">
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
                     ${isDone ? "disabled" : ""}>
                     ${circleIcon}
                   </button>
-                  <span style="font-size:0.85rem;color:${color};">
+                  <span style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color};">
                     ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
                     <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
                     <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
@@ -1337,15 +1349,18 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
               </div>`;
           }
         } else {
+          const itemFilter = isExp ? "grayscale(1) brightness(0.6)" : filter;
+          const itemOpacity = isExp ? 0.35 : opacity;
+          const labelColor = isExp ? "var(--text-tertiary)" : color;
           html += `
-            <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}">
+            <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}">
               <div style="display:flex; align-items:center;">
                 <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                   data-slot-key="${slot.slotKey}" 
                   ${isDone ? "disabled" : ""}>
                   ${circleIcon}
                 </button>
-                <span style="font-size:0.85rem;color:${color};">
+                <span style="font-size:0.85rem;color:${labelColor};">
                   ${formatTime(slot.time)} → ${slot.label} 
                   <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
                 </span>
@@ -1398,11 +1413,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
-    TIMETABLE_LOGIC.forEach((slot, idx) => {
+    this.state.timetable.forEach((slot, idx) => {
       // Determine key for this slot
       let key;
       if (slot.mapsTo === "learning") {
-        const learningSlots = TIMETABLE_LOGIC.filter(s => s.mapsTo === "learning");
+        const learningSlots = this.state.timetable.filter(s => s.mapsTo === "learning");
         const lIdx = learningSlots.indexOf(slot);
         key = `slot${lIdx + 1}`;
       } else {
@@ -1757,11 +1772,19 @@ Rules:
       m.days.every((d) => d.status === "completed" || d.completed),
     ).length;
 
+    // Find last sleep session
+    const lastSleep = (this.app.state.tasks || [])
+      .filter(t => t.category === "Sleep")
+      .sort((a,b) => (b.endTime || 0) - (a.endTime || 0))[0];
+    const sleepDisplay = lastSleep 
+      ? `${new Date(lastSleep.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${lastSleep.duration}m)`
+      : "No data";
+
     overview.innerHTML = `
           <div class="trainer-overview-card"><div class="trainer-overview-label">View Date</div><div class="trainer-overview-value" style="color:var(--text-accent);">${dateLabel}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Active Module</div><div class="trainer-overview-value">${this.escapeHtml(activeModule?.name || "Completed")}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Modules Complete</div><div class="trainer-overview-value">${completedModules}/${this.state.roadmap.modules.length}</div></div>
-          <div class="trainer-overview-card"><div class="trainer-overview-label">Unlocked Module</div><div class="trainer-overview-value">${moduleIndex + 1}</div></div>
+          <div class="trainer-overview-card"><div class="trainer-overview-label">Last Sleep</div><div class="trainer-overview-value" style="font-size:0.7rem;">${sleepDisplay}</div></div>
         `;
 
     // Add Schedule Preview (innovations: improve.md §8)
@@ -1776,8 +1799,19 @@ Rules:
       <h3 style="font-size:0.9rem; color:var(--text-accent); margin-bottom:12px; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.1)); padding-bottom:6px; font-weight:700;">📋 ${dateLabel} SE2 TIMETABLE</h3>
       <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">`;
     
-    if (typeof TIMETABLE_LOGIC !== "undefined") {
-      TIMETABLE_LOGIC.forEach(slot => {
+    const isToday = logicalDate === realDate;
+    const analysis = this.analyzeBehavior();
+    const { state: behavioralState } = analysis;
+
+    // Use a copy for hypothetical tomorrow preview
+    let previewTimetable = JSON.parse(JSON.stringify(this.state.timetable));
+    if (isToday) {
+      // Show what it WOULD be after correction
+      this.shiftTimetableTimes(behavioralState, previewTimetable);
+    }
+    
+    if (typeof previewTimetable !== "undefined") {
+      previewTimetable.forEach(slot => {
         scheduleHtml += `<div style="font-size:0.85rem; color:var(--text-secondary); display:flex; flex-direction:column;">
           <strong style="color:var(--text-accent); font-family:'JetBrains Mono', monospace;">${formatTime(slot.time)}</strong>
           <span style="opacity:0.8;">${slot.label}</span>

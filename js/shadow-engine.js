@@ -495,39 +495,41 @@ class ShadowEngine {
     return { label: "Pressure: Critical", cls: "shadow-pressure-high" };
   }
 
-  countShadowWinsThisMonth(dailyMap, shadowAvg) {
+  countShadowWinsThisMonth(dailyMap, shadowAvg, targetDateStr = null) {
     if (shadowAvg <= 0)
       return { myWins: 0, shadowWins: 0, activeDays: 0, recentWinRate: 0 };
-    const now = new Date();
+    
+    // Use targetDateStr (logical) if provided, else use physical now
+    const now = targetDateStr ? new Date(targetDateStr) : new Date();
     const month = now.getMonth();
     const year = now.getFullYear();
-    const todayStr = this.app.getDateString(now);
+    const todayStr = targetDateStr || this.app.getDateString(new Date());
     const monthDays = [];
 
     let myWins = 0;
     let activeDays = 0;
     let shadowWins = 0;
 
+    // Loop through all days of the current month up to the target date
     for (let day = 1; day <= now.getDate(); day++) {
       const d = new Date(year, month, day);
       const date = this.app.getDateString(d);
       const minutes = dailyMap.get(date) || 0;
 
-      if (minutes === 0) continue;
-
       const isToday = date === todayStr;
       const isWin = minutes >= shadowAvg;
 
+      // In Shadow Engine 2.0, inactivity is treated as a loss for the user
+      // unless it's the current 'Today' which is still in progress.
       if (isWin) {
         myWins++;
         activeDays++;
+        monthDays.push({ date, isWin: true });
       } else if (!isToday) {
+        // Shadow wins the day if the user was inactive or below target in the past
         shadowWins++;
         activeDays++;
-      }
-
-      if (isWin || !isToday) {
-        monthDays.push({ date, isWin });
+        monthDays.push({ date, isWin: false });
       }
     }
 
