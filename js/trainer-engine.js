@@ -1845,7 +1845,7 @@ Rules:
       <h3 style="font-size:0.9rem; color:var(--text-accent); margin-bottom:12px; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.1)); padding-bottom:6px; font-weight:700;">📋 ${dateLabel} SE2 TIMETABLE</h3>
       <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">`;
 
-    const isToday = logicalDate === realDate;
+    const isToday = logicalNextDate === realDate;
     const analysis = this.analyzeBehavior();
     const { state: behavioralState } = analysis;
 
