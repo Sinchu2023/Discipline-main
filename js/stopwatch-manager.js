@@ -131,13 +131,17 @@ class StopwatchManager {
           }
           this.startTicking();
         }
-        startSleep() {
-          this.start("Sleep", {
-            category: "Sleep",
-            subcategory: "Night Sleep",
-            description: "Sleep Session",
-          });
-        }
+  startSleep() {
+    this.start("Sleep", {
+      category: "Sleep",
+      subcategory: "Night Sleep",
+      description: "Sleep Session",
+    });
+    // SE2: Automatically finalize the day and generate next schedule
+    if (this.app.trainerEngine?.autoFinalizeAtSleep) {
+      this.app.trainerEngine.autoFinalizeAtSleep();
+    }
+  }
         stop() {
           if (!this.isRunning) return;
           this.stopTicking();

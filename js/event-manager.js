@@ -125,8 +125,8 @@ class EventManager {
               !this.app.trainerEngine.state.roadmap.editMode;
             this.app.trainerEngine.refresh();
           });
-          this.app.elements["copy-trainer"].addEventListener("click", () =>
-            this.app.trainerEngine.copyPlan(),
+          this.app.elements["next-day-btn"].addEventListener("click", () =>
+            this.app.trainerEngine.handleNextDayClick(),
           );
           const deleteRoadmapBtn = document.getElementById("delete-roadmap-btn");
           if (deleteRoadmapBtn) {

@@ -81,7 +81,7 @@ class DisciplineTracker {
             "close-trainer",
             "close-trainer-modal",
             "refresh-trainer",
-            "copy-trainer",
+            "next-day-btn",
             "shadow-current-card",
             "shadow-standard-card",
             "shadow-current-minutes",

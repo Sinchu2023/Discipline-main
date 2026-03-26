@@ -1167,7 +1167,14 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
   triggerFinalizeDay() {
     if (!confirm("Finalize today's performance and generate tomorrow's schedule?")) return;
-    
+    this._performDayFinalization();
+  }
+
+  autoFinalizeAtSleep() {
+    this._performDayFinalization(true);
+  }
+
+  _performDayFinalization(isSilent = false) {
     // 1. Run dynamic timetable shift based on behavior
     const behavior = this.analyzeBehavior();
     this.shiftTimetableTimes(behavior.state);
@@ -1177,9 +1184,10 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     
     // 3. Save updated roadmap & refresh
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
-    alert("Day finalized. Schedule updated based on your performance!");
+    if (!isSilent) alert("Day finalized. Schedule updated based on your performance!");
     this.refresh();
   }
+
 
 
   // ── syncMissionFromRoadmap ───────────────────────────────────────────────
@@ -1748,13 +1756,11 @@ Rules:
     this.app.elements["trainer-modal"].style.display = "flex";
   }
 
-  copyPlan() {
-    this.ensureRoadmap();
-    this.app.saveToStorage(
-      CONFIG.STORAGE_KEYS.ROADMAP_STATE,
-      this.state.roadmap,
-    );
+  // SE2: ADVANCE TO NEXT DAY (manual trigger from Roadmap Console)
+  handleNextDayClick() {
+    this._performDayFinalization();
   }
+
 
   async deleteRoadmap() {
     if (!this.state.roadmap?.modules?.length) {
