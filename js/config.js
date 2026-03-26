@@ -15,7 +15,6 @@ const CONFIG = {
     SYNC_QUEUE: "discipline_tracker_sync_queue",
     SHADOW_AVG: "discipline_tracker_shadow_avg",
     TRAINER_STATE: "discipline_tracker_trainer_state",
-    FLOW_PROTOCOL: "discipline_tracker_flow_protocol",
     ROADMAP_STATE: "discipline_tracker_roadmap_state",
     FIREBASE_USER: "discipline_tracker_firebase_user",
     CLIENT_VERSION: "discipline_tracker_client_version",
@@ -66,11 +65,23 @@ const CONFIG = {
 
   DAILY_GOALS: [
     {
+      id: "roadmap_learning",
+      label: "Shunt Clipper Circuits Clamper Circuits",
+      minutesTarget: 180,
+      sessionsTarget: 0,
+      keywords: ["deep work", "learn", "learning", "study"],
+      discipline_type: "strict",
+      estimated_minutes: 150,
+      target_minutes: 180,
+      priority: 0,
+      category: "learning",
+    },
+    {
       id: "project",
       label: "Project Work",
       minutesTarget: 180,
       sessionsTarget: 0,
-      keywords: ["project"],
+      keywords: ["project", "build"],
       // Shadow Engine 2.0 metadata
       discipline_type: "flexible",
       estimated_minutes: 120,
