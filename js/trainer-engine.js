@@ -44,8 +44,8 @@ class TrainerEngine {
           if (missionLabel) {
             const label = missionLabel.getAttribute("data-label");
             const subtext = missionLabel.getAttribute("data-subtext");
-            if (this.app.stopwatchManager?.startTaskFromRoadmap) {
-              this.app.stopwatchManager.startTaskFromRoadmap(label, subtext);
+            if (this.app.stopwatch?.startTaskFromRoadmap) {
+              this.app.stopwatch.startTaskFromRoadmap(label, subtext);
             }
           }
         }
@@ -1352,8 +1352,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                     ${circleIcon}
                   </button>
                   <span class="mission-task-label" 
-                        style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: opacity 0.2s;"
-                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                        style="font-size:0.85rem; color:${isExp ? "#555" : color}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
+                        onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'"
                         data-label="${this.escapeHtml(slot.label)}" 
                         data-subtext="${this.escapeHtml(taskObj.text)}">
                     ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
@@ -1386,8 +1386,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                   ${circleIcon}
                 </button>
                 <span class="mission-task-label" 
-                      style="font-size:0.85rem;color:${labelColor}; cursor:pointer; transition: opacity 0.2s;"
-                      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                      style="font-size:0.85rem; color:${labelColor}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
+                      onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'"
                       data-label="${this.escapeHtml(slot.label)}" 
                       data-subtext="">
                   ${formatTime(slot.time)} → ${slot.label} 
