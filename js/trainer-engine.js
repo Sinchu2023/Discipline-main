@@ -38,6 +38,7 @@ class TrainerEngine {
           }
           if (e.target.id === "btn-undo-cascade") this.undoCascade();
           if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
+          if (e.target.id === "btn-revert-yesterday") this.switchToYesterday();
 
           // SE2: Auto-start stopwatch when clicking mission text
           const missionLabel = e.target.closest(".mission-task-label");
@@ -1091,8 +1092,18 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     if (shouldReset) {
       const q = this.getFullRoadmapQueue();
+      
+      // SE2: If we are initializing a FRESH state between 12 AM and 4 AM,
+      // assume we are still working on "Yesterday" and use that as the starting date.
+      let effectiveDate = today;
+      if (nowHour < 4) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 1);
+        effectiveDate = this.app.getDateString(d);
+      }
+
       cascade = {
-        date: today,
+        date: effectiveDate,
         roadmapQueue: q,
         activeSlots: {
           slot1: q[0] || null,
@@ -1792,9 +1803,15 @@ Rules:
 
     const { moduleIndex, activeModule } = this.getRoadmapProgress();
     const cascade = this.ensureCascadeState();
-    const logicalDate = cascade.date || this.app.getDateString(new Date());
+    const logicalCurrentDate = cascade.date || this.app.getDateString(new Date());
+    
+    // Preview date is ALWAYS LogicalCurrentDate + 1
+    const d = new Date(logicalCurrentDate);
+    d.setDate(d.getDate() + 1);
+    const logicalNextDate = this.app.getDateString(d);
+    
     const realDate = this.app.getDateString(new Date());
-    const dateLabel = logicalDate === realDate ? "TODAY" : logicalDate;
+    const dateLabel = logicalNextDate;
 
     // Calculate completed modules
     const completedModules = this.state.roadmap.modules.filter((m) =>
@@ -1992,46 +2009,38 @@ Rules:
   }
 
   autoFinalizeAtSleep() {
-    // SE2: Immediate Wake Rerouting (Problem 4/5/8)
-    // Calculate mandatory 5-hour wake offset based on *current* time
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-
-    // Use 48h timeline to handle midnight transitions safely
-    // If it's early morning (0-8 AM), treat as 'late today' (1440 + min)
     let sleepTime48 = nowMin;
     if (nowMin < 480) sleepTime48 += 1440;
 
-    const firstSlot = TIMETABLE_LOGIC[0];
-    const [h, m] = firstSlot.time.split(":").map(Number);
+    const firstSlot = this.state.timetable[0] || TIMETABLE_LOGIC[0];
+    const [h, m] = (firstSlot.time || "04:00").split(":").map(Number);
     const idealWake48 = 1440 + (h * 60 + m);
 
     const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
     const wakeDeadline48 = sleepTime48 + minSleep;
-
     const wakeOffset = Math.max(0, wakeDeadline48 - idealWake48);
 
-    console.log(`[SE2 Sleep Trigger] Sleep: ${nowMin}m, IdealWake: ${idealWake48}m, Offset: ${wakeOffset}m`);
+    console.log("[SE2] Deterministic Sleep Flip triggered.");
     this._performDayFinalization(wakeOffset);
   }
 
   triggerFinalizeDay() {
-    if (confirm("Finalize today's performance and generate tomorrow's schedule?")) {
-      // Manual finalization should still respect the minimum sleep window for the actual time right now
-      const now = new Date();
-      const nowMin = now.getHours() * 60 + now.getMinutes();
-      let sleepTime48 = nowMin;
-      if (nowMin < 480) sleepTime48 += 1440;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    let sleepTime48 = nowMin;
+    if (nowMin < 480) sleepTime48 += 1440;
 
-      const firstSlot = this.state.timetable[0];
-      const [h, m] = (firstSlot?.time || "04:00").split(":").map(Number);
-      const idealWake48 = 1440 + (h * 60 + m);
+    const firstSlot = this.state.timetable[0] || TIMETABLE_LOGIC[0];
+    const [h, m] = (firstSlot.time || "04:00").split(":").map(Number);
+    const idealWake48 = 1440 + (h * 60 + m);
 
-      const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
-      const wakeOffset = Math.max(0, (sleepTime48 + minSleep) - idealWake48);
+    const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
+    const wakeDeadline48 = sleepTime48 + minSleep;
+    const wakeOffset = Math.max(0, wakeDeadline48 - idealWake48);
 
-      this._performDayFinalization(wakeOffset);
-    }
+    this._performDayFinalization(wakeOffset);
   }
 
   _performDayFinalization(wakeOffset = 0) {
@@ -2109,6 +2118,32 @@ Rules:
     this._performDayFinalization();
   }
 
+  switchToYesterday() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yesterdayStr = this.app.getDateString(d);
+    
+    const cascade = this.app.loadFromStorage("cascade_state");
+    if (cascade) {
+      cascade.date = yesterdayStr;
+      this.app.saveToStorage("cascade_state", cascade);
+      this.refresh();
+    }
+  }
+
+
+  // SE2: Automatically called when the "Sleep" stopwatch is started
+  autoFinalizeAtSleep() {
+    // Only finalize if we are not already on a future date preview
+    const realDate = this.app.getDateString(new Date());
+    const cascade = this.ensureCascadeState();
+    
+    // We only want to finalize if the current mission view is actually "Today"
+    if (cascade.date <= realDate) {
+      console.log("[SE2] Auto-finalizing day via Sleep trigger...");
+      this._performDayFinalization();
+    }
+  }
 
   async deleteRoadmap() {
     if (!this.state.roadmap?.modules?.length) {
