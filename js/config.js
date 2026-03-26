@@ -41,6 +41,7 @@ const CONFIG = {
     LEARNING_RATE_FAILURE_SEVERE: 0.1,
     LEARNING_RATE_FAILURE_MODERATE: 0.2,
     LEARNING_RATE_STABLE: 0.3,
+    LEARNING_RATE_GROWTH: 0.35,
     // Smart Success Evaluation — below this ratio, partial credit only
     EFFORT_SUCCESS_THRESHOLD: 0.7,
     // Flexible task buffer multiplier

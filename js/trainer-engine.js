@@ -127,8 +127,12 @@ class TrainerEngine {
       rate = (current / Math.max(1, ideal)) < 0.5
         ? SE2.LEARNING_RATE_FAILURE_SEVERE
         : SE2.LEARNING_RATE_FAILURE_MODERATE;
+    } else if (state === "GROWTH") {
+      // GROWTH: slightly faster progression than STABLE, still within the 30-min cap
+      rate = SE2.LEARNING_RATE_GROWTH || 0.35;
     } else {
-      rate = SE2.LEARNING_RATE_STABLE; // STABLE or GROWTH both use 0.3
+      // STABLE: balanced correction
+      rate = SE2.LEARNING_RATE_STABLE;
     }
     const raw = current + (ideal - current) * rate;
     // Clamp shift to MAX_DAILY_SHIFT_LIMIT
@@ -220,25 +224,40 @@ class TrainerEngine {
   // ── SE2: Mission Target Generator ────────────────────────────────────
   // Returns adjusted daily mission targets for each DAILY_GOAL based on
   // behavioral state, sleep compromise status, and flexibility buffer.
+  // Each goal uses its OWN 7-day keyword-matched average (not total daily minutes).
   generateMissionTargets(behavioralState, sleepCompromised) {
     const { SE2 } = CONFIG;
     const flexBuffer = this.computeFlexibilityBuffer();
     const goals = CONFIG.DAILY_GOALS || [];
-    const dailyMap = this.getDailyProductiveMap();
-
-    // Compute current 7-day average per-task (approximate via total)
     const today = new Date();
-    let avgMinutes = 0;
+    const todayStr = this.app.getDateString(today);
+
+    // Build per-day task arrays for last 7 days (excluding today)
+    const last7Days = [];
     for (let i = 1; i <= 7; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const ds = this.app.getDateString(d);
-      avgMinutes += dailyMap.get(ds) || 0;
+      last7Days.push(this.app.getDateString(d));
     }
-    avgMinutes = avgMinutes / 7;
 
     return goals.map((goal) => {
       const ideal = goal.target_minutes || goal.minutesTarget || 0;
+      const keywords = goal.keywords || [];
+
+      // Compute per-goal 7-day average using keyword matching
+      let goalTotalMinutes = 0;
+      last7Days.forEach((dayStr) => {
+        const dayGoalMinutes = this.app.state.tasks
+          .filter((t) => {
+            if (t.date !== dayStr || !this.app.isProductiveCategory(t.category)) return false;
+            const haystack = `${t.description || ""} ${t.subcategory || ""} ${t.category || ""}`.toLowerCase();
+            return keywords.some((kw) => haystack.includes(kw.toLowerCase()));
+          })
+          .reduce((sum, t) => sum + (t.duration || 0), 0);
+        goalTotalMinutes += dayGoalMinutes;
+      });
+      const avgMinutes = goalTotalMinutes / 7;
+
       let target = this.progressiveCorrection(avgMinutes, ideal, behavioralState);
 
       // Apply sleep compromise load reduction (−15%)
@@ -901,98 +920,196 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   ensureCascadeState() {
     const today = this.app.getDateString(new Date());
     let cascade = this.app.loadFromStorage("cascade_state");
-    if (!cascade || cascade.date !== today) {
+    // Rebuild state if stale (new day) or missing required schema fields
+    const isSchemaValid = cascade && cascade.roadmapQueue !== undefined
+      && cascade.activeSlots && typeof cascade.activeSlots === "object" && !Array.isArray(cascade.activeSlots)
+      && cascade.completion && cascade.slotStatus;
+    if (!cascade || cascade.date !== today || !isSchemaValid) {
       const q = this.getFullRoadmapQueue();
       cascade = {
         date: today,
-        activeSlots: [
-          q[0] || null,
-          q[1] || null,
-          q[2] || null
-        ]
+        roadmapQueue: q,
+        activeSlots: {
+          slot1: q[0] || null,
+          slot2: q[1] || null,
+          slot3: q[2] || null,
+        },
+        completion: { slot1: false, slot2: false, slot3: false },
+        slotStatus:  { slot1: "active", slot2: "active", slot3: "active" },
+        stateHistory: [],
       };
       this.app.saveToStorage("cascade_state", cascade);
     }
     return cascade;
   }
 
-  triggerCascadeComplete(slotIndex) {
+  // ── Cascade: compute slot time statuses ─────────────────────────────────
+  // Marks slots as 'expired' if their scheduled time has passed and they
+  // were not completed. Slots remain editable even when expired (improve.md §9).
+  _refreshSlotStatuses(cascade) {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const SLOT_TIMES = [
+      { key: "slot1", hour: 4,  min: 0  }, // 4:00 AM deep work
+      { key: "slot2", hour: 7,  min: 30 }, // 7:30 AM deep work
+      { key: "slot3", hour: 16, min: 0  }, // 4:00 PM learn
+    ];
+    SLOT_TIMES.forEach(({ key, hour, min }) => {
+      if (cascade.completion[key]) {
+        cascade.slotStatus[key] = "completed";
+      } else if (nowMinutes > hour * 60 + min) {
+        cascade.slotStatus[key] = "expired";
+      } else {
+        cascade.slotStatus[key] = "active";
+      }
+    });
+  }
+
+  // ── Cascade: save non-destructive snapshot before any mutation ──────────
+  _pushCascadeHistory(cascade) {
+    cascade.stateHistory = cascade.stateHistory || [];
+    cascade.stateHistory.push(JSON.parse(JSON.stringify({
+      roadmapQueue: cascade.roadmapQueue,
+      activeSlots:  cascade.activeSlots,
+      completion:   cascade.completion,
+      slotStatus:   cascade.slotStatus,
+    })));
+    if (cascade.stateHistory.length > 20) cascade.stateHistory.shift();
+  }
+
+  triggerCascadeComplete(slotKey) {
     const cascade = this.ensureCascadeState();
-    const completedTask = cascade.activeSlots[slotIndex];
+    // ── Non-destructive: save snapshot before mutating (improve.md §6) ──
+    this._pushCascadeHistory(cascade);
+
+    const completedTask = cascade.activeSlots[slotKey];
     if (completedTask) {
       this.setRoadmapDayStatus(completedTask.moduleIndex, completedTask.dayIndex, true);
       this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
     }
-    cascade.activeSlots.splice(slotIndex, 1);
-    
+
+    // Mark completion + rebuild slot from next in queue
+    cascade.completion[slotKey] = true;
+    cascade.slotStatus[slotKey] = "completed";
+
+    // Rebuild roadmapQueue and fill the completed slot with the next item
     const q = this.getFullRoadmapQueue();
-    const activeTexts = cascade.activeSlots.filter(Boolean).map(x => x.text);
-    const nextInQueue = q.find(x => !activeTexts.includes(x.text));
-    
-    cascade.activeSlots.push(nextInQueue || null);
+    cascade.roadmapQueue = q;
+    const usedTexts = Object.values(cascade.activeSlots)
+      .filter(Boolean).map(x => x.text);
+    const nextItem = q.find(x => !usedTexts.includes(x.text));
+    cascade.activeSlots[slotKey] = nextItem || null;
+    if (nextItem) {
+      cascade.completion[slotKey] = false;
+      cascade.slotStatus[slotKey] = "active";
+    }
+
     this.app.saveToStorage("cascade_state", cascade);
     this.syncMissionFromRoadmap();
   }
 
   triggerCascadeMiss() {
     const cascade = this.ensureCascadeState();
-    let firstActiveIdx = cascade.activeSlots.findIndex(x => x !== null);
-    if (firstActiveIdx === -1 || firstActiveIdx >= 2) return;
-    
-    for (let i = 2; i > firstActiveIdx; i--) {
-      cascade.activeSlots[i] = cascade.activeSlots[i - 1];
-    }
-    cascade.activeSlots[firstActiveIdx] = null;
-    
+    // ── Non-destructive: save snapshot before mutating (improve.md §6) ──
+    this._pushCascadeHistory(cascade);
+
+    // Rotate: slot1 → null, slot2 → old slot1, slot3 → old slot2
+    // The "missed" slot1 is pushed to back and cleared from front
+    const prev = { ...cascade.activeSlots };
+    cascade.activeSlots.slot1 = null;
+    cascade.activeSlots.slot2 = prev.slot1;
+    cascade.activeSlots.slot3 = prev.slot2;
+    cascade.completion.slot1 = false;
+    cascade.slotStatus.slot1 = "expired";
+
     this.app.saveToStorage("cascade_state", cascade);
     this.syncMissionFromRoadmap();
   }
 
+  // ── Cascade: undo last action (improve.md §6) ────────────────────────────
+  undoCascade() {
+    const cascade = this.ensureCascadeState();
+    if (!cascade.stateHistory?.length) return;
+    const prev = cascade.stateHistory.pop();
+    // Restore mutable parts, preserving date and stateHistory
+    cascade.roadmapQueue = prev.roadmapQueue;
+    cascade.activeSlots  = prev.activeSlots;
+    cascade.completion   = prev.completion;
+    cascade.slotStatus   = prev.slotStatus;
+    this.app.saveToStorage("cascade_state", cascade);
+    this.syncMissionFromRoadmap();
+  }
+
+  // ── syncMissionFromRoadmap ───────────────────────────────────────────────
+  // Derives the entire mission UI from cascadeState (improve.md §3, §10, §12).
+  // UI reads cascadeState → derived model → HTML. No independent UI state.
   syncMissionFromRoadmap() {
     try {
+      // ── Step 1: Ensure CONFIG goals are up-to-date ─────────────────────
       CONFIG.DAILY_GOALS = [
         {
           id: "roadmap_learning", label: "Roadmap Tasks", minutesTarget: 270, sessionsTarget: 0,
-          keywords: ["deep work", "learn", "learning", "study"], discipline_type: "flexible", target_minutes: 270, category: "learning"
+          keywords: ["deep work", "learn", "learning", "study"],
+          discipline_type: "strict", target_minutes: 270, category: "learning", priority: 0,
         },
         {
           id: "project", label: "Project Work", minutesTarget: 180, sessionsTarget: 0,
-          keywords: ["project", "build"], discipline_type: "flexible", target_minutes: 180, category: "deep_work"
+          keywords: ["project", "build"],
+          discipline_type: "flexible", target_minutes: 180, category: "deep_work", priority: 1,
         },
         {
           id: "revision", label: "Revision", minutesTarget: 120, sessionsTarget: 0,
-          keywords: ["revision"], discipline_type: "flexible", target_minutes: 120, category: "learning"
-        }
+          keywords: ["revision"],
+          discipline_type: "flexible", target_minutes: 120, category: "learning", priority: 2,
+        },
       ];
 
+      // ── Step 2: Load state and refresh slot time statuses ──────────────
       const cascade = this.ensureCascadeState();
-      const UI_SLOTS = [
-        { time: "4:00 AM", label: "Deep Work (Learning)", type: "learning", slotIdx: 0 },
-        { time: "6:15 AM", label: "Training", type: "static" },
-        { time: "7:30 AM", label: "Deep Work (Learning)", type: "learning", slotIdx: 1 },
-        { time: "11:00 AM", label: "Build (Project)", type: "static" },
-        { time: "4:00 PM", label: "Learn (Learning)", type: "learning", slotIdx: 2 },
-        { time: "7:30 PM", label: "Atomic Habits", type: "static" },
-        { time: "9:45 PM", label: "Revision", type: "static" },
-        { time: "11:30 PM", label: "Sleep", type: "static" }
+      this._refreshSlotStatuses(cascade);
+
+      // ── Step 3: Derive the UI model from cascadeState ──────────────────
+      // Slot key → display config
+      const SLOT_CONFIG = [
+        { slotKey: "slot1", time: "4:00 AM",  label: "Deep Work",  type: "learning" },
+        { slotKey: null,    time: "6:15 AM",  label: "Training",   type: "static"   },
+        { slotKey: "slot2", time: "7:30 AM",  label: "Deep Work",  type: "learning" },
+        { slotKey: null,    time: "11:00 AM", label: "Build (Project)", type: "static" },
+        { slotKey: "slot3", time: "4:00 PM",  label: "Learn",      type: "learning" },
+        { slotKey: null,    time: "7:30 PM",  label: "Atomic Habits", type: "static" },
+        { slotKey: null,    time: "9:45 PM",  label: "Revision",   type: "static"   },
+        { slotKey: null,    time: "11:30 PM", label: "Sleep",      type: "static"   },
       ];
 
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
-      
+
+      // ── Step 4: Build HTML from derived model (no independent UI state) ─
       let html = "";
-      UI_SLOTS.forEach(slot => {
-        if (slot.type === "learning") {
-          const taskObj = cascade.activeSlots[slot.slotIdx];
+      SLOT_CONFIG.forEach(slot => {
+        if (slot.type === "learning" && slot.slotKey) {
+          const taskObj    = cascade.activeSlots[slot.slotKey];
+          const isDone     = cascade.completion[slot.slotKey];
+          const status     = cascade.slotStatus[slot.slotKey]; // active | expired | completed
+          const statusIcon = status === "completed" ? "✔" : status === "expired" ? "⚠" : "●";
+          const statusColor = status === "completed" ? "var(--success)"
+            : status === "expired" ? "var(--warning)" : "var(--text-secondary)";
+
           if (taskObj) {
-             html += `
-              <div class="sd-mission-item shadow-goal-item">
-                <input class="mission-cascade-check" type="checkbox" data-slot="${slot.slotIdx}" style="margin-right:8px; cursor:pointer; min-width:14px; min-height:14px;"/>
-                <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label} [ROADMAP: ${this.escapeHtml(taskObj.text)}]</span>
+            html += `
+              <div class="sd-mission-item shadow-goal-item" style="${isDone ? "opacity:0.6;" : ""}">
+                <input class="mission-cascade-check" type="checkbox" data-slot-key="${slot.slotKey}"
+                  ${isDone ? "checked disabled" : ""}
+                  style="margin-right:8px; cursor:pointer; min-width:14px; min-height:14px; accent-color:var(--success);"/>
+                <span style="font-size:0.85rem; color:${statusColor};">
+                  ${statusIcon}&nbsp;${slot.time} → ${slot.label}
+                  [${this.escapeHtml(taskObj.text)}]
+                  <em style="font-size:0.75rem; opacity:0.7;">${status}</em>
+                </span>
               </div>`;
           } else {
-             html += `
-              <div class="sd-mission-item shadow-goal-item" style="opacity: 0.5;">
+            html += `
+              <div class="sd-mission-item shadow-goal-item" style="opacity:0.4;">
                 <div class="sd-mission-dot" style="margin-right:8px; background:transparent; border:1px solid #444;"></div>
                 <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label} [Empty]</span>
               </div>`;
@@ -1005,26 +1122,42 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
             </div>`;
         }
       });
-      
-      let btnHtml = `
-        <button id="btn-continue-day" style="width:100%; margin-top:12px; padding:6px; background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border); border-radius:4px; font-size:0.75rem; cursor:pointer;">
-          Missed? Continue Day (Cascade Forward)
-        </button>`;
-        
-      container.innerHTML = html + btnHtml;
 
+      // ── Step 5: Action buttons ─────────────────────────────────────────
+      const hasHistory = cascade.stateHistory?.length > 0;
+      html += `
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button id="btn-continue-day"
+            style="flex:1; padding:6px; background:var(--bg-card); color:var(--text-secondary);
+                   border:1px solid var(--border); border-radius:4px; font-size:0.75rem; cursor:pointer;">
+            Missed? Cascade Forward
+          </button>
+          <button id="btn-undo-cascade"
+            style="padding:6px 12px; background:var(--bg-card); color:${hasHistory ? "var(--warning)" : "var(--text-secondary)"};
+                   border:1px solid var(--border); border-radius:4px; font-size:0.75rem;
+                   cursor:${hasHistory ? "pointer" : "default"}; opacity:${hasHistory ? 1 : 0.4};"
+            ${hasHistory ? "" : "disabled"}>
+            ↩ Undo
+          </button>
+        </div>`;
+
+      container.innerHTML = html;
+
+      // ── Step 6: Wire events — all mutations go through cascade engine ──
       container.querySelectorAll(".mission-cascade-check").forEach(cb => {
         cb.addEventListener("change", (e) => {
           if (e.target.checked) {
-             const slotIdx = Number(e.target.getAttribute("data-slot"));
-             this.triggerCascadeComplete(slotIdx);
+            const slotKey = e.target.getAttribute("data-slot-key");
+            this.triggerCascadeComplete(slotKey);
           }
         });
       });
-      
-      document.getElementById("btn-continue-day").addEventListener("click", () => {
-         this.triggerCascadeMiss();
-      });
+
+      const missBtn = document.getElementById("btn-continue-day");
+      if (missBtn) missBtn.addEventListener("click", () => this.triggerCascadeMiss());
+
+      const undoBtn = document.getElementById("btn-undo-cascade");
+      if (undoBtn) undoBtn.addEventListener("click", () => this.undoCascade());
 
     } catch (err) {
       console.error("[syncMissionFromRoadmap] Cascade logic failed:", err);
