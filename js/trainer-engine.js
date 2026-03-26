@@ -97,6 +97,15 @@ class TrainerEngine {
       .replace(/'/g, "&#039;");
   }
 
+  _handleMissionClick(element) {
+    const label = element.getAttribute("data-label");
+    const subtext = element.getAttribute("data-subtext");
+    const sw = this.app.stopwatch || this.app.stopwatchManager;
+    if (sw?.startTaskFromRoadmap) {
+      sw.startTaskFromRoadmap(label, subtext);
+    }
+  }
+
   getDailyProductiveMap() {
     const map = new Map();
     this.app.state.tasks.forEach((task) => {
@@ -1392,8 +1401,10 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                   ${circleIcon}
                 </button>
                 <span class="mission-task-label" 
-                      style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: opacity 0.2s;"
-                      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                      style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; position:relative; z-index:10; pointer-events:auto;"
+                      onmouseover="this.style.textShadow='0 0 8px var(--primary)'; this.style.opacity='0.8'" 
+                      onmouseout="this.style.textShadow='none'; this.style.opacity='1'"
+                      onclick="window.app.trainerEngine._handleMissionClick(this)"
                       data-label="${this.escapeHtml(slot.label)}" 
                       data-subtext="${this.escapeHtml(taskObj.text)}">
                   ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
@@ -1413,8 +1424,10 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                   ${circleIcon}
                 </button>
                 <span class="mission-task-label" 
-                      style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: opacity 0.2s;"
-                      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                      style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; position:relative; z-index:10; pointer-events:auto;"
+                      onmouseover="this.style.textShadow='0 0 8px var(--primary)'; this.style.opacity='0.8'" 
+                      onmouseout="this.style.textShadow='none'; this.style.opacity='1'"
+                      onclick="window.app.trainerEngine._handleMissionClick(this)"
                       data-label="${this.escapeHtml(slot.label)}" 
                       data-subtext="">
                   ${formatTime(slot.time)} → ${slot.label} 
