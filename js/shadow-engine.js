@@ -130,7 +130,7 @@ class ShadowEngine {
     return dailyMap;
   }
 
-  getTodayGoalProgress(dateStr = this.app.getDateString(new Date())) {
+  getTodayGoalProgress(dateStr = this.app.getDateString(new Date()), sourceTasks = null) {
     const goals = CONFIG.DAILY_GOALS || [];
     const progress = {};
 
@@ -142,22 +142,18 @@ class ShadowEngine {
         minutesTarget: goal.minutesTarget || 0,
         sessionsTarget: goal.sessionsTarget || 0,
         completed: goal.completed || false,
-        // SE2 metadata
         discipline_type: goal.discipline_type || "flexible",
         target_minutes: goal.target_minutes || goal.minutesTarget || 0,
       };
     });
 
-    this.app.state.tasks.forEach((task) => {
-      if (
-        !task ||
-        task.date !== dateStr ||
-        !Number.isFinite(task.duration) ||
-        task.duration <= 0
-      )
-        return;
-      const haystack =
-        `${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`.toLowerCase();
+    // PERFORMANCE: Use provided sourceTasks (filtered for today) if available
+    const tasksToProcess = sourceTasks || this.app.state.tasks;
+
+    tasksToProcess.forEach((task) => {
+      if (!task || task.date !== dateStr || !Number.isFinite(task.duration) || task.duration <= 0) return;
+      
+      const haystack = `${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`.toLowerCase();
       goals.forEach((goal) => {
         if (goal.type === "checkbox") return;
         if (!goal.keywords?.some((word) => haystack.includes(word))) return;
@@ -168,6 +164,7 @@ class ShadowEngine {
 
     return progress;
   }
+
 
   // ── SE2: Smart Success Evaluation ───────────────────────────────────────
   // Success is not binary. ≥ 70% of target = partial credit.
@@ -268,19 +265,16 @@ class ShadowEngine {
       signals.last_behavioral_state = state;
 
       // 4. Update energy_map per hour based on today's logged tasks
-      const todayTasks = this.app.state.tasks.filter(
-        (t) => t.date === dateStr && this.app.isProductiveCategory(t.category),
-      );
-      todayTasks.forEach((task) => {
+      // PERFORMANCE: use pre-filtered todayTasks instead of filtering all tasks again
+      const todayDateTasks = this.app.state.tasks.filter(t => t.date === dateStr && this.app.isProductiveCategory(t.category));
+      todayDateTasks.forEach((task) => {
         if (!task.startTime) return;
         const hour = String(new Date(task.startTime).getHours()).padStart(2, "0") + ":00";
         const existing = signals.energy_map[hour] || 0;
         const effort = Math.min(1, (task.duration || 0) / 60);
-        // Exponential moving average (α=0.3)
-        signals.energy_map[hour] = parseFloat(
-          (existing * 0.7 + effort * 0.3).toFixed(3),
-        );
+        signals.energy_map[hour] = parseFloat((existing * 0.7 + effort * 0.3).toFixed(3));
       });
+
 
       // 5. Task log history (last 30 entries)
       if (todayMinutes > 0) {
@@ -336,16 +330,17 @@ class ShadowEngine {
 
   // ── Existing metric methods ──────────────────────────────────────────────
 
-  getTodayDistractionMinutes(dateStr = this.app.getDateString(new Date())) {
-    return this.app.state.tasks
+  getTodayDistractionMinutes(dateStr = this.app.getDateString(new Date()), sourceTasks = null) {
+    const tasks = sourceTasks || this.app.state.tasks;
+    return tasks
       .filter(
-        (task) =>
-          task.date === dateStr &&
-          (task.category === "Time Waste / Distraction" ||
-            task.graph_tag === "distraction"),
+        (t) =>
+          t.date === dateStr &&
+          (t.category === "Time Waste / Distraction" || t.graph_tag === "distraction"),
       )
       .reduce((sum, task) => sum + task.duration, 0);
   }
+
 
   getWinLadder(dailyMap, shadowAvg) {
     const days = [];
@@ -594,14 +589,8 @@ class ShadowEngine {
     return { points, minutes, untracked, reasons, budget, distractionMinutes, overBudget };
   }
 
-  render({
-    todayMinutes,
-    shadowAvg,
-    currentAvg,
-    previousAvg,
-    hasMomentumBaseline,
-    isNewStandard,
-  }) {
+  render(data) {
+    const { todayMinutes, shadowAvg, currentAvg, previousAvg, hasMomentumBaseline, isNewStandard, todayTasks } = data;
     const safeShadow = shadowAvg > 0 ? shadowAvg : 1;
     const gap = shadowAvg - todayMinutes;
     const weeklyGap = shadowAvg - currentAvg;
@@ -614,9 +603,12 @@ class ShadowEngine {
     const neededTie = Math.max(0, shadowAvg - todayMinutes);
     const neededLead = Math.max(0, shadowAvg - todayMinutes + 1);
     const todayDate = this.app.getDateString(new Date());
-    const goalProgress = this.getTodayGoalProgress(todayDate);
+    
+    // PERFORMANCE: Use pre-filtered todayTasks passed from refresh()
+    const goalProgress = this.getTodayGoalProgress(todayDate, todayTasks);
     const missionScore = this.calculateMissionScore(goalProgress);
-    const distractionMinutes = this.getTodayDistractionMinutes(todayDate);
+    const distractionMinutes = this.getTodayDistractionMinutes(todayDate, todayTasks);
+
     const penalty = this.getPenalty(
       todayMinutes,
       shadowAvg,
@@ -812,9 +804,10 @@ class ShadowEngine {
   }
 
   refresh(allowAnimation = true) {
+    const todayDate = this.app.getDateString(new Date());
+    const todayTasks = (this.app.state.tasks || []).filter(t => t.date === todayDate);
     const metrics = this.computeRollingMetrics();
-    const historicalBest = metrics.bestAvg;
-    const resolvedShadow = Math.max(this.shadowSevenDayAverage, historicalBest);
+    const resolvedShadow = Math.max(this.shadowSevenDayAverage, metrics.bestAvg);
     const isNewStandard = resolvedShadow > this.shadowSevenDayAverage;
 
     if (resolvedShadow !== this.shadowSevenDayAverage) {
@@ -829,7 +822,10 @@ class ShadowEngine {
       previousAvg: metrics.previousAvg,
       hasMomentumBaseline: metrics.hasMomentumBaseline,
       isNewStandard: allowAnimation && isNewStandard,
+      todayTasks,
     });
     if (this.app.trainerEngine) this.app.trainerEngine.refresh();
   }
+
+
 }

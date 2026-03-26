@@ -3,6 +3,7 @@ class TrainerEngine {
     this.app = app;
     this.state = this.loadState();
     this.state.roadmap = this.getRoadmapState();
+    this.todayTasksCache = []; // Optimization: cache today's tasks for the current frame
     this.levels = [
       { name: "Dormant", min: 0, max: 60 },
       { name: "Initiate", min: 60, max: 120 },
@@ -25,6 +26,21 @@ class TrainerEngine {
   }
 
   initialize() {
+    // Attach mission listeners ONCE here instead of every render
+    const container = document.querySelector(".shadow-goal-list");
+    if (container) {
+      this._missionDelegateHandler = (e) => {
+        if (e.type === "change") {
+          const cb = e.target.closest(".mission-cascade-check");
+          if (cb && e.target.checked) this.triggerCascadeComplete(cb.getAttribute("data-slot-key"));
+        } else if (e.type === "click") {
+          if (e.target.id === "btn-undo-cascade") this.undoCascade();
+          if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
+        }
+      };
+      container.addEventListener("change", this._missionDelegateHandler);
+      container.addEventListener("click", this._missionDelegateHandler);
+    }
     this.refresh();
   }
 
@@ -915,63 +931,37 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     return { moduleIndex, dayIndex, day: module.days[dayIndex], module };
   }
 
-  getTopicProgress(topic, dateStr = this.app.getDateString(new Date())) {
+  getTopicProgress(topic) {
     const normalizedTopic = this.normalizeTopic(topic);
-    const topicWords = normalizedTopic
-      .split(" ")
-      .filter((w) => w.length > 3);
-    const missionType = normalizedTopic.includes("project")
-      ? "project"
-      : normalizedTopic.includes("revision")
-        ? "revision"
-        : "learning";
-    const mapByType = {
-      learning: ["learning"],
-      project: ["project"],
-      revision: ["revision"],
-    };
+    const topicWords = normalizedTopic.split(" ").filter((w) => w.length > 3);
+    const missionType = normalizedTopic.includes("project") ? "project" : normalizedTopic.includes("revision") ? "revision" : "learning";
+    const mapByType = { learning: ["learning"], project: ["project"], revision: ["revision"] };
 
     const slotForTask = (task) => {
       if (!task?.startTime || typeof TIMETABLE_LOGIC === "undefined") return null;
       const dt = new Date(task.startTime);
       const taskMinutes = dt.getHours() * 60 + dt.getMinutes();
-      let nearest = null;
-      let minDiff = Infinity;
+      let nearest = null; let minDiff = Infinity;
       TIMETABLE_LOGIC.forEach((slot) => {
         const [h, m] = (slot.time || "00:00").split(":").map(Number);
-        const slotMinutes = h * 60 + m;
-        const diff = Math.abs(taskMinutes - slotMinutes);
-        if (diff < minDiff) {
-          minDiff = diff;
-          nearest = slot;
-        }
+        const diff = Math.abs(taskMinutes - (h * 60 + m));
+        if (diff < minDiff) { minDiff = diff; nearest = slot; }
       });
       return minDiff <= 120 ? nearest : null;
     };
 
-    let minutes = 0;
-    let sessions = 0;
+    let minutes = 0; let sessions = 0;
     const completedSlots = new Set();
 
-    this.app.state.tasks.forEach((task) => {
-      if (
-        !task ||
-        task.date !== dateStr ||
-        !this.app.isProductiveCategory(task.category)
-      )
-        return;
-      const taskTopic = this.normalizeTopic(
-        task.missionTopic || task.topic || "",
-      );
-      const haystack = this.normalizeTopic(
-        `${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`,
-      );
+    // PERFORMANCE: Use cached today's tasks instead of iterating the entire history
+    (this.todayTasksCache || []).forEach((task) => {
+      if (!this.app.isProductiveCategory(task.category)) return;
+      const taskTopic = this.normalizeTopic(task.missionTopic || task.topic || "");
+      const haystack = this.normalizeTopic(`${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`);
       const nearestSlot = slotForTask(task);
       const slotType = nearestSlot?.mapsTo || "";
       const matchesTimetable = mapByType[missionType]?.includes(slotType);
-      const matchesTopic =
-        taskTopic === normalizedTopic ||
-        topicWords.some((w) => haystack.includes(w));
+      const matchesTopic = taskTopic === normalizedTopic || topicWords.some((w) => haystack.includes(w));
       if (!matchesTopic && !matchesTimetable) return;
       minutes += Number(task.duration || 0);
       sessions += 1;
@@ -981,14 +971,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const totalTargetSlots = missionType === "learning" ? 3 : 1;
     const reqSlots = missionType === "learning" ? Math.ceil(totalTargetSlots * 0.7) : 1;
 
-    return {
-      minutes,
-      sessions,
-      completedSlots: completedSlots.size,
-      reqSlots,
-      threshold: this.getThresholdForTopic(topic),
-    };
+    return { minutes, sessions, completedSlots: completedSlots.size, reqSlots, threshold: this.getThresholdForTopic(topic) };
   }
+
 
   getRoadmapMissionTopic() {
     const active = this.getActiveRoadmapDay();
@@ -1309,22 +1294,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
       container.innerHTML = html;
 
-      // Step 6: Event delegation — one listener, no leak
-      if (this._missionDelegateHandler) {
-        container.removeEventListener("change", this._missionDelegateHandler);
-        container.removeEventListener("click", this._missionDelegateHandler);
-      }
-      this._missionDelegateHandler = (e) => {
-        if (e.type === "change") {
-          const cb = e.target.closest(".mission-cascade-check");
-          if (cb && e.target.checked) this.triggerCascadeComplete(cb.getAttribute("data-slot-key"));
-        } else if (e.type === "click") {
-          if (e.target.id === "btn-undo-cascade") this.undoCascade();
-          if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
-        }
-      };
-      container.addEventListener("change", this._missionDelegateHandler);
-      container.addEventListener("click", this._missionDelegateHandler);
+      // Step 5: Render (only if changed)
+      if (container.getAttribute("data-last-html") === html) return;
+      container.innerHTML = html;
+      container.setAttribute("data-last-html", html);
+
 
 
     } catch (err) {
@@ -1729,34 +1703,31 @@ Rules:
   }
 
   refresh() {
-    // ── SE2 Daily Cycle (deterministic, sequential) ──────────────────
-    // Step 1: readTodayData
+    // ── SE2 Daily Cycle: Cache today's tasks ONCE for this cycle ──
     const todayDate = this.app.getDateString(new Date());
-    const todayTasks = this.app.state.tasks || [];
+    this.todayTasksCache = (this.app.state.tasks || []).filter(t => t.date === todayDate);
 
     // Step 2: analyzeBehavior — reads from BehaviorStore + shadowEngine
     const behaviorSnapshot = this.analyzeBehavior();
-
-    // Step 3: detectBehavioralState (via shadow engine)
-    const behavioralState = behaviorSnapshot.state; // RECOVERY | STABLE | GROWTH
+    const behavioralState = behaviorSnapshot.state;
 
     // ── Apply SE2 Timetable Shifting and Rerouting ──
     this.shiftTimetableTimes(behavioralState);
     this.rerouteScheduleForToday();
 
-    // Step 4: applyCorrection — evaluate timetable & sleep compromise
-    const timetable = this.evaluateTimetable(todayTasks, todayDate);
+    // Step 4: applyCorrection
+    const timetable = this.evaluateTimetable(this.todayTasksCache, todayDate);
     const sleepCompromised = timetable.sleepStatus === "COMPROMISED_OK";
 
-    // Step 5: generateMissions — produces corrected targets per goal
+    // Step 5: generateMissions
     const missionTargets = this.generateMissionTargets(behavioralState, sleepCompromised);
 
-    // Step 6: applyRules — anti-misuse (computeFlexibilityBuffer already mutates BehaviorStore)
+    // Step 6: applyRules
     this.computeFlexibilityBuffer();
 
-    // Step 7: Persist all updated behavioral signals immediately
+    // Step 7: Persist behavioral signals
     if (this.app.shadowEngine?.behaviorStore) {
-      const todayMinutes = this.getDailyProductiveMap().get(todayDate) || 0;
+      const todayMinutes = this.todayTasksCache.reduce((sum, t) => sum + (this.app.isProductiveCategory(t.category) ? t.duration : 0), 0);
       this.app.shadowEngine.updateBehaviorSignals(
         todayDate,
         todayMinutes,
@@ -1764,12 +1735,13 @@ Rules:
       );
     }
 
-    // Step 8: Render roadmap UI and mission panel
+    // Step 8: Render
     this.ensureRoadmap();
     this.renderRoadmap();
     this.syncMissionFromRoadmap();
     this.updatePenaltyTimer();
   }
+
 
   showWindow() {
     this.refresh();
