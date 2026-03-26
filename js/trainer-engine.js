@@ -1055,7 +1055,19 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const isSchemaValid = cascade && cascade.roadmapQueue !== undefined
       && cascade.activeSlots && typeof cascade.activeSlots === "object" && !Array.isArray(cascade.activeSlots)
       && cascade.completion && cascade.slotStatus;
-    if (!cascade || cascade.date !== today || !isSchemaValid) {
+    const now = new Date();
+    const nowHour = now.getHours();
+    
+    // SE2: Don't auto-advance to a new day if it's currently between 12 AM and 4 AM
+    // This allows the user to finish their "Night" (e.g. Sleep at 1:39 AM) 
+    // without the system resetting to tomorrow prematurely.
+    const isMidNightBuffer = nowHour < 4;
+    const isStaleDate = cascade && cascade.date < today;
+    
+    // Only reset if it's a completely new state, schema invalid, or it's past 4 AM on a new day
+    const shouldReset = !cascade || !isSchemaValid || (isStaleDate && !isMidNightBuffer);
+
+    if (shouldReset) {
       const q = this.getFullRoadmapQueue();
       cascade = {
         date: today,
@@ -1102,12 +1114,21 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
     SLOT_MAP.forEach(({ key, time }) => {
-      const slotMin = toMin(time);
+      let slotMin = toMin(time);
+      let compNowMinutes = nowMinutes;
+
+      // SE2: Midnight status context (Problem 1:1 sleep expired)
+      // If we are looking at a Cascade from "Yesterday", treat 'now' as +24h
+      if (!isFutureDay && cascade.date < realDate && nowMinutes < 480) {
+        compNowMinutes += 1440;
+      }
+
       if (cascade.completion[key]) {
         cascade.slotStatus[key] = "completed";
-      } else if (!isFutureDay && nowMinutes > slotMin) {
+      } else if (!isFutureDay && compNowMinutes > slotMin + 30) {
+        // Expire if window passed (+30m grace)
         cascade.slotStatus[key] = "expired";
-      } else if (!isFutureDay && nowMinutes >= slotMin) {
+      } else if (!isFutureDay && compNowMinutes >= slotMin) {
         cascade.slotStatus[key] = "active";
       } else {
         cascade.slotStatus[key] = "pending";
