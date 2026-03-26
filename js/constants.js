@@ -116,7 +116,7 @@ const MISSION_THRESHOLDS = {
 };
 
 const TIMETABLE_LOGIC = [
-  { time: "05:00", label: "Deep Work", mapsTo: "learning", name: "Deep Work" },
+  { time: "04:00", label: "Deep Work", mapsTo: "learning", name: "Deep Work" },
   { time: "06:15", label: "Train", mapsTo: "static", name: "Train" },
   { time: "07:30", label: "Deep Work", mapsTo: "learning", name: "Deep Work" },
   { time: "11:00", label: "Build", mapsTo: "project", name: "Project Work" },
@@ -129,14 +129,14 @@ const TIMETABLE_LOGIC = [
 // Ideal target times for each slot (used by SE2 progressive timetable shifting).
 // The engine gradually nudges TIMETABLE_LOGIC toward these times each day.
 const IDEAL_TIMETABLE = [
-  { time: "05:00", label: "Deep Work",    mapsTo: "learning"  },
-  { time: "06:15", label: "Train",        mapsTo: "static"    },
-  { time: "07:30", label: "Deep Work",    mapsTo: "learning"  },
-  { time: "11:00", label: "Build",        mapsTo: "project"   },
-  { time: "16:00", label: "Learn",        mapsTo: "learning"  },
-  { time: "19:30", label: "Atomic Habits",mapsTo: "static"    },
-  { time: "21:45", label: "Revision",     mapsTo: "revision"  },
-  { time: "23:45", label: "Rest",         mapsTo: "static"    },
+  { time: "04:00", label: "Deep Work", mapsTo: "learning" },
+  { time: "06:15", label: "Train", mapsTo: "static" },
+  { time: "07:30", label: "Deep Work", mapsTo: "learning" },
+  { time: "11:00", label: "Build", mapsTo: "project" },
+  { time: "16:00", label: "Learn", mapsTo: "learning" },
+  { time: "19:30", label: "Atomic Habits", mapsTo: "static" },
+  { time: "21:45", label: "Revision", mapsTo: "revision" },
+  { time: "23:45", label: "Rest", mapsTo: "static" },
 ];
 
 const CATEGORY_DEFINITIONS = {

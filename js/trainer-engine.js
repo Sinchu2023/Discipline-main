@@ -1728,15 +1728,44 @@ Rules:
     }
 
     const { moduleIndex, activeModule } = this.getRoadmapProgress();
+    const cascade = this.ensureCascadeState();
+    const logicalDate = cascade.date || this.app.getDateString(new Date());
+    const realDate = this.app.getDateString(new Date());
+    const dateLabel = logicalDate === realDate ? "TODAY" : logicalDate;
+
+    // Calculate completed modules
     const completedModules = this.state.roadmap.modules.filter((m) =>
       m.days.every((d) => d.status === "completed" || d.completed),
     ).length;
+
     overview.innerHTML = `
+          <div class="trainer-overview-card"><div class="trainer-overview-label">View Date</div><div class="trainer-overview-value" style="color:var(--text-accent);">${dateLabel}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Active Module</div><div class="trainer-overview-value">${this.escapeHtml(activeModule?.name || "Completed")}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Modules Complete</div><div class="trainer-overview-value">${completedModules}/${this.state.roadmap.modules.length}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Unlocked Module</div><div class="trainer-overview-value">${moduleIndex + 1}</div></div>
-          <div class="trainer-overview-card"><div class="trainer-overview-label">Edit Mode</div><div class="trainer-overview-value">${this.state.roadmap.editMode ? "ON" : "OFF"}</div></div>
         `;
+
+    // Add Schedule Preview (innovations: improve.md §8)
+    const formatTime = (t) => {
+      const [h, m] = t.split(":").map(Number);
+      const ampm = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 || 12;
+      return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+    };
+
+    let scheduleHtml = `<div class="roadmap-schedule-preview" style="margin-bottom:24px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border);">
+      <h3 style="font-size:0.9rem; color:var(--text-accent); margin-bottom:12px; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.1)); padding-bottom:6px; font-weight:700;">📋 ${dateLabel} SE2 TIMETABLE</h3>
+      <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">`;
+    
+    if (typeof TIMETABLE_LOGIC !== "undefined") {
+      TIMETABLE_LOGIC.forEach(slot => {
+        scheduleHtml += `<div style="font-size:0.85rem; color:var(--text-secondary); display:flex; flex-direction:column;">
+          <strong style="color:var(--text-accent); font-family:'JetBrains Mono', monospace;">${formatTime(slot.time)}</strong>
+          <span style="opacity:0.8;">${slot.label}</span>
+        </div>`;
+      });
+    }
+    scheduleHtml += `</div></div>`;
 
     let html = "";
     this.state.roadmap.modules.forEach((mod, mi) => {
@@ -1756,18 +1785,28 @@ Rules:
         if (status === "locked" && dayUnlocked) status = "active";
 
         const disabled = status === "locked" ? "disabled" : "";
-        const checked = status === "completed" ? "checked" : "";
+        const checked = status === "completed" || day.completed ? "checked" : "";
         const stateIcon = status === "completed" ? "✔" : status === "active" ? "●" : "🔒";
         const stateLabel = status === "completed" ? "Completed" : status === "active" ? "Active" : "Locked";
-        if (this.state.roadmap.editMode) {
-          html += `<div class="trainer-row"><div class="trainer-key">${day.day} ${stateIcon}</div><div class="trainer-val"><textarea data-module="${mi}" data-day="${di}" class="roadmap-edit">${this.escapeHtml(day.text)}</textarea></div><label><input type="checkbox" data-module="${mi}" data-day="${di}" class="roadmap-check" ${checked} ${disabled}/> ${stateLabel}</label></div>`;
-        } else {
-          html += `<div class="trainer-row"><div class="trainer-key">${day.day} ${stateIcon}</div><div class="trainer-val">${this.escapeHtml(day.text)}</div><label><input type="checkbox" data-module="${mi}" data-day="${di}" class="roadmap-check" ${checked} ${disabled}/> ${stateLabel}</label></div>`;
-        }
+        
+        const dayText = this.state.roadmap.editMode
+          ? `<textarea class="roadmap-edit" data-module="${mi}" data-day="${di}">${this.escapeHtml(day.text)}</textarea>`
+          : this.escapeHtml(day.text);
+
+        html += `
+          <div class="roadmap-day-item ${status}" style="opacity: ${status === 'locked' ? '0.5' : '1'}; display:flex; align-items:flex-start; margin-bottom:12px; padding:10px; background:rgba(255,255,255,0.02); border-radius:6px; border:1px solid var(--border-subtle, rgba(255,255,255,0.05));">
+            <input type="checkbox" class="roadmap-check" data-module="${mi}" data-day="${di}" ${checked} ${disabled} style="margin-right:12px; margin-top:3px; cursor:${status === 'locked' ? 'default' : 'pointer'};">
+            <div class="roadmap-day-info" style="flex:1;">
+              <div class="roadmap-day-label" style="font-size:0.75rem; color:${status === 'active' ? 'var(--text-accent)' : 'var(--text-secondary)'}; font-weight:600; text-transform:uppercase; margin-bottom:4px;">${day.day || `Day ${di + 1}`} — ${stateLabel} ${stateIcon}</div>
+              <div class="roadmap-day-text" style="font-size:0.9rem; line-height:1.4;">${dayText}</div>
+            </div>
+          </div>
+        `;
       });
       html += `</section>`;
     });
-    content.innerHTML = html;
+
+    content.innerHTML = scheduleHtml + html;
 
     content.querySelectorAll(".roadmap-check").forEach((cb) =>
       cb.addEventListener("change", (e) => {
@@ -1920,7 +1959,6 @@ Rules:
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE, this.state);
     
     // 3. UI update
-    this.app.uiManager.showStreakPopup(this.app.state.streak);
     this.refresh();
     this.app.shadowEngine?.refresh(false);
   }
