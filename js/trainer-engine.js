@@ -141,6 +141,140 @@ class TrainerEngine {
     return Math.max(0, Math.round(current + clamped));
   }
 
+  // ── SE2: Daily Timetable Time Shifting ───────────────────────────────────
+  // Reads last 7 days of actual task start times per slot category and
+  // progressively shifts TIMETABLE_LOGIC times toward IDEAL_TIMETABLE.
+  // Formula: next_time = current + (ideal - current) * LR, clamped ≤ 30 min.
+  shiftTimetableTimes(behavioralState) {
+    try {
+      if (typeof IDEAL_TIMETABLE === "undefined" || !TIMETABLE_LOGIC) return;
+      const { SE2 } = CONFIG;
+      const today = new Date();
+      const last7Dates = [];
+      for (let i = 1; i <= 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        last7Dates.push(this.app.getDateString(d));
+      }
+
+      // Helper: "HH:MM" string ↔ minutes
+      const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      const toTime = (m) => {
+        const clamped = Math.max(0, Math.min(1439, Math.round(m)));
+        return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
+      };
+
+      TIMETABLE_LOGIC.forEach((slot, idx) => {
+        const ideal = IDEAL_TIMETABLE[idx];
+        if (!ideal) return;
+        if (slot.mapsTo === "static") return; // don't shift static slots (training, atomic habits)
+
+        // Gather actual start times matching this slot's mapsTo category
+        const actualMins = [];
+        last7Dates.forEach((dateStr) => {
+          this.app.state.tasks.forEach((task) => {
+            if (task.date !== dateStr || !task.startTime) return;
+            const slotMap = {
+              learning: ["Study / Skill Development", "Productive Work"],
+              project:  ["Productive Work"],
+              revision: ["Study / Skill Development"],
+            };
+            const cats = slotMap[slot.mapsTo] || [];
+            if (!cats.includes(task.category)) return;
+            const mins = new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes();
+            // Only count tasks that started within ±90 min of this slot's planned time
+            if (Math.abs(mins - toMin(slot.time)) <= 90) actualMins.push(mins);
+          });
+        });
+
+        if (actualMins.length === 0) return; // no data — leave slot unchanged
+        const avgActual = actualMins.reduce((s, v) => s + v, 0) / actualMins.length;
+        const idealMin  = toMin(ideal.time);
+        const currentMin = toMin(slot.time);
+
+        // Determine LR from behavioral state
+        const lr = behavioralState === "GROWTH"
+          ? SE2.LEARNING_RATE_GROWTH || 0.35
+          : behavioralState === "RECOVERY"
+            ? SE2.LEARNING_RATE_FAILURE_MODERATE
+            : SE2.LEARNING_RATE_STABLE;
+
+        const raw   = avgActual + (idealMin - avgActual) * lr;
+        const shift = raw - currentMin;
+        const clamped = Math.sign(shift) * Math.min(Math.abs(shift), SE2.MAX_DAILY_SHIFT_LIMIT);
+        slot.time = toTime(currentMin + clamped);
+      });
+
+      // Shift sleep slot (mapsTo === "static", label === "Rest")
+      const sleepSlotIdx = TIMETABLE_LOGIC.findIndex(s => s.label === "Rest");
+      if (sleepSlotIdx >= 0 && IDEAL_TIMETABLE[sleepSlotIdx]) {
+        const slot   = TIMETABLE_LOGIC[sleepSlotIdx];
+        const ideal  = IDEAL_TIMETABLE[sleepSlotIdx];
+        const sleepMins = [];
+        last7Dates.forEach((dateStr) => {
+          this.app.state.tasks.forEach((task) => {
+            if (task.date !== dateStr || task.category !== "Sleep" || !task.startTime) return;
+            sleepMins.push(new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes());
+          });
+        });
+        if (sleepMins.length > 0) {
+          const avgSleep   = sleepMins.reduce((s, v) => s + v, 0) / sleepMins.length;
+          const idealMin   = toMin(ideal.time);
+          const currentMin = toMin(slot.time);
+          const lr         = CONFIG.SE2.LEARNING_RATE_STABLE;
+          const raw        = avgSleep + (idealMin - avgSleep) * lr;
+          const shift      = raw - currentMin;
+          const clamped    = Math.sign(shift) * Math.min(Math.abs(shift), CONFIG.SE2.MAX_DAILY_SHIFT_LIMIT);
+          slot.time        = toTime(currentMin + clamped);
+        }
+      }
+    } catch (err) {
+      console.warn("[shiftTimetableTimes] failed:", err);
+    }
+  }
+
+  // ── SE2: Wake-Time Rerouting (GPS mode) ──────────────────────────────────
+  // On load: detects actual wake/start time from first task today.
+  // If later than planned, shifts all remaining slot times forward by that delta.
+  // This is the "GPS rerouting" — the engine adapts TO today, not against it.
+  rerouteScheduleForToday() {
+    try {
+      const todayStr = this.app.getDateString(new Date());
+      const todayTasks = this.app.state.tasks.filter(
+        t => t.date === todayStr && t.startTime && this.app.isProductiveCategory(t.category)
+      );
+      if (!todayTasks.length) return;
+
+      // Earliest productive task today = effective wake/start time
+      const earliestMs  = Math.min(...todayTasks.map(t => new Date(t.startTime).getTime()));
+      const actualStart = new Date(earliestMs);
+      const actualMin   = actualStart.getHours() * 60 + actualStart.getMinutes();
+
+      // Planned first slot time
+      const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      const plannedMin = toMin(TIMETABLE_LOGIC[0].time);
+      const delta = actualMin - plannedMin; // positive = woke late
+
+      if (delta <= 5) return; // within grace window — no rerouting needed
+      const cappedDelta = Math.min(delta, 120); // never shift more than 2 hours
+
+      // Shift all slots forward by delta
+      const toTime = (m) => {
+        const c = Math.max(0, Math.min(1439, Math.round(m)));
+        return `${String(Math.floor(c / 60)).padStart(2, "0")}:${String(c % 60).padStart(2, "0")}`;
+      };
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      TIMETABLE_LOGIC.forEach(slot => {
+        const slotMin = toMin(slot.time);
+        if (slotMin > nowMin) { // only shift future slots
+          slot.time = toTime(slotMin + cappedDelta);
+        }
+      });
+    } catch (err) {
+      console.warn("[rerouteScheduleForToday] failed:", err);
+    }
+  }
+
   // ── SE2: Behavioral Analysis ─────────────────────────────────────────
   // Reads state from shadowEngine.detectBehavioralState() and returns
   // a structured behavioral snapshot for decision making.
@@ -1041,11 +1175,19 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   }
 
   // ── syncMissionFromRoadmap ───────────────────────────────────────────────
-  // Derives the entire mission UI from cascadeState (improve.md §3, §10, §12).
-  // UI reads cascadeState → derived model → HTML. No independent UI state.
+  // Performance: debounced via rAF + single container event delegation.
+  // No manual buttons — slot expiry is time-driven automatically.
   syncMissionFromRoadmap() {
+    if (this._syncMissionRaf) return;
+    this._syncMissionRaf = requestAnimationFrame(() => {
+      this._syncMissionRaf = null;
+      this._doSyncMission();
+    });
+  }
+
+  _doSyncMission() {
     try {
-      // ── Step 1: Ensure CONFIG goals are up-to-date ─────────────────────
+      // Step 1: Canonical goals
       CONFIG.DAILY_GOALS = [
         {
           id: "roadmap_learning", label: "Roadmap Tasks", minutesTarget: 270, sessionsTarget: 0,
@@ -1064,104 +1206,99 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         },
       ];
 
-      // ── Step 2: Load state and refresh slot time statuses ──────────────
+      // Step 2: State + slot statuses
       const cascade = this.ensureCascadeState();
       this._refreshSlotStatuses(cascade);
+      this._scheduleAutoExpiry(cascade);
 
-      // ── Step 3: Derive the UI model from cascadeState ──────────────────
-      // Slot key → display config
+      // Step 3: Slot display config
       const SLOT_CONFIG = [
-        { slotKey: "slot1", time: "4:00 AM",  label: "Deep Work",  type: "learning" },
-        { slotKey: null,    time: "6:15 AM",  label: "Training",   type: "static"   },
-        { slotKey: "slot2", time: "7:30 AM",  label: "Deep Work",  type: "learning" },
-        { slotKey: null,    time: "11:00 AM", label: "Build (Project)", type: "static" },
-        { slotKey: "slot3", time: "4:00 PM",  label: "Learn",      type: "learning" },
-        { slotKey: null,    time: "7:30 PM",  label: "Atomic Habits", type: "static" },
-        { slotKey: null,    time: "9:45 PM",  label: "Revision",   type: "static"   },
-        { slotKey: null,    time: "11:30 PM", label: "Sleep",      type: "static"   },
+        { slotKey: "slot1", time: "4:00 AM",  label: "Deep Work",       type: "learning" },
+        { slotKey: null,    time: "6:15 AM",  label: "Training",         type: "static"   },
+        { slotKey: "slot2", time: "7:30 AM",  label: "Deep Work",        type: "learning" },
+        { slotKey: null,    time: "11:00 AM", label: "Build (Project)",   type: "static"   },
+        { slotKey: "slot3", time: "4:00 PM",  label: "Learn",            type: "learning" },
+        { slotKey: null,    time: "7:30 PM",  label: "Atomic Habits",    type: "static"   },
+        { slotKey: null,    time: "9:45 PM",  label: "Revision",         type: "static"   },
+        { slotKey: null,    time: "11:30 PM", label: "Sleep",            type: "static"   },
       ];
 
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
 
-      // ── Step 4: Build HTML from derived model (no independent UI state) ─
+      // Step 4: Build HTML — expired is grey (--text-secondary), done is green
       let html = "";
       SLOT_CONFIG.forEach(slot => {
         if (slot.type === "learning" && slot.slotKey) {
-          const taskObj    = cascade.activeSlots[slot.slotKey];
-          const isDone     = cascade.completion[slot.slotKey];
-          const status     = cascade.slotStatus[slot.slotKey]; // active | expired | completed
-          const statusIcon = status === "completed" ? "✔" : status === "expired" ? "⚠" : "●";
-          const statusColor = status === "completed" ? "var(--success)"
-            : status === "expired" ? "var(--warning)" : "var(--text-secondary)";
+          const taskObj = cascade.activeSlots[slot.slotKey];
+          const isDone  = cascade.completion[slot.slotKey];
+          const status  = cascade.slotStatus[slot.slotKey]; // active|expired|completed
+          const color   = isDone ? "var(--success)" : "var(--text-secondary)";
+          const icon    = isDone ? "✔" : status === "expired" ? "○" : "●";
 
           if (taskObj) {
-            html += `
-              <div class="sd-mission-item shadow-goal-item" style="${isDone ? "opacity:0.6;" : ""}">
+            html += `<div class="sd-mission-item shadow-goal-item" style="${isDone ? "opacity:0.55;" : ""}">
                 <input class="mission-cascade-check" type="checkbox" data-slot-key="${slot.slotKey}"
                   ${isDone ? "checked disabled" : ""}
-                  style="margin-right:8px; cursor:pointer; min-width:14px; min-height:14px; accent-color:var(--success);"/>
-                <span style="font-size:0.85rem; color:${statusColor};">
-                  ${statusIcon}&nbsp;${slot.time} → ${slot.label}
-                  [${this.escapeHtml(taskObj.text)}]
-                  <em style="font-size:0.75rem; opacity:0.7;">${status}</em>
-                </span>
+                  style="margin-right:8px;cursor:pointer;min-width:14px;min-height:14px;accent-color:var(--success);"/>
+                <span style="font-size:0.85rem;color:${color};">${icon}&nbsp;${slot.time} → ${slot.label} [${this.escapeHtml(taskObj.text)}] <em style="font-size:0.72rem;opacity:0.45;">${status}</em></span>
               </div>`;
           } else {
-            html += `
-              <div class="sd-mission-item shadow-goal-item" style="opacity:0.4;">
-                <div class="sd-mission-dot" style="margin-right:8px; background:transparent; border:1px solid #444;"></div>
-                <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label} [Empty]</span>
+            html += `<div class="sd-mission-item shadow-goal-item" style="opacity:0.35;">
+                <span style="font-size:0.85rem;color:var(--text-secondary);">○&nbsp;${slot.time} → ${slot.label} [Queue empty]</span>
               </div>`;
           }
         } else {
-          html += `
-            <div class="sd-mission-item shadow-goal-item">
+          html += `<div class="sd-mission-item shadow-goal-item">
               <div class="sd-mission-dot" style="margin-right:8px;"></div>
-              <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label}</span>
+              <span style="font-size:0.85rem;color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label}</span>
             </div>`;
         }
       });
 
-      // ── Step 5: Action buttons ─────────────────────────────────────────
-      const hasHistory = cascade.stateHistory?.length > 0;
-      html += `
-        <div style="display:flex; gap:8px; margin-top:12px;">
-          <button id="btn-continue-day"
-            style="flex:1; padding:6px; background:var(--bg-card); color:var(--text-secondary);
-                   border:1px solid var(--border); border-radius:4px; font-size:0.75rem; cursor:pointer;">
-            Missed? Cascade Forward
-          </button>
-          <button id="btn-undo-cascade"
-            style="padding:6px 12px; background:var(--bg-card); color:${hasHistory ? "var(--warning)" : "var(--text-secondary)"};
-                   border:1px solid var(--border); border-radius:4px; font-size:0.75rem;
-                   cursor:${hasHistory ? "pointer" : "default"}; opacity:${hasHistory ? 1 : 0.4};"
-            ${hasHistory ? "" : "disabled"}>
-            ↩ Undo
-          </button>
-        </div>`;
-
+      // Step 5: Single DOM write
       container.innerHTML = html;
 
-      // ── Step 6: Wire events — all mutations go through cascade engine ──
-      container.querySelectorAll(".mission-cascade-check").forEach(cb => {
-        cb.addEventListener("change", (e) => {
-          if (e.target.checked) {
-            const slotKey = e.target.getAttribute("data-slot-key");
-            this.triggerCascadeComplete(slotKey);
-          }
-        });
-      });
-
-      const missBtn = document.getElementById("btn-continue-day");
-      if (missBtn) missBtn.addEventListener("click", () => this.triggerCascadeMiss());
-
-      const undoBtn = document.getElementById("btn-undo-cascade");
-      if (undoBtn) undoBtn.addEventListener("click", () => this.undoCascade());
+      // Step 6: Event delegation — one listener, no leak
+      if (this._missionDelegateHandler) {
+        container.removeEventListener("change", this._missionDelegateHandler);
+      }
+      this._missionDelegateHandler = (e) => {
+        const cb = e.target.closest(".mission-cascade-check");
+        if (cb && e.target.checked) {
+          this.triggerCascadeComplete(cb.getAttribute("data-slot-key"));
+        }
+      };
+      container.addEventListener("change", this._missionDelegateHandler);
 
     } catch (err) {
-      console.error("[syncMissionFromRoadmap] Cascade logic failed:", err);
+      console.error("[_doSyncMission] failed:", err);
     }
+  }
+
+  // ── Auto-expiry: fires re-render at each slot's scheduled time ───────────
+  // Replaces the manual "Cascade Forward" button. Time-driven, not user-driven.
+  _scheduleAutoExpiry(cascade) {
+    (this._expiryTimers || []).forEach(id => clearTimeout(id));
+    this._expiryTimers = [];
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    [
+      { key: "slot1", hour: 4,  min: 0  },
+      { key: "slot2", hour: 7,  min: 30 },
+      { key: "slot3", hour: 16, min: 0  },
+    ].forEach(({ key, hour, min }) => {
+      if (cascade.completion[key]) return;
+      const ms = ((hour * 60 + min) - nowMin) * 60000;
+      if (ms > 0) {
+        this._expiryTimers.push(setTimeout(() => {
+          const c = this.ensureCascadeState();
+          this._refreshSlotStatuses(c);
+          this.app.saveToStorage("cascade_state", c);
+          this.syncMissionFromRoadmap();
+        }, ms));
+      }
+    });
   }
 
   updatePenaltyTimer() {
@@ -1546,6 +1683,10 @@ Rules:
 
     // Step 3: detectBehavioralState (via shadow engine)
     const behavioralState = behaviorSnapshot.state; // RECOVERY | STABLE | GROWTH
+
+    // ── Apply SE2 Timetable Shifting and Rerouting ──
+    this.shiftTimetableTimes(behavioralState);
+    this.rerouteScheduleForToday();
 
     // Step 4: applyCorrection — evaluate timetable & sleep compromise
     const timetable = this.evaluateTimetable(todayTasks, todayDate);
