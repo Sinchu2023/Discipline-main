@@ -798,6 +798,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     let minutes = 0;
     let sessions = 0;
+    const completedSlots = new Set();
 
     this.app.state.tasks.forEach((task) => {
       if (
@@ -821,11 +822,17 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       if (!matchesTopic && !matchesTimetable) return;
       minutes += Number(task.duration || 0);
       sessions += 1;
+      if (nearestSlot && nearestSlot.time) completedSlots.add(nearestSlot.time);
     });
+
+    const totalTargetSlots = missionType === "learning" ? 3 : 1;
+    const reqSlots = missionType === "learning" ? Math.ceil(totalTargetSlots * 0.7) : 1;
 
     return {
       minutes,
       sessions,
+      completedSlots: completedSlots.size,
+      reqSlots,
       threshold: this.getThresholdForTopic(topic),
     };
   }
@@ -842,15 +849,14 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   getDailyMissionTasks() {
     const roadmapTopic = this.getRoadmapMissionTopic();
     const learningProgress = this.getTopicProgress(roadmapTopic);
-    const learningDone = learningProgress.minutes >= learningProgress.threshold;
+    // SE2 update: roadmap day completes if >= 70% of learning slots are handled
+    const learningDone = learningProgress.completedSlots >= learningProgress.reqSlots;
 
     const projectProgress = this.getTopicProgress("Project Work");
-    const projectDone =
-      projectProgress.minutes >=
-      this.getThresholdForTopic("Project Work");
+    const projectDone = projectProgress.completedSlots >= projectProgress.reqSlots;
+
     const revisionProgress = this.getTopicProgress("Revision");
-    const revisionThreshold = this.getThresholdForTopic("Revision");
-    const revisionDone = revisionProgress.minutes >= revisionThreshold;
+    const revisionDone = revisionProgress.completedSlots >= revisionProgress.reqSlots;
 
     return [
       {
@@ -883,11 +889,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         {
           id: "roadmap_learning",
           label: roadmapTopic,
-          minutesTarget: 180,
+          minutesTarget: 270,
           sessionsTarget: 0,
           keywords: ["deep work", "learn", "learning", "study", ...this.normalizeTopic(roadmapTopic).split(" ").filter(Boolean)],
-          discipline_type: "strict",
-          target_minutes: 180,
+          discipline_type: "flexible",
+          target_minutes: 270,
           category: "learning",
         },
         {
@@ -959,7 +965,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         const topic = (active.day.text || "").split("\n")[0].trim();
         const progress = this.getTopicProgress(topic);
         if (active.day.status !== "completed" && !active.day.completed &&
-          progress.minutes >= this.getThresholdForTopic(topic)) {
+          progress.completedSlots >= progress.reqSlots) {
           this.setRoadmapDayStatus(active.moduleIndex, active.dayIndex, true);
           this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
           this.normalizeRoadmapDays();
