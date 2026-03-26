@@ -732,6 +732,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
         getThresholdForTopic(topic = "") {
           const key = this.normalizeTopic(topic);
+          if (key && key !== "project work" && key !== "revision") {
+            return 180;
+          }
           return MISSION_THRESHOLDS[key] || MISSION_THRESHOLDS.default;
         }
 
@@ -764,6 +767,35 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           const topicWords = normalizedTopic
             .split(" ")
             .filter((w) => w.length > 3);
+          const missionType = normalizedTopic.includes("project")
+            ? "project"
+            : normalizedTopic.includes("revision")
+              ? "revision"
+              : "learning";
+          const mapByType = {
+            learning: ["learning"],
+            project: ["project"],
+            revision: ["revision"],
+          };
+
+          const slotForTask = (task) => {
+            if (!task?.startTime || typeof TIMETABLE_LOGIC === "undefined") return null;
+            const dt = new Date(task.startTime);
+            const taskMinutes = dt.getHours() * 60 + dt.getMinutes();
+            let nearest = null;
+            let minDiff = Infinity;
+            TIMETABLE_LOGIC.forEach((slot) => {
+              const [h, m] = (slot.time || "00:00").split(":").map(Number);
+              const slotMinutes = h * 60 + m;
+              const diff = Math.abs(taskMinutes - slotMinutes);
+              if (diff < minDiff) {
+                minDiff = diff;
+                nearest = slot;
+              }
+            });
+            return minDiff <= 120 ? nearest : null;
+          };
+
           let minutes = 0;
           let sessions = 0;
 
@@ -780,10 +812,13 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
             const haystack = this.normalizeTopic(
               `${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`,
             );
+            const nearestSlot = slotForTask(task);
+            const slotType = nearestSlot?.mapsTo || "";
+            const matchesTimetable = mapByType[missionType]?.includes(slotType);
             const matchesTopic =
               taskTopic === normalizedTopic ||
               topicWords.some((w) => haystack.includes(w));
-            if (!matchesTopic) return;
+            if (!matchesTopic && !matchesTimetable) return;
             minutes += Number(task.duration || 0);
             sessions += 1;
           });
@@ -795,26 +830,19 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           };
         }
 
-        getDailyMissionTasks() {
+        getRoadmapMissionTopic() {
           const active = this.getActiveRoadmapDay();
-          const learning = [];
-
-          if (active) {
-            const moduleDays = active.module.days;
-            for (let i = 0; i <= active.dayIndex; i++) {
-              const day = moduleDays[i];
-              const isDone = day.status === "completed" || day.completed;
-              if (!isDone) learning.push(day);
-            }
-            if (!learning.length) learning.push(active.day);
+          if (active?.day?.text) {
+            const text = (active.day.text || "").split("\n")[0].trim();
+            if (text) return text;
           }
+          return "Shunt Clipper Circuits Clamper Circuits";
+        }
 
-          const learningTasks = learning.slice(0, 1).map((day) => {
-            const topic = (day.text || "").split("\n")[0].trim();
-            const progress = this.getTopicProgress(topic);
-            const done = progress.minutes >= progress.threshold;
-            return { type: "learning", topic, progress, done };
-          });
+        getDailyMissionTasks() {
+          const roadmapTopic = this.getRoadmapMissionTopic();
+          const learningProgress = this.getTopicProgress(roadmapTopic);
+          const learningDone = learningProgress.minutes >= learningProgress.threshold;
 
           const projectProgress = this.getTopicProgress("Project Work");
           const projectDone =
@@ -825,7 +853,12 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           const revisionDone = revisionProgress.minutes >= revisionThreshold;
 
           return [
-            ...learningTasks,
+            {
+              type: "learning",
+              topic: roadmapTopic,
+              progress: learningProgress,
+              done: learningDone,
+            },
             {
               type: "project",
               topic: "Project Work",
@@ -837,56 +870,47 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
               topic: "Revision",
               progress: revisionProgress,
               done: revisionDone,
-              active: learningTasks.every((t) => t.done) && projectDone,
+              active: learningDone && projectDone,
             },
           ];
         }
 
         syncMissionFromRoadmap() {
           try {
-          // ── 1. Build DAILY_GOALS from roadmap state ──────────────────
-          if (!this.state.roadmap?.modules?.length) {
-            CONFIG.DAILY_GOALS = [];
-          } else {
-            const { moduleIndex, activeModule } = this.getRoadmapProgress();
-            if (!activeModule) {
-              CONFIG.DAILY_GOALS = [];
-            } else {
-              const goals = [];
-              let addedUncompleted = 0;
-
-              for (let di = 0; di < activeModule.days.length; di++) {
-                const day = activeModule.days[di];
-                const isDone = day.status === "completed" || day.completed;
-                const isActive = day.status === "active";
-
-                if (isDone || isActive) {
-                  goals.push({
-                    id: `roadmap_m${moduleIndex}_d${di}`,
-                    label: `${activeModule.name}: ${(day.text || "").split("\n")[0].trim()}`,
-                    type: "checkbox",
-                    completed: isDone,
-                  });
-                  if (!isDone) {
-                    addedUncompleted++;
-                    if (addedUncompleted >= 1) break; // one active task at a time
-                  }
-                }
-              }
-
-              // If module is fully done, hint at next module
-              const moduleDone = activeModule.days.every(d => d.status === "completed" || d.completed);
-              if (moduleDone) {
-                const nextMod = this.state.roadmap.modules[moduleIndex + 1];
-                goals.push(nextMod
-                  ? { id: `roadmap_m${moduleIndex+1}_preview`, label: `Start ${nextMod.name}`, type: "checkbox", completed: false }
-                  : { id: `roadmap_done`, label: `Roadmap Complete! 🎉`, type: "checkbox", completed: true }
-                );
-              }
-
-              CONFIG.DAILY_GOALS = goals;
-            }
-          }
+          // ── 1. Keep mission goals fixed to timetable-backed trio ─────────
+          const roadmapTopic = this.getRoadmapMissionTopic();
+          CONFIG.DAILY_GOALS = [
+            {
+              id: "roadmap_learning",
+              label: roadmapTopic,
+              minutesTarget: 180,
+              sessionsTarget: 0,
+              keywords: ["deep work", "learn", "learning", "study", ...this.normalizeTopic(roadmapTopic).split(" ").filter(Boolean)],
+              discipline_type: "strict",
+              target_minutes: 180,
+              category: "learning",
+            },
+            {
+              id: "project",
+              label: "Project Work",
+              minutesTarget: 180,
+              sessionsTarget: 0,
+              keywords: ["project", "build"],
+              discipline_type: "flexible",
+              target_minutes: 180,
+              category: "deep_work",
+            },
+            {
+              id: "revision",
+              label: "Revision",
+              minutesTarget: 120,
+              sessionsTarget: 0,
+              keywords: ["revision"],
+              discipline_type: "flexible",
+              target_minutes: 120,
+              category: "learning",
+            },
+          ];
 
           // ── 2. Render the shadow-goal-list DOM from roadmap tasks ────
           const tasks = this.getDailyMissionTasks();
