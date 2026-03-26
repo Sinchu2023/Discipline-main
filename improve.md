@@ -1,174 +1,184 @@
-## Role
+# Daily Mission — Final Implementation Prompt (Cascade Within Day)
+
+## ROLE
 
 Act as a senior front-end engineer and behavior-system designer.
 
-You are working inside an existing Discipline Tracker dashboard.
-Preserve all UI design, layout, dark theme, spacing, and components.
+Work inside an existing Discipline Tracker dashboard.
+
+Constraints:
+
+* Do NOT change UI layout, design, spacing, or components
+* ONLY update logic and behavior
 
 ---
 
-## Task
+## CORE UI (FIXED TIMETABLE)
 
-Update ONLY the **Daily Mission logic and behavior**, without changing its visual structure.
+The schedule must always display exactly:
 
-The Daily Mission card UI must remain exactly the same.
-
----
-
-## Core Requirement
-
-Daily Mission must display ONLY 3 items:
-
-1. Roadmap Task (dynamic)
-2. Project Work
-3. Revision
+4:00 AM  → Deep Work (Learning) [Day 1 Roadmap]
+6:15 AM  → Training
+7:30 AM  → Deep Work (Learning) [Day 2 Roadmap]
+11:00 AM → Build (Project)
+4:00 PM  → Learn (Learning) [Day 3 Roadmap]
+7:30 PM  → Atomic Habits
+9:45 PM  → Revision
+11:30 PM → Sleep
 
 ---
 
-## Roadmap-Based Time Mapping (CRITICAL LOGIC)
+## ROADMAP LABEL INJECTION
 
-Use this internal timetable logic:
+* Replace Day1/Day2/Day3 with actual roadmap task names
+* Always prefix with [ROADMAP]
 
-* 5:00 AM → Learning Slot 1 → Day 1 roadmap item
-* 7:30 AM → Learning Slot 2 → Day 2 roadmap item
-* 4:00 PM → Learning Slot 3 → Day 3 roadmap item
-
-Other slots:
-
-* 6:15 AM → Training (internal only, NOT shown in UI)
-* 11:00 AM → Build → maps to Project Work
-* 7:30 PM → Atomic Habits (internal only)
-* 9:45 PM → Revision → maps to Revision
-* 11:30 PM → Sleep (internal only)
+Example:
+4:00 AM → Deep Work (Learning) [ROADMAP: Arrays]
 
 ---
 
-## IMPORTANT UI RULE
+## COMPLETION SYSTEM
 
-❌ Do NOT show:
+Each roadmap slot must have a checkbox:
 
-* Deep Work
-* Learn
-* Time slots
+[ ] Slot1 (4:00)
+[ ] Slot2 (7:30)
+[ ] Slot3 (4:00PM)
 
-✅ ONLY show:
+States:
 
-* Actual roadmap task name (for current active day)
-* Project Work
-* Revision
-
----
-
-## Roadmap Progression Logic (VERY IMPORTANT)
-
-The system must manage roadmap progression across days.
-
-### Behavior:
-
-* Each learning slot represents a **roadmap day (Day 1, Day 2, Day 3)**
+* unchecked = incomplete
+* checked = completed
 
 ---
 
-### Case 1: If Day 1 is COMPLETED
+## CORE BEHAVIOR — SAME DAY CASCADE (CRITICAL)
 
-* Move to Day 2 for next cycle
-* Day 2 becomes primary roadmap task
-
----
-
-### Case 2: If Day 1 is NOT completed
-
-* DO NOT move forward
-* Keep Day 1 as active roadmap task
-* Day 2 and Day 3 must SHIFT forward
-
-Meaning:
-
-```text
-Day 1 → stays active
-Day 2 → shifts to next slot
-Day 3 → shifts further
-```
+This system MUST cascade tasks forward within the SAME DAY.
 
 ---
 
-### Case 3: Partial Completion
+## INITIAL STATE
 
-* If only 1 or 2 learning slots are completed:
-
-  * Do NOT advance roadmap
-  * Maintain current day until completion threshold is met
-
----
-
-## Completion Rule
-
-A roadmap day is considered complete if:
-
-* ≥ 70% of its learning slots are completed
+Slot1 → Day1
+Slot2 → Day2
+Slot3 → Day3
 
 ---
 
-## Adaptive Behavior (COACH MODE)
+## RULE 1 — MISSED TASK SHIFTS FORWARD
 
-The system must:
+If a task is NOT completed in its slot:
 
-* Learn from user consistency
-* Adjust difficulty gradually
+* It moves to the NEXT slot in the same day
 
-### Rules:
+Example:
 
-* If user is consistent → increase strictness slightly
-* If user fails → reduce next day load
-* If user is unstable → maintain level
+Before:
+Slot1 → Day1
+Slot2 → Day2
+Slot3 → Day3
 
----
+If Day1 is missed:
 
-## Flexibility Rule (Learning Tasks)
-
-* Learning tasks are NOT time-exact
-* Allow buffer:
-
-  actual_time = estimated_time × 1.5
-
----
-
-## Strict vs Flexible
-
-STRICT:
-
-* Progression logic
-* Roadmap advancement
-
-FLEXIBLE:
-
-* Learning duration
-* Study pace
+After:
+Slot1 → (empty or next-day fill later)
+Slot2 → Day1
+Slot3 → Day2
+Next queue → Day3 pushed forward
 
 ---
 
-## Data Behavior
+## RULE 2 — CASCADE EFFECT
 
-System must track:
+When a task shifts forward:
 
-* Completed slots
-* Missed slots
-* Current roadmap day index
-* Progress percentage
+* All tasks below shift down
+* Last task gets pushed out to next cycle
 
 ---
 
-## Output Expectation
+## RULE 3 — COMPLETION REMOVES TASK
 
-Update logic so that:
+If a task is completed at any slot:
 
-* Daily Mission UI remains unchanged
-* Roadmap task dynamically updates based on progress
-* No timetable UI is shown
-* Internal mapping drives behavior
+* It is removed immediately
+* Remaining tasks shift up
+* New task fills last slot
 
 ---
 
-## One-line Principle
+## RULE 4 — MULTIPLE FAILURES
 
-"Show only what matters. Hide the system. Let logic drive progression."
+If a task is repeatedly missed:
+
+Slot1 miss → Slot2
+Slot2 miss → Slot3
+Slot3 miss → Next Day Slot1
+
+The task continues until completed
+
+---
+
+## RULE 5 — UPDATE TRIGGER
+
+Cascade logic runs when:
+
+* slot time passes (optional auto-trigger)
+
+---
+
+## DATA MODEL
+
+{
+roadmapQueue: [Day1, Day2, Day3, Day4],
+activeSlots: [Day1, Day2, Day3],
+completion: {
+slot1: false,
+slot2: false,
+slot3: false
+}
+}
+
+---
+
+## UPDATE FLOW
+
+1. Read slot completion
+2. For each slot in order:
+
+   * if completed → remove
+   * if not completed → shift forward
+3. Re-pack slots
+4. Fill empty slots from roadmapQueue
+5. Update UI
+
+---
+
+## VISUAL STATE
+
+[ ] Pending
+[✓] Completed
+
+---
+
+## RESET
+
+* Reset completion
+* Reset slots to initial mapping
+
+---
+
+## FINAL BEHAVIOR
+
+* Timetable is fixed
+* Tasks move forward within the same day
+* Missed tasks never stay stuck
+* Completed tasks disappear
+
+---
+
+## ONE LINE PRINCIPLE
+
+"Miss it → it moves to the next session immediately."

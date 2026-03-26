@@ -881,104 +881,153 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     ];
   }
 
+  getFullRoadmapQueue() {
+    this.ensureRoadmap();
+    const queue = [];
+    this.state.roadmap.modules.forEach(m => {
+      m.days.forEach(d => {
+        if (d.status !== "completed" && !d.completed) {
+          queue.push({
+            text: (d.text || "").split("\n")[0].trim(),
+            moduleIndex: this.state.roadmap.modules.indexOf(m),
+            dayIndex: m.days.indexOf(d)
+          });
+        }
+      });
+    });
+    return queue;
+  }
+
+  ensureCascadeState() {
+    const today = this.app.getDateString(new Date());
+    let cascade = this.app.loadFromStorage("cascade_state");
+    if (!cascade || cascade.date !== today) {
+      const q = this.getFullRoadmapQueue();
+      cascade = {
+        date: today,
+        activeSlots: [
+          q[0] || null,
+          q[1] || null,
+          q[2] || null
+        ]
+      };
+      this.app.saveToStorage("cascade_state", cascade);
+    }
+    return cascade;
+  }
+
+  triggerCascadeComplete(slotIndex) {
+    const cascade = this.ensureCascadeState();
+    const completedTask = cascade.activeSlots[slotIndex];
+    if (completedTask) {
+      this.setRoadmapDayStatus(completedTask.moduleIndex, completedTask.dayIndex, true);
+      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+    }
+    cascade.activeSlots.splice(slotIndex, 1);
+    
+    const q = this.getFullRoadmapQueue();
+    const activeTexts = cascade.activeSlots.filter(Boolean).map(x => x.text);
+    const nextInQueue = q.find(x => !activeTexts.includes(x.text));
+    
+    cascade.activeSlots.push(nextInQueue || null);
+    this.app.saveToStorage("cascade_state", cascade);
+    this.syncMissionFromRoadmap();
+  }
+
+  triggerCascadeMiss() {
+    const cascade = this.ensureCascadeState();
+    let firstActiveIdx = cascade.activeSlots.findIndex(x => x !== null);
+    if (firstActiveIdx === -1 || firstActiveIdx >= 2) return;
+    
+    for (let i = 2; i > firstActiveIdx; i--) {
+      cascade.activeSlots[i] = cascade.activeSlots[i - 1];
+    }
+    cascade.activeSlots[firstActiveIdx] = null;
+    
+    this.app.saveToStorage("cascade_state", cascade);
+    this.syncMissionFromRoadmap();
+  }
+
   syncMissionFromRoadmap() {
     try {
-      // ── 1. Keep mission goals fixed to timetable-backed trio ─────────
-      const roadmapTopic = this.getRoadmapMissionTopic();
       CONFIG.DAILY_GOALS = [
         {
-          id: "roadmap_learning",
-          label: roadmapTopic,
-          minutesTarget: 270,
-          sessionsTarget: 0,
-          keywords: ["deep work", "learn", "learning", "study", ...this.normalizeTopic(roadmapTopic).split(" ").filter(Boolean)],
-          discipline_type: "flexible",
-          target_minutes: 270,
-          category: "learning",
+          id: "roadmap_learning", label: "Roadmap Tasks", minutesTarget: 270, sessionsTarget: 0,
+          keywords: ["deep work", "learn", "learning", "study"], discipline_type: "flexible", target_minutes: 270, category: "learning"
         },
         {
-          id: "project",
-          label: "Project Work",
-          minutesTarget: 180,
-          sessionsTarget: 0,
-          keywords: ["project", "build"],
-          discipline_type: "flexible",
-          target_minutes: 180,
-          category: "deep_work",
+          id: "project", label: "Project Work", minutesTarget: 180, sessionsTarget: 0,
+          keywords: ["project", "build"], discipline_type: "flexible", target_minutes: 180, category: "deep_work"
         },
         {
-          id: "revision",
-          label: "Revision",
-          minutesTarget: 120,
-          sessionsTarget: 0,
-          keywords: ["revision"],
-          discipline_type: "flexible",
-          target_minutes: 120,
-          category: "learning",
-        },
+          id: "revision", label: "Revision", minutesTarget: 120, sessionsTarget: 0,
+          keywords: ["revision"], discipline_type: "flexible", target_minutes: 120, category: "learning"
+        }
       ];
 
-      // ── 2. Render the shadow-goal-list DOM from roadmap tasks ────
-      const tasks = this.getDailyMissionTasks();
+      const cascade = this.ensureCascadeState();
+      const UI_SLOTS = [
+        { time: "4:00 AM", label: "Deep Work (Learning)", type: "learning", slotIdx: 0 },
+        { time: "6:15 AM", label: "Training", type: "static" },
+        { time: "7:30 AM", label: "Deep Work (Learning)", type: "learning", slotIdx: 1 },
+        { time: "11:00 AM", label: "Build (Project)", type: "static" },
+        { time: "4:00 PM", label: "Learn (Learning)", type: "learning", slotIdx: 2 },
+        { time: "7:30 PM", label: "Atomic Habits", type: "static" },
+        { time: "9:45 PM", label: "Revision", type: "static" },
+        { time: "11:30 PM", label: "Sleep", type: "static" }
+      ];
+
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
-
-      const taskIds = ["mission-task-1", "mission-task-2", "mission-task-3"];
-      const checks = this.getTodayManualMissionChecks();
-
-      container.innerHTML = tasks.map((item, idx) => {
-        const autoDone = !!item.done;
-        const checkId = this.getMissionCheckId(item.topic);
-        const manualDone = !!checks[checkId];
-        const done = autoDone || manualDone;
-        const labelId = idx < 3 ? ` id="${taskIds[idx]}"` : "";
-        const dotCls = done ? " done" : "";
-        
-        return `
-          <div class="sd-mission-item shadow-goal-item">
-            <div class="sd-mission-dot${dotCls}"></div>
-            <span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span>
-            <input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" style="display:none;" ${done ? "checked" : ""} />
-          </div>`.trim();
-      }).join("");
-
-      container.querySelectorAll(".mission-check").forEach(checkbox => {
-        checkbox.addEventListener("change", (e) => {
-          const checkId = e.target.getAttribute("data-mission-check-id");
-          if (!checkId) return;
-          checks[checkId] = !!e.target.checked;
-          e.target.closest(".shadow-goal-item")?.classList.toggle("shadow-goal-done", !!e.target.checked);
-          // Also mark on the roadmap day if this matches the active day
-          if (this.state.roadmap?.modules?.length) {
-            const { moduleIndex, activeModule } = this.getRoadmapProgress();
-            if (activeModule) {
-              const activeDayIdx = activeModule.days.findIndex(d => d.status === "active" && this.getMissionCheckId((d.text || "").split("\n")[0].trim()) === checkId);
-              if (activeDayIdx >= 0 && e.target.checked) {
-                this.setRoadmapDayStatus(moduleIndex, activeDayIdx, true);
-                this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
-              }
-            }
+      
+      let html = "";
+      UI_SLOTS.forEach(slot => {
+        if (slot.type === "learning") {
+          const taskObj = cascade.activeSlots[slot.slotIdx];
+          if (taskObj) {
+             html += `
+              <div class="sd-mission-item shadow-goal-item">
+                <input class="mission-cascade-check" type="checkbox" data-slot="${slot.slotIdx}" style="margin-right:8px; cursor:pointer; min-width:14px; min-height:14px;"/>
+                <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label} [ROADMAP: ${this.escapeHtml(taskObj.text)}]</span>
+              </div>`;
+          } else {
+             html += `
+              <div class="sd-mission-item shadow-goal-item" style="opacity: 0.5;">
+                <div class="sd-mission-dot" style="margin-right:8px; background:transparent; border:1px solid #444;"></div>
+                <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label} [Empty]</span>
+              </div>`;
           }
-          this.saveTrainerState();
-          // Refresh scores after manual check
-          if (this.app.shadowEngine) this.app.shadowEngine.refresh(false);
+        } else {
+          html += `
+            <div class="sd-mission-item shadow-goal-item">
+              <div class="sd-mission-dot" style="margin-right:8px;"></div>
+              <span style="font-size:0.85rem; color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label}</span>
+            </div>`;
+        }
+      });
+      
+      let btnHtml = `
+        <button id="btn-continue-day" style="width:100%; margin-top:12px; padding:6px; background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border); border-radius:4px; font-size:0.75rem; cursor:pointer;">
+          Missed? Continue Day (Cascade Forward)
+        </button>`;
+        
+      container.innerHTML = html + btnHtml;
+
+      container.querySelectorAll(".mission-cascade-check").forEach(cb => {
+        cb.addEventListener("change", (e) => {
+          if (e.target.checked) {
+             const slotIdx = Number(e.target.getAttribute("data-slot"));
+             this.triggerCascadeComplete(slotIdx);
+          }
         });
       });
+      
+      document.getElementById("btn-continue-day").addEventListener("click", () => {
+         this.triggerCascadeMiss();
+      });
 
-      // ── 3. Auto-complete via time tracking ───────────────────────
-      const active = this.getActiveRoadmapDay();
-      if (active) {
-        const topic = (active.day.text || "").split("\n")[0].trim();
-        const progress = this.getTopicProgress(topic);
-        if (active.day.status !== "completed" && !active.day.completed &&
-          progress.completedSlots >= progress.reqSlots) {
-          this.setRoadmapDayStatus(active.moduleIndex, active.dayIndex, true);
-          this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
-          this.normalizeRoadmapDays();
-        }
-      }
     } catch (err) {
-      console.error("[syncMissionFromRoadmap] failed:", err);
+      console.error("[syncMissionFromRoadmap] Cascade logic failed:", err);
     }
   }
 
