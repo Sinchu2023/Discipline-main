@@ -23,7 +23,6 @@ class DisciplineTracker {
           this.uiManager = new UIManager(this);
           this.shadowEngine = new ShadowEngine(this);
           this.trainerEngine = new TrainerEngine(this);
-          this.flowEngine = new FlowProtocolEngine(this);
           this.graphManager = new GraphManager(this);
           this.eventManager = new EventManager(this);
           this.migrateSchema();
@@ -115,20 +114,6 @@ class DisciplineTracker {
             "shadow-distraction-budget",
             "shadow-win-ladder",
             "shadow-mission-score",
-            "flow-blockers-status",
-            "flow-proneness-status",
-            "flow-triggers-status",
-            "flow-cycle-status",
-            "wake-now-btn",
-            "first-action-btn",
-            "kill-switch-btn",
-            "kill-switch-countdown",
-            "flow-before-phone-check",
-            "attention-minus-btn",
-            "attention-plus-btn",
-            "attention-stretch-value",
-            "war-score",
-            "flow-action-steps",
             "mission-task-1",
             "mission-task-2",
             "mission-task-3",
@@ -349,7 +334,6 @@ class DisciplineTracker {
           this.taskManager.initialize();
           this.shadowEngine.initialize();
           this.trainerEngine.initialize();
-          this.flowEngine.initialize();
           this.graphManager.initialize();
           this.eventManager.initialize();
           this.updateStreak();

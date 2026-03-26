@@ -111,10 +111,8 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
 
 const MISSION_THRESHOLDS = {
   default: 30,
-  "basic semiconductor physics": 30,
-  "different models of diodes": 30,
-  "project work": 45,
-  revision: 20,
+  "project work": 180,
+  revision: 120,
 };
 const CATEGORY_DEFINITIONS = {
   Sleep: ["Night Sleep", "Nap", "Recovery"],

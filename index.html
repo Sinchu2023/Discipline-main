@@ -1406,97 +1406,6 @@
         color: #ff7b7b;
       }
 
-      .flow-lab-section {
-        margin: 0 0 2rem;
-        background: linear-gradient(
-          135deg,
-          rgba(18, 18, 20, 0.95),
-          rgba(14, 14, 16, 0.95)
-        );
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 1rem;
-        box-shadow: var(--shadow);
-      }
-
-      .flow-lab-title {
-        font-size: 1.05rem;
-        font-weight: 700;
-        margin-bottom: 0.9rem;
-        letter-spacing: 0.4px;
-      }
-
-      .flow-lab-grid {
-        display: grid;
-        grid-template-columns: 1.2fr 1fr 1fr;
-        gap: 12px;
-      }
-
-      .flow-card {
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 10px;
-        background: rgba(255, 255, 255, 0.03);
-      }
-
-      .flow-card h4 {
-        font-size: 0.86rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        margin-bottom: 6px;
-        letter-spacing: 0.45px;
-      }
-
-      .flow-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 6px;
-        font-size: 0.9rem;
-      }
-
-      .flow-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      .flow-checklist label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 6px;
-        font-size: 0.9rem;
-      }
-
-      #kill-switch-countdown {
-        font-size: 1.1rem;
-        color: var(--warning);
-        margin-top: 6px;
-      }
-
-      .flow-steps {
-        margin-top: 10px;
-        border-top: 1px dashed rgba(255, 255, 255, 0.15);
-        padding-top: 8px;
-      }
-
-      .flow-steps-title {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        margin-bottom: 6px;
-      }
-
-      .flow-steps-list {
-        margin-left: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 0.86rem;
-        color: var(--text-primary);
       }
       /* Responsive Design */
       @media (max-width: 1200px) {
@@ -1936,28 +1845,6 @@
                 <span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">00:00:00</span>
               </div>
             </div>
-            
-            <!-- Flow State -->
-            <div class="sd-bot-panel">
-              <div class="sd-panel-title">FLOW STATE</div>
-              <div class="sd-duel-rows" style="padding:0;">
-                <div class="sd-duel-row">
-                  <span class="sd-row-label">blockers</span>
-                  <span class="sd-row-value red" id="flow-blockers-status">high</span>
-                </div>
-                <div class="sd-duel-row">
-                  <span class="sd-row-label">proneness</span>
-                  <span class="sd-row-value" id="flow-proneness-status">set wake + first action</span>
-                </div>
-                <div class="sd-duel-row">
-                  <span class="sd-row-label">triggers</span>
-                  <span class="sd-row-value orange" id="flow-triggers-status">moderate +4%</span>
-                </div>
-                <div class="sd-duel-row">
-                  <span class="sd-row-label">cycle</span>
-                  <span class="sd-row-value" id="flow-cycle-status">recovery / reset</span>
-                </div>
-              </div>
             </div>
           </div>
           
@@ -2265,7 +2152,6 @@
     <script src="js/ui-manager.js"></script>
     <script src="js/shadow-engine.js"></script>
     <script src="js/trainer-engine.js"></script>
-    <script src="js/flow-protocol-engine.js"></script>
     <script src="js/graph-manager.js"></script>
     <script src="js/event-manager.js"></script>
     <script src="js/discipline-tracker.js"></script>

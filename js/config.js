@@ -33,25 +33,18 @@ const CONFIG = {
   },
   DAILY_GOALS: [
     {
-      id: "nptel",
-      label: "NPTEL",
-      minutesTarget: 120,
-      sessionsTarget: 2,
-      keywords: ["nptel"],
-    },
-    {
-      id: "yt",
-      label: "YouTube Learning",
-      minutesTarget: 120,
-      sessionsTarget: 2,
-      keywords: ["youtube", "yt"],
-    },
-    {
       id: "project",
       label: "Project Work",
       minutesTarget: 180,
       sessionsTarget: 0,
       keywords: ["project"],
+    },
+    {
+      id: "revision",
+      label: "Revision",
+      minutesTarget: 120,
+      sessionsTarget: 0,
+      keywords: ["revision"],
     },
   ],
 };

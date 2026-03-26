@@ -168,6 +168,53 @@ class TrainerEngine {
           };
         }
 
+        evaluateTimetable(tasks, dateStr) {
+          const todaysTasks = tasks.filter((t) => t.date === dateStr);
+          let sleepMinutes = 0;
+          let deepWorkMinutes = 0;
+          let projectMinutes = 0;
+          let learnRevisionMinutes = 0;
+          let earlyDeepWorkStart = null;
+
+          todaysTasks.forEach((t) => {
+            const cat = t.category.toLowerCase();
+            const sub = (t.subcategory || "").toLowerCase();
+            const startHour = new Date(t.startTime).getHours();
+            
+            if (cat === "sleep" || cat === "rest") {
+              sleepMinutes += t.duration;
+            } else if (this.app.isProductiveCategory(t.category)) {
+              if (sub.includes("project")) {
+                projectMinutes += t.duration;
+              } else if (sub.includes("revision") || sub.includes("learn") || startHour >= 16) {
+                learnRevisionMinutes += t.duration;
+              } else {
+                deepWorkMinutes += t.duration;
+                if (startHour >= 4 && startHour <= 6) {
+                  if (!earlyDeepWorkStart || t.startTime < earlyDeepWorkStart) earlyDeepWorkStart = t.startTime;
+                }
+              }
+            }
+          });
+
+          const missedEarlyStart = !earlyDeepWorkStart && new Date().getHours() >= 8; 
+          const highEffort = (deepWorkMinutes + projectMinutes) >= 300; 
+          const sleepSafetyMin = 300; 
+          const idealSleep = 420; 
+          
+          let sleepStatus = "OPTIMAL";
+          if (sleepMinutes > 0) {
+            if (sleepMinutes < sleepSafetyMin) sleepStatus = "DANGER";
+            else if (sleepMinutes < idealSleep) {
+              sleepStatus = highEffort ? "COMPROMISED_OK" : "SHORT";
+            }
+          } else {
+             sleepStatus = "PENDING";
+          }
+
+          return { missedEarlyStart, sleepStatus, highEffort, sleepMinutes, deepWorkMinutes, projectMinutes, learnRevisionMinutes };
+        }
+
         buildTrainerSnapshot() {
           const metrics = this.app.shadowEngine.computeRollingMetrics();
           const shadow7DayAverage = Math.max(
@@ -195,7 +242,15 @@ class TrainerEngine {
 
           const antiSandbag = this.computeAntiSandbagSignals(shadow7DayAverage);
           const lossChainBuffPct = this.state.shadowBuffDays > 0 ? 0.05 : 0;
-          const adaptiveBuffPct = antiSandbag.adaptivePressure.buffPct;
+          let adaptiveBuffPct = antiSandbag.adaptivePressure.buffPct;
+          
+          const todayDate = this.app.getDateString(new Date());
+          const timetable = this.evaluateTimetable(this.app.state.tasks, todayDate);
+          
+          if (timetable.sleepStatus === "COMPROMISED_OK") {
+             adaptiveBuffPct -= 0.05; 
+          }
+
           const effectiveShadow =
             shadow7DayAverage * (1 + lossChainBuffPct + adaptiveBuffPct);
           const userEffectiveToday =
@@ -205,7 +260,6 @@ class TrainerEngine {
             ? effectiveShadow * 1.05
             : effectiveShadow + 1;
           const weeklyGap = effectiveShadow - metrics.currentAvg;
-          const todayDate = this.app.getDateString(new Date());
           const missionProgress =
             this.app.shadowEngine.getTodayGoalProgress(todayDate);
           const missionScore =
@@ -278,92 +332,62 @@ class TrainerEngine {
             distractionMinutes,
             distractionOverBudget: computedPenalty.overBudget,
             winLadder: ladder,
+            timetable,
           };
         }
 
         buildReport(d = this.buildTrainerSnapshot()) {
-          const trend = this.getShadowTrend(
-            d.last3DayAverage,
-            d.previous3DayAverage,
-          );
-          const userMilestone = this.getMilestoneProgress(
-            d.userLevel.current,
-            d.currentMinutesToday,
-            d.winsInLast5,
-          );
-          const shadowMilestone = this.getMilestoneProgress(
-            d.shadowLevel.current,
-            d.effectiveShadow,
-            Math.max(0, 5 - d.winsInLast5),
-          );
+          const trend = this.getShadowTrend(d.last3DayAverage, d.previous3DayAverage);
           const nextPenalty = Math.max(15, Math.ceil(d.penaltyMinutes * 1.1));
-          const streakBuff =
-            d.currentStreakDays >= 7
-              ? "Active: USER +5% for next 7 days"
-              : `Locked: ${7 - Math.min(7, d.currentStreakDays)} consecutive wins remaining`;
-          const threeLossBuff =
-            "If 3 consecutive losses confirmed: SHADOW +5% effective average for next 3 days";
-
           const anti = d.antiSandbag;
-          const antiBuffStatus = anti.adaptivePressure.active
-            ? `Adaptive Pressure Buff active (+3%) for ${anti.adaptivePressure.daysLeft} day(s)`
-            : `Adaptive Pressure Buff inactive (trigger: 3 consecutive wins <3% margin, current run ${anti.minimalRun})`;
-          const aggressionStatus = anti.aggressionMode.active
-            ? `Aggression Mode active (minimum +5% win margin) for ${anti.aggressionMode.daysLeft} day(s)`
-            : `Aggression Mode inactive (trigger: 5 consecutive wins <=5m margin, current run ${anti.squeezeRun})`;
-          const minimalLabel = anti.minimalDominanceDetected
-            ? "Minimal Dominance Detected"
-            : "Dominance Quality Acceptable";
+          
+          const phase1 = Math.min(60, Math.max(45, Math.ceil(d.minutesToWin * 0.5)));
 
-          const phase1 = Math.min(
-            60,
-            Math.max(45, Math.ceil(d.minutesToWin * 0.5)),
-          );
-          const phase2 = Math.max(0, d.minutesToTie - phase1);
-          const safetyTarget = Math.ceil(d.minutesToWin * 1.15);
-          const phase3 = Math.max(
-            0,
-            safetyTarget - Math.max(0, phase1 + phase2),
-          );
+          let coachTone = "";
+          if (d.monthlyWinRate > 0.6) {
+             coachTone = "Progress is excellent. Maintain precision. The system is adapting to your high performance.";
+          } else if (d.monthlyWinRate < 0.4) {
+             coachTone = "We need to stabilize. Focus on execution over emotion. Hit the baseline consistently.";
+          } else {
+             coachTone = "Performance is stable. Push slightly further today to break the equilibrium.";
+          }
 
-          return `=== SHADOW STATUS ===
+          let timetableFeedback = "";
+          if (d.timetable.sleepStatus === "DANGER") {
+             timetableFeedback = "CRITICAL: Sleep deficit detected (<5 hours). Structural integrity compromised. You must prioritize minimum restorative rest tonight.";
+          } else if (d.timetable.sleepStatus === "COMPROMISED_OK") {
+             timetableFeedback = "High effort recognized. Minor sleep compromise accepted today without penalty. Mission load has been slightly reduced to allow recovery.";
+          } else if (d.timetable.sleepStatus === "SHORT") {
+             timetableFeedback = "Sleep was suboptimal without high effort justification. Realign rest timing.";
+          }
+
+          if (d.timetable.missedEarlyStart) {
+             timetableFeedback += (timetableFeedback ? " " : "") + "5:00 AM Deep Work block missed. Strict rules apply here; recalibrate your start tomorrow.";
+          }
+
+          return `=== COACHING FEEDBACK ===
+${coachTone}
+${timetableFeedback ? timetableFeedback + "\n" : ""}Learning and revision blocks remain flexible. Focus on comprehension and depth; overruns here are accepted. Sleep and wake timings are strict.
+
+=== SHADOW ENGINE STATUS ===
 Level: ${d.shadowLevel.current.name} | L${d.shadowMicroLevel}/100
-Active Buffs: ${this.state.shadowBuffDays > 0 ? `+5% for ${this.state.shadowBuffDays} day(s)` : "None"}; ${antiBuffStatus}; ${aggressionStatus}
-Effective Average: ${this.app.formatDuration(d.effectiveShadow)}
+Effective Target: ${this.app.formatDuration(d.effectiveShadow)}
 Trend: ${trend}
-Strength: Highest proven 7-day average at ${this.app.formatDuration(d.strongestHistorical7DayAverage)}
-Vulnerability: Shadow weakens when your monthly win rate rises above 60%
-Next Level Milestone: ${shadowMilestone}
+Active Adjustments: ${anti.adaptivePressure.active ? "+3% Pressure" : "None"} | ${d.timetable.sleepStatus === "COMPROMISED_OK" ? "-5% Recovery Allowance" : ""}
 
-=== USER STATUS ===
-Level: ${d.userLevel.current.name} | L${d.userMicroLevel}/100
-Active Penalties: ${this.app.formatDuration(d.penaltyMinutes)} (${d.penaltyPoints}pt) | ${d.penaltyReasons.length ? d.penaltyReasons.join(" • ") : "No active penalty triggers"}
+=== TRACKING SNAPSHOT ===
 Mission Score: ${d.missionScore}/100
-Distraction Budget: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (+${this.app.formatDuration(d.distractionOverBudget)} over)` : ""}
+Distraction: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (+${this.app.formatDuration(d.distractionOverBudget)})` : ""}
 Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " ✓" : ""} • 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " ✓" : ""}
-Mode: ${d.mode}
-Gap: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
-Minutes to Tie: ${this.app.formatDuration(d.minutesToTie)}
-Minutes to Win: ${this.app.formatDuration(d.minutesToWin)} (target ${this.app.formatDuration(d.effectiveWinTarget)})
-Required Pace: ${d.requiredPace} min/hour
-Next Level Milestone: ${userMilestone}
+Current Mode: ${d.mode}
+Gap to Target: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
 
-=== SYSTEM EFFECTS ===
-If You Lose Today: Next penalty becomes ${this.app.formatDuration(nextPenalty)} (+10%) because current penalty triggers remain active.
-If You Win Today: ${minimalLabel}; Shadow effective average remains ${this.app.formatDuration(d.effectiveShadow)} unless anti-sandbag trigger extends pressure.
-If 7-Day Streak Achieved: ${streakBuff}.
-If 3 Consecutive Losses: ${threeLossBuff}.
+=== DAILY OBJECTIVE ===
+Minutes to Win: ${this.app.formatDuration(d.minutesToWin)}
+Required Average Pace: ${d.requiredPace} min/hour
 
-=== CRUSH PLAN ===
-Phase 1: ${this.app.formatDuration(phase1)} immediate high-impact deep work block.
-Phase 2: ${this.app.formatDuration(phase2)} tie-securing block to reach ${this.app.formatDuration(d.minutesToTie)}.
-Phase 3: ${this.app.formatDuration(phase3)} safety buffer block (15% above win target).
-
-=== LONG-TERM DOMINATION ===
-Surpass Shadow level by lifting your rolling 7-day average above ${this.app.formatDuration((d.shadowLevel.next || d.shadowLevel.current).min)} and sustaining milestone rules (5 days, 3 wins). Maintain next level by protecting monthly win rate above 60% and keeping required pace below 45 min/hour. Break Shadow momentum by converting today into a win and chaining 3 of next 5 days above ${this.app.formatDuration(d.effectiveWinTarget)} under current anti-sandbag pressure. Secure the next milestone immediately: ${d.userLevel.next ? d.userLevel.next.name : "Top level retention"}.
-
-=== COMMAND ===
-Execute Phase 1 now and close only after logging the full ${this.app.formatDuration(phase1)}.`;
+=== SUGGESTED ACTION ===
+Commit to a focused ${this.app.formatDuration(phase1)} deep work session immediately.`;
         }
 
         escapeHtml(value = "") {
@@ -579,7 +603,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             if (!learning.length) learning.push(active.day);
           }
 
-          const learningTasks = learning.slice(0, 2).map((day) => {
+          const learningTasks = learning.slice(0, 1).map((day) => {
             const topic = (day.text || "").split("\n")[0].trim();
             const progress = this.getTopicProgress(topic);
             const done = progress.minutes >= progress.threshold;
@@ -590,10 +614,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const projectDone =
             projectProgress.minutes >=
             this.getThresholdForTopic("Project Work");
-          const allLearningDone =
-            (learningTasks.length > 0
-              ? learningTasks.every((t) => t.done)
-              : true) && projectDone;
           const revisionProgress = this.getTopicProgress("Revision");
           const revisionThreshold = this.getThresholdForTopic("Revision");
           const revisionDone = revisionProgress.minutes >= revisionThreshold;
@@ -611,9 +631,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               topic: "Revision",
               progress: revisionProgress,
               done: revisionDone,
-              active: allLearningDone,
+              active: learningTasks.every((t) => t.done) && projectDone,
             },
-          ].slice(0, 4);
+          ];
         }
 
         syncMissionFromRoadmap() {
@@ -667,7 +687,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const container = document.querySelector(".shadow-goal-list");
           if (!container) return;
 
-          const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4"];
+          const taskIds = ["mission-task-1","mission-task-2","mission-task-3"];
           const checks = this.getTodayManualMissionChecks();
 
           container.innerHTML = tasks.map((item, idx) => {
@@ -675,7 +695,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const checkId = this.getMissionCheckId(item.topic);
             const manualDone = !!checks[checkId];
             const done = autoDone || manualDone;
-            const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
+            const labelId = idx < 3 ? ` id="${taskIds[idx]}"` : "";
             const doneCls = done ? " shadow-goal-done" : "";
             return `<div class="shadow-goal-item${doneCls}"><span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span><input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} /></div>`;
           }).join("");
