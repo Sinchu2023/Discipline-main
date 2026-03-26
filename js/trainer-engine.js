@@ -1073,9 +1073,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     // without the system resetting to tomorrow prematurely.
     const isMidNightBuffer = nowHour < 4;
     const isStaleDate = cascade && cascade.date < today;
+    const isFutureDate = cascade && cascade.date > today;
     
-    // Only reset if it's a completely new state, schema invalid, or it's past 4 AM on a new day
-    const shouldReset = !cascade || !isSchemaValid || (isStaleDate && !isMidNightBuffer);
+    // Only reset if it's a completely new state, schema invalid, it's past 4 AM on a new day,
+    // or if the user accidentally finalized their day early and jumped into the future.
+    const shouldReset = !cascade || !isSchemaValid || (isStaleDate && !isMidNightBuffer) || isFutureDate;
 
     if (shouldReset) {
       const q = this.getFullRoadmapQueue();
