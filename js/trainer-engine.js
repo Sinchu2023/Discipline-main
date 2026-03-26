@@ -844,49 +844,6 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
         syncMissionFromRoadmap() {
           try {
-          // ── 1. Build DAILY_GOALS from roadmap state ──────────────────
-          if (!this.state.roadmap?.modules?.length) {
-            CONFIG.DAILY_GOALS = [];
-          } else {
-            const { moduleIndex, activeModule } = this.getRoadmapProgress();
-            if (!activeModule) {
-              CONFIG.DAILY_GOALS = [];
-            } else {
-              const goals = [];
-              let addedUncompleted = 0;
-
-              for (let di = 0; di < activeModule.days.length; di++) {
-                const day = activeModule.days[di];
-                const isDone = day.status === "completed" || day.completed;
-                const isActive = day.status === "active";
-
-                if (isDone || isActive) {
-                  goals.push({
-                    id: `roadmap_m${moduleIndex}_d${di}`,
-                    label: `${activeModule.name}: ${(day.text || "").split("\n")[0].trim()}`,
-                    type: "checkbox",
-                    completed: isDone,
-                  });
-                  if (!isDone) {
-                    addedUncompleted++;
-                    if (addedUncompleted >= 1) break; // one active task at a time
-                  }
-                }
-              }
-
-              // If module is fully done, hint at next module
-              const moduleDone = activeModule.days.every(d => d.status === "completed" || d.completed);
-              if (moduleDone) {
-                const nextMod = this.state.roadmap.modules[moduleIndex + 1];
-                goals.push(nextMod
-                  ? { id: `roadmap_m${moduleIndex+1}_preview`, label: `Start ${nextMod.name}`, type: "checkbox", completed: false }
-                  : { id: `roadmap_done`, label: `Roadmap Complete! 🎉`, type: "checkbox", completed: true }
-                );
-              }
-
-              CONFIG.DAILY_GOALS = goals;
-            }
-          }
 
           // ── 2. Render the shadow-goal-list DOM from roadmap tasks ────
           const tasks = this.getDailyMissionTasks();
@@ -942,9 +899,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
             }
           }
           } catch (err) {
-            // Safety net: if anything throws, ensure DAILY_GOALS is never undefined
             console.error("[syncMissionFromRoadmap] failed:", err);
-            if (!Array.isArray(CONFIG.DAILY_GOALS)) CONFIG.DAILY_GOALS = [];
           }
         }
 
