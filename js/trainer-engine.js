@@ -273,21 +273,24 @@ class TrainerEngine {
 
       // Planned first slot time
       const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-      const plannedMin = toMin(TIMETABLE_LOGIC[0].time);
-      const delta = actualMin - plannedMin; // positive = woke late
-
-      if (delta <= 5) return; // within grace window — no rerouting needed
-      const cappedDelta = Math.min(delta, 120); // never shift more than 2 hours
-
-      // Shift all slots forward by delta
       const toTime = (m) => {
         const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
         return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
+      const plannedMin = toMin(TIMETABLE_LOGIC[0].time);
+      const delta = actualMin - plannedMin; 
+
+      // If delta is +/- 5 mins, ignore (jitter)
+      if (Math.abs(delta) <= 5) return; 
+      
+      // Cap the shift (don't shift more than 2 hours in either direction)
+      const cappedDelta = Math.sign(delta) * Math.min(Math.abs(delta), 120); 
+
+      // Shift all future slots by delta
       const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
       TIMETABLE_LOGIC.forEach(slot => {
         const slotMin = toMin(slot.time);
-        if (slotMin > nowMin) { // only shift future slots
+        if (slotMin > nowMin - 30) { // Shift slots that are upcoming or just started
           slot.time = toTime(slotMin + cappedDelta);
         }
       });
@@ -380,7 +383,7 @@ class TrainerEngine {
   // Returns adjusted daily mission targets for each DAILY_GOAL based on
   // behavioral state, sleep compromise status, and flexibility buffer.
   // Each goal uses its OWN 7-day keyword-matched average (not total daily minutes).
-  generateMissionTargets(behavioralState, sleepCompromised) {
+  generateMissionTargets(behavioralState, sleepCompromised, isFatigued = false) {
     const { SE2 } = CONFIG;
     const flexBuffer = this.computeFlexibilityBuffer();
     const goals = CONFIG.DAILY_GOALS || [];
@@ -422,6 +425,10 @@ class TrainerEngine {
       // Recovery state: additional load reduction
       if (behavioralState === "RECOVERY") {
         target = Math.round(target * (1 - SE2.RECOVERY_LOAD_REDUCTION));
+      }
+      // SE2 Fatigue: Poor sleep load reduction (-20%)
+      if (isFatigued) {
+        target = Math.round(target * (1 - (SE2.FATIGUE_LOAD_REDUCTION_FACTOR || 0.2)));
       }
 
       // Flexible task: show buffer range
@@ -1863,7 +1870,14 @@ Rules:
     const sleepCompromised = timetable.sleepStatus === "COMPROMISED_OK";
 
     // Step 5: generateMissions
-    const missionTargets = this.generateMissionTargets(behavioralState, sleepCompromised);
+    // SE2: Detect last night's sleep for fatigue reduction
+    const lastSleepTask = (this.app.state.tasks || [])
+      .filter(t => t.category === "Sleep" && t.date === realDate)
+      .sort((a,b) => (b.endTime || 0) - (a.endTime || 0))[0];
+    const sleepMinutes = lastSleepTask ? lastSleepTask.duration : 720; // default to plenty if unknown
+    const isFatigued = sleepMinutes < CONFIG.SE2.FATIGUE_THRESHOLD_MINUTES;
+
+    const missionTargets = this.generateMissionTargets(behavioralState, sleepCompromised, isFatigued);
 
 
     // Step 6: applyRules
@@ -1894,7 +1908,27 @@ Rules:
   }
 
   autoFinalizeAtSleep() {
-    this._performDayFinalization();
+    // SE2: Immediate Wake Rerouting (Problem 4/5/8)
+    // Calculate mandatory 5-hour wake offset based on *current* time
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    
+    // Use 48h timeline to handle midnight transitions safely
+    // If it's early morning (0-8 AM), treat as 'late today' (1440 + min)
+    let sleepTime48 = nowMin;
+    if (nowMin < 480) sleepTime48 += 1440; 
+    
+    const firstSlot = TIMETABLE_LOGIC[0];
+    const [h, m] = firstSlot.time.split(":").map(Number);
+    const idealWake48 = 1440 + (h * 60 + m); 
+    
+    const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
+    const wakeDeadline48 = sleepTime48 + minSleep;
+    
+    const wakeOffset = Math.max(0, wakeDeadline48 - idealWake48);
+    
+    console.log(`[SE2 Sleep Trigger] Sleep: ${nowMin}m, IdealWake: ${idealWake48}m, Offset: ${wakeOffset}m`);
+    this._performDayFinalization(wakeOffset);
   }
 
   triggerFinalizeDay() {
@@ -1903,12 +1937,27 @@ Rules:
     }
   }
 
-  _performDayFinalization() {
+  _performDayFinalization(wakeOffset = 0) {
     const analysis = this.analyzeBehavior();
     const { state: behavioralState } = analysis;
     
     // 1. Shift baseline timetable times for tomorrow
     this.shiftTimetableTimes(behavioralState);
+
+    // ── Immediate Wake Rerouting (GPS Override) ──
+    // If wakeOffset > 0, we must shift the entire tomorrow schedule
+    if (wakeOffset > 0) {
+      const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      const toTime = (m) => {
+        const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
+        return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+      };
+      
+      TIMETABLE_LOGIC.forEach(slot => {
+        const currentMin = toMin(slot.time);
+        slot.time = toTime(currentMin + wakeOffset);
+      });
+    }
 
     // 2. Unfinished Roadmap Task Carry-over (improve.md §8)
     const cascade = this.ensureCascadeState();

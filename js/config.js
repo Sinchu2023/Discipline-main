@@ -63,6 +63,8 @@ const CONFIG = {
     FLEX_ABUSE_SKIP_RATE_THRESHOLD: 0.60,
     // Recovery load reduction factor
     RECOVERY_LOAD_REDUCTION: 0.15,
+    FATIGUE_LOAD_REDUCTION_FACTOR: 0.20,
+    FATIGUE_THRESHOLD_MINUTES: 420, // 7 hours
   },
 
   DAILY_GOALS: [
