@@ -142,6 +142,20 @@ class StopwatchManager {
       this.app.trainerEngine.autoFinalizeAtSleep();
     }
   }
+
+  startTaskFromRoadmap(label, subtext) {
+    if (this.isRunning) {
+      if (!confirm(`A task "${this.app.state.activeTask.name}" is already running. Switch to "${label}"?`)) return;
+      this.stop();
+    }
+
+    // Resolve category based on label (e.g., "Deep Work" -> "Productive Work")
+    const category = this.app.resolveCategory(label) || "Productive Work";
+    const subcategory = label; 
+    const description = subtext || label;
+
+    this.start(label, { category, subcategory, description });
+  }
         stop() {
           if (!this.isRunning) return;
           this.stopTicking();

@@ -38,6 +38,16 @@ class TrainerEngine {
           }
           if (e.target.id === "btn-undo-cascade") this.undoCascade();
           if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
+
+          // SE2: Auto-start stopwatch when clicking mission text
+          const missionLabel = e.target.closest(".mission-task-label");
+          if (missionLabel) {
+            const label = missionLabel.getAttribute("data-label");
+            const subtext = missionLabel.getAttribute("data-subtext");
+            if (this.app.stopwatchManager?.startTaskFromRoadmap) {
+              this.app.stopwatchManager.startTaskFromRoadmap(label, subtext);
+            }
+          }
         }
       };
       // No longer need 'change' for checkboxes, just 'click' for circle buttons
@@ -1341,7 +1351,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                     ${isDone ? "disabled" : ""}>
                     ${circleIcon}
                   </button>
-                  <span style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color};">
+                  <span class="mission-task-label" 
+                        style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: opacity 0.2s;"
+                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                        data-label="${this.escapeHtml(slot.label)}" 
+                        data-subtext="${this.escapeHtml(taskObj.text)}">
                     ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
                     <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
                     <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
@@ -1371,7 +1385,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                   ${isDone ? "disabled" : ""}>
                   ${circleIcon}
                 </button>
-                <span style="font-size:0.85rem;color:${labelColor};">
+                <span class="mission-task-label" 
+                      style="font-size:0.85rem;color:${labelColor}; cursor:pointer; transition: opacity 0.2s;"
+                      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                      data-label="${this.escapeHtml(slot.label)}" 
+                      data-subtext="">
                   ${formatTime(slot.time)} → ${slot.label} 
                   <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
                 </span>
