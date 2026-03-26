@@ -46,8 +46,9 @@ const CONFIG = {
     EFFORT_SUCCESS_THRESHOLD: 0.7,
     // Flexible task buffer multiplier
     FLEXIBLE_TASK_MULTIPLIER: 1.5,
-    // Max minutes a target may shift in a single day
+    // Max minutes a target may shift in a single day (Stable vs Recovery)
     MAX_DAILY_SHIFT_LIMIT: 30,
+    MAX_DAILY_SHIFT_RECOVERY_LIMIT: 120, 
     // Sleep limits (minutes)
     MIN_SLEEP_LIMIT: 300,  // 5 hours — absolute floor
     IDEAL_SLEEP: 420,      // 7 hours — target

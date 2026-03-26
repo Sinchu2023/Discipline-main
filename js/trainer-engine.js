@@ -208,17 +208,23 @@ class TrainerEngine {
         const idealMin  = toMin(ideal.time);
         const currentMin = toMin(slot.time);
 
-        // Determine LR from behavioral state
+        // Determine LR and Limit from behavioral state
+        const isRecovery = behavioralState === "RECOVERY";
         const lr = behavioralState === "GROWTH"
           ? SE2.LEARNING_RATE_GROWTH || 0.35
-          : behavioralState === "RECOVERY"
+          : isRecovery
             ? SE2.LEARNING_RATE_FAILURE_MODERATE
             : SE2.LEARNING_RATE_STABLE;
 
+        const maxShift = isRecovery 
+          ? SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT 
+          : SE2.MAX_DAILY_SHIFT_LIMIT;
+
         const raw   = avgActual + (idealMin - avgActual) * lr;
         const shift = raw - currentMin;
-        const clamped = Math.sign(shift) * Math.min(Math.abs(shift), SE2.MAX_DAILY_SHIFT_LIMIT);
+        const clamped = Math.sign(shift) * Math.min(Math.abs(shift), maxShift);
         slot.time = toTime(currentMin + clamped);
+
       });
 
       // Shift sleep slot (mapsTo === "static", label === "Rest")
@@ -235,13 +241,19 @@ class TrainerEngine {
         });
         if (sleepMins.length > 0) {
           const avgSleep   = sleepMins.reduce((s, v) => s + v, 0) / sleepMins.length;
+          const isRecovery = behavioralState === "RECOVERY";
           const idealMin   = toMin(ideal.time);
           const currentMin = toMin(slot.time);
           const lr         = CONFIG.SE2.LEARNING_RATE_STABLE;
+          const maxShift   = isRecovery 
+            ? CONFIG.SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT 
+            : CONFIG.SE2.MAX_DAILY_SHIFT_LIMIT;
+
           const raw        = avgSleep + (idealMin - avgSleep) * lr;
           const shift      = raw - currentMin;
-          const clamped    = Math.sign(shift) * Math.min(Math.abs(shift), CONFIG.SE2.MAX_DAILY_SHIFT_LIMIT);
+          const clamped    = Math.sign(shift) * Math.min(Math.abs(shift), maxShift);
           slot.time        = toTime(currentMin + clamped);
+
         }
       }
     } catch (err) {
