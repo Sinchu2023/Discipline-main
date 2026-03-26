@@ -1107,7 +1107,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     
     // Use dynamic times from TIMETABLE_LOGIC
     const SLOT_MAP = [];
-    if (typeof TIMETABLE_LOGIC !== "undefined") {
+    if (this.state.timetable) {
       this.state.timetable.forEach((slot, idx) => {
         let finalKey;
         if (slot.mapsTo === "learning") {
@@ -1288,7 +1288,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
       const SLOT_CONFIG = [];
 
-      if (typeof TIMETABLE_LOGIC !== "undefined") {
+      if (this.state.timetable) {
         let learningCount = 1;
         this.state.timetable.forEach((slot, idx) => {
           const type = slot.mapsTo === "learning" ? "learning" : "static";
@@ -1409,7 +1409,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
 
-    if (typeof TIMETABLE_LOGIC === "undefined") return;
+    if (!this.state.timetable) return;
 
     const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
