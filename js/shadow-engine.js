@@ -658,7 +658,7 @@ class ShadowEngine {
     // ── SE2: Behavioral state annotation ──────────────────────────────────
     const behavioralState = this.detectBehavioralState();
     // Persist updated signals
-    this.updateBehaviorSignals(todayDate, todayMinutes, shadowAvg);
+    this.updateBehaviorSignals(targetDate, todayMinutes, shadowAvg);
 
     const setText = (id, text) => { if (this.app.elements[id]) this.app.elements[id].textContent = text; };
     const setClass = (id, cls) => { if (this.app.elements[id]) this.app.elements[id].className = cls; };
