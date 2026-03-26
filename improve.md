@@ -1,139 +1,48 @@
-# Daily Mission — Final Implementation Prompt (Cascade Within Day)
+# Daily Mission State Sync and Architecture Fix Prompt
 
 ## ROLE
 
-Act as a senior front-end engineer and behavior-system designer.
+Act as a senior front-end engineer and state management designer.
 
-Work inside an existing Discipline Tracker dashboard.
+You are debugging and restructuring the Daily Mission and Roadmap integration system.
 
-Constraints:
-
-* Do NOT change UI layout, design, spacing, or components
-* ONLY update logic and behavior
+Do not modify UI design, layout, or styling.
+Only fix logic, state flow, and synchronization.
 
 ---
 
-## CORE UI (FIXED TIMETABLE)
+## OBJECTIVE
 
-The schedule must always display exactly:
-
-4:00 AM  → Deep Work (Learning) [Day 1 Roadmap]
-6:15 AM  → Training
-7:30 AM  → Deep Work (Learning) [Day 2 Roadmap]
-11:00 AM → Build (Project)
-4:00 PM  → Learn (Learning) [Day 3 Roadmap]
-7:30 PM  → Atomic Habits
-9:45 PM  → Revision
-11:30 PM → Sleep
+Fix all inconsistencies between Roadmap Console and Daily Mission by introducing a single, deterministic, synchronized state system.
 
 ---
 
-## ROADMAP LABEL INJECTION
+## CORE PROBLEM
 
-* Replace Day1/Day2/Day3 with actual roadmap task names
-* Always prefix with [ROADMAP]
+The system currently has multiple independent states that are not synchronized.
 
-Example:
-4:00 AM → Deep Work (Learning) [ROADMAP: Arrays]
+This causes:
 
----
-
-## COMPLETION SYSTEM
-
-Each roadmap slot must have a checkbox:
-
-[ ] Slot1 (4:00)
-[ ] Slot2 (7:30)
-[ ] Slot3 (4:00PM)
-
-States:
-
-* unchecked = incomplete
-* checked = completed
+* UI inconsistencies
+* irreversible actions
+* stale data rendering
+* incorrect task states
 
 ---
 
-## CORE BEHAVIOR — SAME DAY CASCADE (CRITICAL)
+## REQUIRED ARCHITECTURE
 
-This system MUST cascade tasks forward within the SAME DAY.
+### 1. Single Source of Truth
 
----
+All systems must use one unified state object:
 
-## INITIAL STATE
-
-Slot1 → Day1
-Slot2 → Day2
-Slot3 → Day3
-
----
-
-## RULE 1 — MISSED TASK SHIFTS FORWARD
-
-If a task is NOT completed in its slot:
-
-* It moves to the NEXT slot in the same day
-
-Example:
-
-Before:
-Slot1 → Day1
-Slot2 → Day2
-Slot3 → Day3
-
-If Day1 is missed:
-
-After:
-Slot1 → (empty or next-day fill later)
-Slot2 → Day1
-Slot3 → Day2
-Next queue → Day3 pushed forward
-
----
-
-## RULE 2 — CASCADE EFFECT
-
-When a task shifts forward:
-
-* All tasks below shift down
-* Last task gets pushed out to next cycle
-
----
-
-## RULE 3 — COMPLETION REMOVES TASK
-
-If a task is completed at any slot:
-
-* It is removed immediately
-* Remaining tasks shift up
-* New task fills last slot
-
----
-
-## RULE 4 — MULTIPLE FAILURES
-
-If a task is repeatedly missed:
-
-Slot1 miss → Slot2
-Slot2 miss → Slot3
-Slot3 miss → Next Day Slot1
-
-The task continues until completed
-
----
-
-## RULE 5 — UPDATE TRIGGER
-
-Cascade logic runs when:
-
-* slot time passes (optional auto-trigger)
-
----
-
-## DATA MODEL
-
-{
-roadmapQueue: [Day1, Day2, Day3, Day4],
-activeSlots: [Day1, Day2, Day3],
+cascadeState = {
+roadmapQueue: [],
+activeSlots: {
+slot1: null,
+slot2: null,
+slot3: null
+},
 completion: {
 slot1: false,
 slot2: false,
@@ -141,44 +50,155 @@ slot3: false
 }
 }
 
----
-
-## UPDATE FLOW
-
-1. Read slot completion
-2. For each slot in order:
-
-   * if completed → remove
-   * if not completed → shift forward
-3. Re-pack slots
-4. Fill empty slots from roadmapQueue
-5. Update UI
+Roadmap Console and Daily Mission must both read and write to this same state.
 
 ---
 
-## VISUAL STATE
+### 2. Two-Way Synchronization
 
-[ ] Pending
-[✓] Completed
+System must support:
 
----
+* Roadmap → Daily Mission
+* Daily Mission → Roadmap
 
-## RESET
+When roadmap changes:
 
-* Reset completion
-* Reset slots to initial mapping
+* activeSlots must be rebuilt
+* UI must re-render
 
----
+When Daily Mission changes:
 
-## FINAL BEHAVIOR
-
-* Timetable is fixed
-* Tasks move forward within the same day
-* Missed tasks never stay stuck
-* Completed tasks disappear
+* roadmap progress must update
 
 ---
 
-## ONE LINE PRINCIPLE
+### 3. Derived UI Model
 
-"Miss it → it moves to the next session immediately."
+UI must NOT store its own state.
+
+UI must always render from:
+
+cascadeState → derived → UI
+
+No independent UI state allowed.
+
+---
+
+### 4. Active Slot Rebuild Rule
+
+Whenever roadmapQueue changes:
+
+* Recalculate activeSlots from queue
+* Replace slot1, slot2, slot3
+* Trigger UI update
+
+---
+
+### 5. Completion State Binding
+
+Each slot must map directly:
+
+slot1 → completion.slot1
+slot2 → completion.slot2
+slot3 → completion.slot3
+
+No shared or global checkbox state.
+
+---
+
+### 6. Cascade Safety (Non-Destructive)
+
+Before any cascade operation:
+
+* Save previous state snapshot
+
+stateHistory.push(copy(cascadeState))
+
+System must support restoring previous state.
+
+---
+
+### 7. Task Rehydration
+
+If a task is unchecked in roadmap:
+
+* It must re-enter roadmapQueue
+* activeSlots must rebuild
+* Task must reappear in UI
+
+---
+
+### 8. State Normalization
+
+Ensure consistency between:
+
+* roadmapQueue
+* activeSlots
+* completion
+
+No duplicate or conflicting data.
+
+---
+
+### 9. Time State Layer
+
+Each slot must include:
+
+slotStatus = active | expired | completed
+
+Rules:
+
+* expired if time passed and not completed
+* expired slots remain editable
+
+---
+
+### 10. UI Consistency Rule
+
+UI must always reflect latest state.
+
+After any change:
+
+* update cascadeState
+* re-render UI
+
+No cached or stale rendering allowed.
+
+---
+
+### 11. Controlled Cascade Execution
+
+Cascade must only run when:
+
+* user triggers action (checkbox or continue button)
+
+Do not run cascade on passive UI refresh.
+
+---
+
+### 12. Separation of Concerns
+
+Strict separation:
+
+* Source: cascadeState
+* Logic: cascade engine
+* View: UI rendering
+
+No mixing of responsibilities.
+
+---
+
+## EXPECTED RESULT
+
+* Roadmap and Daily Mission stay fully synchronized
+* Tasks can be checked and unchecked reliably
+* UI always reflects real state
+* Cascade is predictable and reversible
+* No data loss
+
+---
+
+## FINAL PRINCIPLE
+
+System must operate with a single consistent state and deterministic updates.
+
