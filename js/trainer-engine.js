@@ -175,87 +175,78 @@ class TrainerEngine {
         last7Dates.push(this.app.getDateString(d));
       }
 
-      // Helper: "HH:MM" string ↔ minutes
+      // Helper: "HH:MM" string ↔ minutes (wraps to 24h)
       const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
       const toTime = (m) => {
-        const clamped = Math.max(0, Math.min(1439, Math.round(m)));
-        return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
+        const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
+        return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
 
       TIMETABLE_LOGIC.forEach((slot, idx) => {
         const ideal = IDEAL_TIMETABLE[idx];
         if (!ideal) return;
-        if (slot.mapsTo === "static") return; // don't shift static slots (training, atomic habits)
+        if (slot.mapsTo === "static") return; // don't shift static slots generally
 
-        // Gather actual start times matching this slot's mapsTo category
+        // Gather actual start times matching this slot
         const actualMins = [];
         last7Dates.forEach((dateStr) => {
           this.app.state.tasks.forEach((task) => {
             if (task.date !== dateStr || !task.startTime) return;
-            const slotMap = {
-              learning: ["Study / Skill Development", "Productive Work"],
-              project:  ["Productive Work"],
-              revision: ["Study / Skill Development"],
-            };
+            const slotMap = { learning: ["Study / Skill Development", "Productive Work"], project: ["Productive Work"], revision: ["Study / Skill Development"] };
             const cats = slotMap[slot.mapsTo] || [];
             if (!cats.includes(task.category)) return;
             const mins = new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes();
-            // Only count tasks that started within ±90 min of this slot's planned time
             if (Math.abs(mins - toMin(slot.time)) <= 90) actualMins.push(mins);
           });
         });
 
-        if (actualMins.length === 0) return; // no data — leave slot unchanged
+        if (actualMins.length === 0) return;
         const avgActual = actualMins.reduce((s, v) => s + v, 0) / actualMins.length;
         const idealMin  = toMin(ideal.time);
         const currentMin = toMin(slot.time);
 
-        // Determine LR and Limit from behavioral state
         const isRecovery = behavioralState === "RECOVERY";
-        const lr = behavioralState === "GROWTH"
-          ? SE2.LEARNING_RATE_GROWTH || 0.35
-          : isRecovery
-            ? SE2.LEARNING_RATE_FAILURE_MODERATE
-            : SE2.LEARNING_RATE_STABLE;
+        const lr = behavioralState === "GROWTH" ? 0.35 : isRecovery ? SE2.LEARNING_RATE_FAILURE_MODERATE : SE2.LEARNING_RATE_STABLE;
+        const maxLimit = isRecovery ? SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT : SE2.MAX_DAILY_SHIFT_LIMIT;
 
-        const maxShift = isRecovery 
-          ? SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT 
-          : SE2.MAX_DAILY_SHIFT_LIMIT;
-
-        const raw   = avgActual + (idealMin - avgActual) * lr;
+        const raw = avgActual + (idealMin - avgActual) * lr;
         const shift = raw - currentMin;
-        const clamped = Math.sign(shift) * Math.min(Math.abs(shift), maxShift);
+        const clamped = Math.sign(shift) * Math.min(Math.abs(shift), maxLimit);
         slot.time = toTime(currentMin + clamped);
-
       });
 
-      // Shift sleep slot (mapsTo === "static", label === "Rest")
-      const sleepSlotIdx = TIMETABLE_LOGIC.findIndex(s => s.label === "Rest");
+      // Special handling for Sleep/Rest (Midnight Wrapping)
+      const sleepSlotIdx = TIMETABLE_LOGIC.findIndex(s => s.label?.toLowerCase() === "sleep" || s.label?.toLowerCase() === "rest");
       if (sleepSlotIdx >= 0 && IDEAL_TIMETABLE[sleepSlotIdx]) {
-        const slot   = TIMETABLE_LOGIC[sleepSlotIdx];
-        const ideal  = IDEAL_TIMETABLE[sleepSlotIdx];
+        const slot = TIMETABLE_LOGIC[sleepSlotIdx];
+        const ideal = IDEAL_TIMETABLE[sleepSlotIdx];
         const sleepMins = [];
         last7Dates.forEach((dateStr) => {
           this.app.state.tasks.forEach((task) => {
             if (task.date !== dateStr || task.category !== "Sleep" || !task.startTime) return;
-            sleepMins.push(new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes());
+            let m = new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes();
+            // Wrap early morning sleep (0-8 AM) to +24 hours for correct night-time averaging
+            if (m < 480) m += 1440; 
+            sleepMins.push(m);
           });
         });
+
         if (sleepMins.length > 0) {
-          const avgSleep   = sleepMins.reduce((s, v) => s + v, 0) / sleepMins.length;
+          const avgSleep = sleepMins.reduce((s, v) => s + v, 0) / sleepMins.length;
+          let idealMin = toMin(ideal.time);
+          if (idealMin < 480) idealMin += 1440; // treat 11:45 PM as high or wrap
+          
+          let currentMin = toMin(slot.time);
+          if (currentMin < 480) currentMin += 1440;
+
           const isRecovery = behavioralState === "RECOVERY";
-          const idealMin   = toMin(ideal.time);
-          const currentMin = toMin(slot.time);
-          const lr         = CONFIG.SE2.LEARNING_RATE_STABLE;
-          const maxShift   = isRecovery 
-            ? CONFIG.SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT 
-            : CONFIG.SE2.MAX_DAILY_SHIFT_LIMIT;
+          const lr = SE2.LEARNING_RATE_STABLE;
+          const maxShift = isRecovery ? SE2.MAX_DAILY_SHIFT_RECOVERY_LIMIT : SE2.MAX_DAILY_SHIFT_LIMIT;
 
-          const raw        = avgSleep + (idealMin - avgSleep) * lr;
-          const shift      = raw - currentMin;
-          const clamped    = Math.sign(shift) * Math.min(Math.abs(shift), maxShift);
-          slot.time        = toTime(currentMin + clamped);
-
+          const raw = avgSleep + (idealMin - avgSleep) * lr;
+          const shift = raw - currentMin;
+          const clamped = Math.sign(shift) * Math.min(Math.abs(shift), maxShift);
+          slot.time = toTime(currentMin + clamped);
         }
       }
     } catch (err) {
@@ -290,8 +281,8 @@ class TrainerEngine {
 
       // Shift all slots forward by delta
       const toTime = (m) => {
-        const c = Math.max(0, Math.min(1439, Math.round(m)));
-        return `${String(Math.floor(c / 60)).padStart(2, "0")}:${String(c % 60).padStart(2, "0")}`;
+        const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
+        return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
       const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
       TIMETABLE_LOGIC.forEach(slot => {

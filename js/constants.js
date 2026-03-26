@@ -123,7 +123,7 @@ const TIMETABLE_LOGIC = [
   { time: "16:00", label: "Learn", mapsTo: "learning", name: "Learn" },
   { time: "19:30", label: "Atomic Habits", mapsTo: "static", name: "Atomic Habits" },
   { time: "21:45", label: "Revision", mapsTo: "revision", name: "Revision" },
-  { time: "23:45", label: "Rest", mapsTo: "static", name: "Rest" }
+  { time: "23:45", label: "sleep", mapsTo: "static", name: "sleep" }
 ];
 
 // Ideal target times for each slot (used by SE2 progressive timetable shifting).
@@ -136,7 +136,7 @@ const IDEAL_TIMETABLE = [
   { time: "16:00", label: "Learn", mapsTo: "learning" },
   { time: "19:30", label: "Atomic Habits", mapsTo: "static" },
   { time: "21:45", label: "Revision", mapsTo: "revision" },
-  { time: "23:45", label: "Rest", mapsTo: "static" },
+  { time: "23:45", label: "sleep", mapsTo: "static" },
 ];
 
 const CATEGORY_DEFINITIONS = {
@@ -174,7 +174,7 @@ const CATEGORY_DEFINITIONS = {
 };
 const CATEGORY_ALIASES = {
   sleep: "Sleep",
-  rest: "Sleep",
+  sleep: "Sleep",
   productive: "Productive Work",
   work: "Productive Work",
   training: "Physical Training",
