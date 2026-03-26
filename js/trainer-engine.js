@@ -1083,23 +1083,90 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   _refreshSlotStatuses(cascade) {
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const SLOT_TIMES = [
-      { key: "slot1", hour: 4,  min: 0  }, // 4:00 AM deep work
-      { key: "slot2", hour: 7,  min: 30 }, // 7:30 AM deep work
-      { key: "slot3", hour: 16, min: 0  }, // 4:00 PM learn
+    
+    // Canonical slot times for checks
+    const SLOT_MAP = [
+      { key: "slot1", time: "04:00" },
+      { key: "slot2", time: "07:30" },
+      { key: "slot3", time: "16:00" },
+      { key: "static1", time: "06:15" },
+      { key: "static2", time: "11:00" },
+      { key: "static3", time: "19:30" },
+      { key: "static4", time: "21:45" },
+      { key: "static5", time: "23:30" }
     ];
-    SLOT_TIMES.forEach(({ key, hour, min }) => {
+
+    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+    SLOT_MAP.forEach(({ key, time }) => {
+      const slotMin = toMin(time);
       if (cascade.completion[key]) {
         cascade.slotStatus[key] = "completed";
-      } else if (nowMinutes > hour * 60 + min) {
+      } else if (nowMinutes > slotMin) {
         cascade.slotStatus[key] = "expired";
       } else {
         cascade.slotStatus[key] = "active";
       }
     });
+
+    // Mirror static statuses for the UI config
+    cascade.slotStatus.slot1 = cascade.slotStatus.slot1 || "active";
+    cascade.slotStatus.slot2 = cascade.slotStatus.slot2 || "active";
+    cascade.slotStatus.slot3 = cascade.slotStatus.slot3 || "active";
   }
 
   // ── Cascade: save non-destructive snapshot before any mutation ──────────
+  // ── Restore: Core Action Methods ──────────────────────────────────────────
+  
+  triggerCascadeComplete(slotKey) {
+    const cascade = this.ensureCascadeState();
+    this._pushCascadeHistory(cascade);
+
+    const completedTask = cascade.activeSlots[slotKey];
+    if (completedTask) {
+      this.setRoadmapDayStatus(completedTask.moduleIndex, completedTask.dayIndex, true);
+      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+    }
+
+    // Mark completion. In SE2, the slot ONLY cascades to the next task 
+    // when the next slot trigger fires or on manual "Continue".
+    // This allows the "Tick" to appear immediately and stay visible.
+    cascade.completion[slotKey] = true;
+    cascade.slotStatus[slotKey] = "completed";
+
+    this.app.saveToStorage("cascade_state", cascade);
+    this.syncMissionFromRoadmap();
+  }
+
+  triggerCascadeMiss() {
+    const cascade = this.ensureCascadeState();
+    this._pushCascadeHistory(cascade);
+
+    // Manual or automatic rotation of slots
+    ["slot1", "slot2", "slot3"].forEach(key => {
+      if (!cascade.completion[key]) {
+        cascade.slotStatus[key] = "expired";
+      }
+    });
+
+    this.app.saveToStorage("cascade_state", cascade);
+    this.syncMissionFromRoadmap();
+  }
+
+  undoCascade() {
+    const cascade = this.ensureCascadeState();
+    if (!cascade.stateHistory || cascade.stateHistory.length === 0) return;
+
+    const lastState = cascade.stateHistory.pop();
+    cascade.roadmapQueue = lastState.roadmapQueue;
+    cascade.activeSlots  = lastState.activeSlots;
+    cascade.completion   = lastState.completion;
+    cascade.slotStatus   = lastState.slotStatus;
+
+    this.app.saveToStorage("cascade_state", cascade);
+    this.syncMissionFromRoadmap();
+  }
+
   _pushCascadeHistory(cascade) {
     cascade.stateHistory = cascade.stateHistory || [];
     cascade.stateHistory.push(JSON.parse(JSON.stringify({
@@ -1111,68 +1178,24 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     if (cascade.stateHistory.length > 20) cascade.stateHistory.shift();
   }
 
-  triggerCascadeComplete(slotKey) {
-    const cascade = this.ensureCascadeState();
-    // ── Non-destructive: save snapshot before mutating (improve.md §6) ──
-    this._pushCascadeHistory(cascade);
 
-    const completedTask = cascade.activeSlots[slotKey];
-    if (completedTask) {
-      this.setRoadmapDayStatus(completedTask.moduleIndex, completedTask.dayIndex, true);
-      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
-    }
 
-    // Mark completion + rebuild slot from next in queue
-    cascade.completion[slotKey] = true;
-    cascade.slotStatus[slotKey] = "completed";
-
-    // Rebuild roadmapQueue and fill the completed slot with the next item
-    const q = this.getFullRoadmapQueue();
-    cascade.roadmapQueue = q;
-    const usedTexts = Object.values(cascade.activeSlots)
-      .filter(Boolean).map(x => x.text);
-    const nextItem = q.find(x => !usedTexts.includes(x.text));
-    cascade.activeSlots[slotKey] = nextItem || null;
-    if (nextItem) {
-      cascade.completion[slotKey] = false;
-      cascade.slotStatus[slotKey] = "active";
-    }
-
-    this.app.saveToStorage("cascade_state", cascade);
-    this.syncMissionFromRoadmap();
+  triggerFinalizeDay() {
+    if (!confirm("Finalize today's performance and generate tomorrow's schedule?")) return;
+    
+    // 1. Run dynamic timetable shift based on behavior
+    const behavior = this.analyzeBehavior();
+    this.shiftTimetableTimes(behavior.state);
+    
+    // 2. Clear cascade state for fresh start
+    localStorage.removeItem("cascade_state");
+    
+    // 3. Save updated roadmap & refresh
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+    alert("Day finalized. Schedule updated based on your performance!");
+    this.refresh();
   }
 
-  triggerCascadeMiss() {
-    const cascade = this.ensureCascadeState();
-    // ── Non-destructive: save snapshot before mutating (improve.md §6) ──
-    this._pushCascadeHistory(cascade);
-
-    // Rotate: slot1 → null, slot2 → old slot1, slot3 → old slot2
-    // The "missed" slot1 is pushed to back and cleared from front
-    const prev = { ...cascade.activeSlots };
-    cascade.activeSlots.slot1 = null;
-    cascade.activeSlots.slot2 = prev.slot1;
-    cascade.activeSlots.slot3 = prev.slot2;
-    cascade.completion.slot1 = false;
-    cascade.slotStatus.slot1 = "expired";
-
-    this.app.saveToStorage("cascade_state", cascade);
-    this.syncMissionFromRoadmap();
-  }
-
-  // ── Cascade: undo last action (improve.md §6) ────────────────────────────
-  undoCascade() {
-    const cascade = this.ensureCascadeState();
-    if (!cascade.stateHistory?.length) return;
-    const prev = cascade.stateHistory.pop();
-    // Restore mutable parts, preserving date and stateHistory
-    cascade.roadmapQueue = prev.roadmapQueue;
-    cascade.activeSlots  = prev.activeSlots;
-    cascade.completion   = prev.completion;
-    cascade.slotStatus   = prev.slotStatus;
-    this.app.saveToStorage("cascade_state", cascade);
-    this.syncMissionFromRoadmap();
-  }
 
   // ── syncMissionFromRoadmap ───────────────────────────────────────────────
   // Performance: debounced via rAF + single container event delegation.
@@ -1214,62 +1237,95 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       // Step 3: Slot display config
       const SLOT_CONFIG = [
         { slotKey: "slot1", time: "4:00 AM",  label: "Deep Work",       type: "learning" },
-        { slotKey: null,    time: "6:15 AM",  label: "Training",         type: "static"   },
+        { slotKey: "static1", time: "6:15 AM", label: "Training",       type: "static"   },
         { slotKey: "slot2", time: "7:30 AM",  label: "Deep Work",        type: "learning" },
-        { slotKey: null,    time: "11:00 AM", label: "Build (Project)",   type: "static"   },
+        { slotKey: "static2", time: "11:00 AM", label: "Build (Project)", type: "static"   },
         { slotKey: "slot3", time: "4:00 PM",  label: "Learn",            type: "learning" },
-        { slotKey: null,    time: "7:30 PM",  label: "Atomic Habits",    type: "static"   },
-        { slotKey: null,    time: "9:45 PM",  label: "Revision",         type: "static"   },
-        { slotKey: null,    time: "11:30 PM", label: "Sleep",            type: "static"   },
+        { slotKey: "static3", time: "7:30 PM",  label: "Atomic Habits",    type: "static"   },
+        { slotKey: "static4", time: "9:45 PM",  label: "Revision",         type: "static"   },
+        { slotKey: "static5", time: "11:30 PM", label: "Sleep",            type: "static"   },
       ];
 
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
 
-      // Step 4: Build HTML — expired is grey (--text-secondary), done is green
+      // Step 4: Build HTML — handles both learning and static slots
       let html = "";
       SLOT_CONFIG.forEach(slot => {
-        if (slot.type === "learning" && slot.slotKey) {
-          const taskObj = cascade.activeSlots[slot.slotKey];
-          const isDone  = cascade.completion[slot.slotKey];
-          const status  = cascade.slotStatus[slot.slotKey]; // active|expired|completed
-          const color   = isDone ? "var(--success)" : "var(--text-secondary)";
-          const icon    = isDone ? "✔" : status === "expired" ? "○" : "●";
+        const isLearning = slot.type === "learning";
+        const status = cascade.slotStatus[slot.slotKey] || "active";
+        const isDone = status === "completed";
+        const isExp  = status === "expired";
+        
+        const opacity = isDone ? "0.4" : isExp ? "0.6" : "1";
+        const filter  = isExp ? "grayscale(1)" : "none";
+        const color   = isDone ? "var(--success)" : isExp ? "var(--text-tertiary, #888)" : "var(--text-secondary)";
+        const icon    = isDone ? "✔" : isExp ? "○" : "●";
 
+        if (isLearning) {
+          const taskObj = cascade.activeSlots[slot.slotKey];
           if (taskObj) {
-            html += `<div class="sd-mission-item shadow-goal-item" style="${isDone ? "opacity:0.55;" : ""}">
+            html += `
+              <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}; transition: all 0.3s ease;">
                 <input class="mission-cascade-check" type="checkbox" data-slot-key="${slot.slotKey}"
                   ${isDone ? "checked disabled" : ""}
                   style="margin-right:8px;cursor:pointer;min-width:14px;min-height:14px;accent-color:var(--success);"/>
-                <span style="font-size:0.85rem;color:${color};">${icon}&nbsp;${slot.time} → ${slot.label} [${this.escapeHtml(taskObj.text)}] <em style="font-size:0.72rem;opacity:0.45;">${status}</em></span>
+                <span style="font-size:0.85rem;color:${color};">
+                  ${icon}&nbsp;${slot.time} → ${slot.label} 
+                  <span style="font-weight:500;">[${this.escapeHtml(taskObj.text)}]</span>
+                  <em style="font-size:0.7rem; margin-left:4px; opacity:0.6;">${status}</em>
+                </span>
               </div>`;
           } else {
-            html += `<div class="sd-mission-item shadow-goal-item" style="opacity:0.35;">
-                <span style="font-size:0.85rem;color:var(--text-secondary);">○&nbsp;${slot.time} → ${slot.label} [Queue empty]</span>
+            html += `
+              <div class="sd-mission-item shadow-goal-item" style="opacity:0.35; filter:grayscale(1);">
+                <span style="font-size:0.85rem;color:var(--text-secondary);">○&nbsp;${slot.time} → ${slot.label} [Empty]</span>
               </div>`;
           }
         } else {
-          html += `<div class="sd-mission-item shadow-goal-item">
-              <div class="sd-mission-dot" style="margin-right:8px;"></div>
-              <span style="font-size:0.85rem;color:var(--text-secondary);">&nbsp;${slot.time} → ${slot.label}</span>
+          // Static slots also show expiry now
+          html += `
+            <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}; padding-left:22px;">
+              <span style="font-size:0.85rem;color:${color};">${icon}&nbsp;${slot.time} → ${slot.label} <em style="font-size:0.7rem; opacity:0.5;">${status}</em></span>
             </div>`;
         }
       });
 
-      // Step 5: Single DOM write
+      // Step 5: Single DOM write + persistent buttons
+      const hasHistory = cascade.stateHistory?.length > 0;
+      html += `
+        <div style="display:flex; gap:8px; margin-top:16px;">
+          <button id="btn-undo-cascade"
+            style="padding:6px 12px; background:var(--bg-card); color:${hasHistory ? "var(--warning)" : "var(--text-tertiary)"};
+                   border:1px solid var(--border); border-radius:4px; font-size:0.7rem;
+                   cursor:${hasHistory ? "pointer" : "default"}; opacity:${hasHistory ? 1 : 0.4};"
+            ${hasHistory ? "" : "disabled"}>↩ Undo</button>
+          <button id="btn-finalize-day"
+            style="flex:1; padding:6px; background:var(--bg-card); color:var(--success);
+                   border:1px solid var(--success); border-radius:4px; font-size:0.75rem; cursor:pointer;">
+            Finalize Day & Next Schedule
+          </button>
+        </div>`;
+
       container.innerHTML = html;
 
       // Step 6: Event delegation — one listener, no leak
       if (this._missionDelegateHandler) {
         container.removeEventListener("change", this._missionDelegateHandler);
+        container.removeEventListener("click", this._missionDelegateHandler);
       }
       this._missionDelegateHandler = (e) => {
-        const cb = e.target.closest(".mission-cascade-check");
-        if (cb && e.target.checked) {
-          this.triggerCascadeComplete(cb.getAttribute("data-slot-key"));
+        if (e.type === "change") {
+          const cb = e.target.closest(".mission-cascade-check");
+          if (cb && e.target.checked) this.triggerCascadeComplete(cb.getAttribute("data-slot-key"));
+        } else if (e.type === "click") {
+          if (e.target.id === "btn-undo-cascade") this.undoCascade();
+          if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
         }
       };
       container.addEventListener("change", this._missionDelegateHandler);
+      container.addEventListener("click", this._missionDelegateHandler);
+
 
     } catch (err) {
       console.error("[_doSyncMission] failed:", err);

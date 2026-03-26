@@ -141,57 +141,30 @@
 
 * Move the user toward the ideal schedule step by step, never by force.
 
-there also same refer this also 
-Master Prompt: Shadow Engine 2.0 (SE2) Implementation
-Role & System Identity
-Act as a Senior System Architect and Control-System Engineer. Your task is to implement/refine a Deterministic Self-Learning Discipline Engine called Shadow Engine 2.0 (SE2). Your responses must be technical, objective, and deterministic. Avoid motivational or "AI-assistant" language.
+### 16. Mission UI Refresh and Expiry Logic
 
-Core Objective
-Analyze historical user performance to adjust daily mission targets and timetable timings. Gradually shift the user toward an "Ideal Schedule" using mathematical correction and behavioral state detection.
+* The Daily Mission UI must update immediately when the current time passes a task slot.
+* If a mission is not completed and its scheduled time has passed, mark it as expired and show it in grey.
+* The checkbox state must reflect the real completion state instantly.
+* Do not wait until the end of the day to change the UI color or status.
+* The mission list must re-render whenever time, completion state, or schedule state changes.
+* If a task is completed, the tick must appear immediately.
+* If a task is not completed by its time window, the task must grey out immediately.
 
-1. Mathematical Foundation: The Shift Rule
-Implement the Progressive Correction Formula for all time-based targets:
+### 17. End-of-Day Schedule Generation
 
-next_target_time = current_average_time + (ideal_time - current_average_time) * learning_rate
-Constraints:
-Maximum Shift: The total shift (next - current) must NEVER exceed 30 minutes per day.
-Learning Rate (LR):
-Growth/Stable: LR = 0.3
-Failure (Moderate): LR = 0.2
-Failure (Severe/Recovery): LR = 0.1
-2. Behavioral State Machine
-Classify the user into one of three states based on the last 7 days of data (min 3 days required):
+* Do not regenerate the full timetable on every small time change.
+* Regenerate the next timetable only at the correct day boundary or when the user continues to the next cycle.
+* Mission UI state and timetable generation must be separated.
+* UI status updates should happen live.
+* Next-day roadmap generation should happen once after the day is finalized.
 
-State	Condition	Impact
-GROWTH	Win Rate > 70% AND Slope > 0	Use LR 0.3, apply target increments.
-RECOVERY	Win Rate < 40% AND Slope < 0	Use LR 0.1, reduce load by 15%.
-STABLE	All other conditions	Use LR 0.3, maintain baseline level.
-3. Deterministic Update Sequence
-Every daily update cycle MUST follow this exact 7-step logic:
+### 18. Required Fix Behavior
 
-Read Today's Data: Fetch task durations, start times, and categories.
-Analyze Behavior: Compute rolling 7-day average and trend slope.
-Detect State: Assign GROWTH, STABLE, or RECOVERY.
-Apply Correction: Calculate new targets using the Shift Rule + Max Shift Limit.
-Generate Missions: Create 3–5 core missions with specific discipline types.
-Apply Rules:
-Strict Tasks: Failure if delayed > 5 mins (e.g., wake-up, sleep start).
-Flexible Tasks: Apply 1.5x duration buffer.
-Output Plan: Generate the new timetable and mission set.
-4. Sleep & Recovery Policy
-Absolute Floor: Never permit sleep < 300 mins (MIN_SLEEP_LIMIT).
-Sleep Compromise:
-Allowed only if effort was genuine (high-value task completion).
-Limit: Maximum 2 compromises per 7-day window.
-Penalty Logic: If sleep is compromised (OK status), the next day's task load MUST be reduced by 15%.
-5. Anti-Misuse Logic
-Flexibility Abuse: If a user skips "Flexible" tasks > 60% of the time, the system MUST automatically reduce the flexibility buffer or convert the task to "Strict."
-Penalty Trigger: Behind shadow target OR low mission score (<60) results in penalty minutes (added to the next day's requirement).
-6. Output Transformation
-The resultant output must be a structured System Report:
-
-Behavioral.State: [STABLE/RECOVERY/GROWTH]
-Correction.Mode: [Explanation of the shift size]
-Sleep.Status: [OPTIMAL/COMPROMISED_OK/DANGER]
-Mission.Targets: [List of tasks with Strict/Flexible labels and time ranges]
-Command: A single-line execution instruction based on the highest priority task.
+* The current issue is that the mission UI updates too slowly.
+* Fix the mission state flow so the visible mission list reflects current time without delay.
+* Ensure the grey state, checkbox state, and expired state are derived from live data and not from stale cached state.
+* Ensure the UI does not jump directly to the next task without first updating the current task status correctly.
+* Ensure the schedule remains visible and accurate throughout the day.
+######  tell me what is done and what is not 
+ tell me what is done and what is not 
