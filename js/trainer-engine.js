@@ -172,7 +172,7 @@ class TrainerEngine {
       const { SE2 } = CONFIG;
       const today = new Date();
       const last7Dates = [];
-      for (let i = 1; i <= 7; i++) {
+      for (let i = 0; i < 7; i++) { // Include TODAY (i=0) so the current day's performance applies!
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         last7Dates.push(this.app.getDateString(d));
@@ -1125,6 +1125,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     SLOT_MAP.forEach(({ key, time }) => {
       let slotMin = toMin(time);
+      // Treat early morning slots (00:00 - 04:00) as part of the night shift
+      if (slotMin < 240) slotMin += 1440; 
+      
       let compNowMinutes = nowMinutes;
 
       // SE2: Midnight status context (Problem 1:1 sleep expired)
@@ -1988,7 +1991,20 @@ Rules:
 
   triggerFinalizeDay() {
     if (confirm("Finalize today's performance and generate tomorrow's schedule?")) {
-      this._performDayFinalization();
+      // Manual finalization should still respect the minimum sleep window for the actual time right now
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      let sleepTime48 = nowMin;
+      if (nowMin < 480) sleepTime48 += 1440; 
+      
+      const firstSlot = this.state.timetable[0];
+      const [h, m] = (firstSlot?.time || "04:00").split(":").map(Number);
+      const idealWake48 = 1440 + (h * 60 + m); 
+      
+      const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
+      const wakeOffset = Math.max(0, (sleepTime48 + minSleep) - idealWake48);
+      
+      this._performDayFinalization(wakeOffset);
     }
   }
 
@@ -2001,14 +2017,14 @@ Rules:
 
     // ── Immediate Wake Rerouting (GPS Override) ──
     // If wakeOffset > 0, we must shift the entire tomorrow schedule
-    if (wakeOffset > 0) {
+    if (wakeOffset > 0 && this.state.timetable) {
       const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
       const toTime = (m) => {
         const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
         return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
       
-      TIMETABLE_LOGIC.forEach(slot => {
+      this.state.timetable.forEach(slot => {
         const currentMin = toMin(slot.time);
         slot.time = toTime(currentMin + wakeOffset);
       });
