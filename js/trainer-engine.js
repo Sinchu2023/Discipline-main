@@ -2047,8 +2047,7 @@ Rules:
     });
 
     // Reset SE2 cascade for the new day
-    // Advance from logical date instead of real time so multiple clicks correctly fast-forward
-    const tomorrow = cascade.date ? new Date(cascade.date) : new Date();
+    const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = this.app.getDateString(tomorrow);
     
