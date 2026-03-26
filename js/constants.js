@@ -114,6 +114,18 @@ const MISSION_THRESHOLDS = {
   "project work": 180,
   revision: 120,
 };
+
+const TIMETABLE_LOGIC = [
+  { time: "05:00", label: "Deep Work", mapsTo: "learning", name: "Deep Work" },
+  { time: "06:15", label: "Train", mapsTo: "static", name: "Train" },
+  { time: "07:30", label: "Deep Work", mapsTo: "learning", name: "Deep Work" },
+  { time: "11:00", label: "Build", mapsTo: "project", name: "Project Work" },
+  { time: "16:00", label: "Learn", mapsTo: "learning", name: "Learn" },
+  { time: "19:30", label: "Atomic Habits", mapsTo: "static", name: "Atomic Habits" },
+  { time: "21:45", label: "Revision", mapsTo: "revision", name: "Revision" },
+  { time: "23:45", label: "Rest", mapsTo: "static", name: "Rest" }
+];
+
 const CATEGORY_DEFINITIONS = {
   Sleep: ["Night Sleep", "Nap", "Recovery"],
   "Productive Work": [

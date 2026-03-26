@@ -9,7 +9,6 @@ document.addEventListener("visibilitychange", () => {
         window.app.taskManager.renderTasks();
         window.app.taskManager.renderFavorites();
         if (window.app.shadowEngine) window.app.shadowEngine.refresh(false);
-        if (window.app.flowEngine) window.app.flowEngine.refresh();
     }
 });
 

@@ -104,41 +104,6 @@ class EventManager {
             const file = e.target.files?.[0];
             this.app.uiManager.importDataFromFile(file);
           });
-          if (this.app.elements["wake-now-btn"])
-            this.app.elements["wake-now-btn"].addEventListener("click", () =>
-              this.app.flowEngine.markWakeNow(),
-            );
-          if (this.app.elements["first-action-btn"])
-            this.app.elements["first-action-btn"].addEventListener(
-              "click",
-              () => this.app.flowEngine.markFirstActionNow(),
-            );
-          if (this.app.elements["kill-switch-btn"])
-            this.app.elements["kill-switch-btn"].addEventListener("click", () =>
-              this.app.flowEngine.runKillSwitch(),
-            );
-          if (this.app.elements["flow-before-phone-check"])
-            this.app.elements["flow-before-phone-check"].addEventListener(
-              "change",
-              (e) =>
-                this.app.flowEngine.toggleFlowBeforePhone(e.target.checked),
-            );
-          if (this.app.elements["attention-minus-btn"])
-            this.app.elements["attention-minus-btn"].addEventListener(
-              "click",
-              () => this.app.flowEngine.decrementAttentionStretch(),
-            );
-          if (this.app.elements["attention-plus-btn"])
-            this.app.elements["attention-plus-btn"].addEventListener(
-              "click",
-              () => this.app.flowEngine.incrementAttentionStretch(),
-            );
-          document.querySelectorAll(".war-mode-check").forEach((cb) => {
-            cb.addEventListener("change", (e) => {
-              const key = e.target.getAttribute("data-key");
-              this.app.flowEngine.toggleWarMode(key, e.target.checked);
-            });
-          });
           this.app.elements["close-modal"].addEventListener("click", () =>
             this.app.uiManager.hideReport(),
           );

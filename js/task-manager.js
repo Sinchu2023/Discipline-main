@@ -122,7 +122,6 @@ class TaskManager {
           if (tEl) tEl.textContent = this.app.formatDuration(totalTime);
 
           if (this.app.shadowEngine) this.app.shadowEngine.refresh();
-          if (this.app.flowEngine) this.app.flowEngine.refresh();
         }
         renderTasks() {
           const today = this.app.getDateString();

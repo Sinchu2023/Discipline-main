@@ -1,244 +1,103 @@
-Act as a senior system architect, behavioral scientist, and control-system engineer.
+## Role
 
-You are designing a deterministic self-learning discipline engine called Shadow Engine 2.0.
+Act as a senior front-end engineer working inside an existing codebase.
 
-You are not an AI assistant in this context.
-You are a system designer.
+## Task
 
-Your design must be:
+Update my existing Discipline Tracker dashboard with only the changes listed below. Keep the current dark theme, styling, spacing, card shape, typography, and responsive behavior intact. Do not add any new dependencies. Do not redesign the UI.
 
-completely offline
-free of paid APIs
-built only on logic, rules, and stored user data
-manually implementable in code
-fully explainable and deterministic
-SYSTEM OBJECTIVE
+## Main requirement
 
-Design a discipline engine that does not only track performance, but also:
+There must be no separate timetable section.
 
-learns user behavior over time
-adapts daily missions dynamically
-corrects behavior gradually, not aggressively
-balances strict discipline with realistic flexibility
-prevents both burnout and misuse
-remains stable, transparent, and deterministic
-CRITICAL DESIGN RULES
-1. No sudden correction jumps
+The **Daily Mission section is the timetable**.
 
-Never jump directly from failure to ideal behavior.
+## Required changes
 
-Always correct in small steps
-Always use gradual transitions
-Always preserve realism
-2. Behavior-based adaptation
+### 1) Remove the Flow State section completely
 
-Mission updates must depend on historical user behavior, not fixed one-size-fits-all rules.
+* Delete the entire Flow State card/section from the UI.
+* Remove any related state, helpers, logic, imports, or rendering paths.
+* The layout must collapse naturally with no empty placeholder space.
 
-3. Dual-mode discipline
+### 2) Keep Penalty and Monthly Battle unchanged
 
-The system must operate in two modes:
+* Do not redesign them.
+* Do not change their logic.
+* Do not change labels, metrics, styling, or internal structure.
+* Do not change their visual design.
+* Only allow layout shift caused by removing Flow State.
 
-STRICT mode for habits where discipline matters
-FLEXIBLE mode for learning where exact timing is uncertain
-4. No emotional logic
+### 3) Daily Mission must become the timetable
 
-Do not use motivational or emotional reasoning.
-Use only structured, rule-based decisions.
+Replace the Daily Mission content with a time-based mission system.
 
-5. Explainable and deterministic
+Daily Mission should show these permanent items:
 
-Every output must be traceable to a clear logic path.
+1. Shunt Clipper Circuits Clamper Circuits
+2. Project Work
+3. Revision
 
-CORE MECHANICS TO IMPLEMENT
-1. Progressive Correction System
+These are permanent mission headings.
 
-The system must move the user gradually toward the ideal target.
+The timetable logic behind them is:
 
-Use this formula:
+* 5:00 AM — Deep Work (learning topics)
+* 6:15 AM — Train
+* 7:30 AM — Deep Work (learning topics)
+* 11:00 AM — Build
+* 4:00 PM — Learn (learning topics)
+* 7:30 PM — Atomic Habits
+* 9:45 PM — Revision
+* 11:45 PM — Rest
 
-next_target = current + (ideal - current) × learning_rate
+Use this timetable only as the logic basis for mission planning, grouping, and status updates.
 
-learning_rate rules:
-severe failure → 0.1
-moderate failure → 0.2
-stable behavior → 0.3
+### 4) Mission mapping rules
 
-Also include a maximum daily shift limit so correction never becomes too aggressive.
+* Deep Work and Learn are learning-topic blocks.
+* Build maps to Project Work.
+* Revision maps to Revision.
+* Train, Atomic Habits, and Rest may remain part of internal routine logic if needed.
+* Do not add extra visible mission items unless the existing structure already requires them.
 
-2. Task Classification System
+### 5) Layout order must stay correct
 
-Classify all tasks into two categories:
+* Remove Flow State.
+* Keep Daily Mission in its original place.
+* Keep Penalty and Monthly Battle visible on the right side. which is beside the daily mission.
+* Maintain the existing responsive grid layout.
+* Do not let the dashboard collapse into a stacked layout on desktop.
+* Daily Mission should stay on the left.
+* Penalty and Monthly Battle should stay on the right.
 
-STRICT TASKS
+## Implementation rules
 
-Examples:
+* Use the current codebase structure.
+* Reuse existing components and helpers where possible.
+* Remove only what is necessary.
+* Keep the code clean and minimal.
+* Do not break the current data flow.
+* Do not add new libraries.
+* Make sure the app still works correctly on mobile.
 
-sleep timing
-wake timing
-deep work start
+## Expected result
 
-Rules:
+After the update:
 
-no compromise
-must be enforced consistently
-these define discipline structure
-FLEXIBLE TASKS
+* Flow State is gone.
+* Daily Mission acts as the timetable.
+* Penalty remains unchanged.
+* Monthly Battle remains unchanged.
+* The current dark design is preserved.
+* The dashboard layout remains balanced with Daily Mission on the left and Penalty + Monthly Battle on the right.
+* and daily mission consists ofnot just 3 items but it should be like a timetable. but not refering it has a time table. it should be like a mission list but with time table. and it should be like a mission list but with time table i have given above.
+## Important note
 
-Examples:
+Do not create a separate timetable component.
+Do not render timetable as a separate visible block.
+Treat the timetable as the internal logic that powers Daily Mission only.
 
-learning
-watching lectures
-practice
-revision-type study sessions
+## Output expectation
 
-Rules:
-
-allow buffer
-estimate realistically
-use actual_time = estimated × 1.5 to 2.0
-do not assume exact completion time for learning tasks
-3. Adaptive Mission Generator
-
-The system must generate the next day’s mission based on behavioral state.
-
-Supported states:
-RECOVERY
-STABLE
-GROWTH
-Behavior by state:
-RECOVERY → reduce load, apply gentle correction
-STABLE → maintain current level
-GROWTH → slightly increase difficulty
-
-The mission generator must use the user’s current state, not a fixed schedule only.
-
-4. Behavior Learning System
-
-Track and store these signals:
-
-sleep patterns
-task delays
-completion rate
-skip frequency
-time-of-day performance
-
-From these, derive:
-
-resistance per task
-energy map per hour
-success probability per task/time slot
-
-This learning system must continuously update from user behavior.
-
-5. Smart Success Evaluation
-
-Do not use binary completion only.
-
-Use this rule:
-
-if effort ≥ 70% → SUCCESS
-
-This is necessary so the system rewards genuine effort and avoids unnecessary frustration.
-
-6. Controlled Flexibility System
-
-Flexibility is allowed only when all of the following are true:
-
-effort is high
-the task is important
-the user is not repeatedly misusing flexibility
-
-Flexibility must be blocked when:
-
-avoidance is repeated
-misuse patterns are detected
-7. Controlled Sleep Compromise
-
-Sleep reduction is allowed only under controlled conditions.
-
-Allow it only if:
-the task is high value
-effort is genuine
-it is not happening frequently
-Rules:
-minimum sleep limit must always exist
-if sleep is reduced today, next day load must be reduced
-the number of sleep compromises per week must be limited
-8. Anti-Misuse System
-
-If the user begins abusing flexibility:
-
-gradually reduce flexibility
-automatically increase strictness
-protect the system from becoming permissive
-9. Reinforcement System
-
-After success:
-
-provide calm reinforcing feedback
-do not use over-excitement
-do not use punishment tone
-
-The goal is to make success feel stable, repeatable, and structural.
-
-10. System Flow
-
-The daily cycle must follow this exact sequence:
-
-Read today’s data
-Analyze behavior
-Detect state: recovery / stable / growth
-Apply correction logic
-Generate next mission
-Apply strict and flexible rules
-Output a structured mission plan
-OUTPUT FORMAT REQUIRED
-
-Provide the design in the following structure:
-
-1. Feature list
-
-List all major system features clearly.
-
-2. Module breakdown
-
-Break the system into logical modules.
-
-3. Logic of each module
-
-Explain what each module does and how it works.
-
-4. Data structures required
-
-Define the core data structures the system needs.
-
-5. Exact decision flow
-
-Show how the engine moves from data input to mission output.
-
-6. Step-by-step daily mission update logic
-
-Explain how the mission changes from one day to the next.
-
-RESTRICTIONS
-Do not write code
-Do not give vague advice
-Do not skip important logic
-Do not depend on AI APIs
-Do not suggest paid tools
-FINAL EXPECTATION
-
-The final system should behave like:
-
-a strict but intelligent coach
-a gradual behavior corrector
-a system that learns and adapts over time
-
-It should not behave like:
-
-a rigid rule engine
-a motivational app
-a punishment system
-ONE-LINE PHILOSOPHY
-
-“Do not force perfection. Evolve the user toward it using controlled, intelligent steps.”
+Apply the changes directly in the existing files so the dashboard updates correctly without altering the cu
