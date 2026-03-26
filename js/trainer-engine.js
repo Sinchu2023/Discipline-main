@@ -2,13 +2,8 @@ class TrainerEngine {
   constructor(app) {
     this.app = app;
     this.state = this.loadState();
-    
-    // Multi-Roadmap State
-    this.roadmapData = this.getRoadmapState();
-    // Backwards Compatibility: Alias the active roadmap into the state
-    this.state.roadmap = this.roadmapData.roadmaps[this.roadmapData.activeIndex];
-    
-    this.todayTasksCache = []; // Optimization
+    this.state.roadmap = this.getRoadmapState();
+    this.todayTasksCache = []; // Optimization: cache today's tasks for the current frame
     this.levels = [
       { name: "Dormant", min: 0, max: 60 },
       { name: "Initiate", min: 60, max: 120 },
@@ -28,82 +23,38 @@ class TrainerEngine {
       manualMissionChecks: saved.manualMissionChecks || {},
       // SE2: Persist the evolving standard (TIMETABLE_LOGIC)
       timetable: saved.timetable || JSON.parse(JSON.stringify(TIMETABLE_LOGIC)),
-      // SE2: Persistent mapping of slot to roadmap ID
-      slotRoadmapMap: saved.slotRoadmapMap || { slot1: 0, slot2: 0, slot3: 1 },
     };
   }
 
   initialize() {
-    // SE2: Robust delegation on document for all mission-related clicks
-    if (!this._hasAttachedListeners) {
-      document.addEventListener("click", (e) => {
-        // 1. Mission Completion Circle
-        const circleBtn = e.target.closest(".mission-circle-btn");
-        if (circleBtn && !circleBtn.hasAttribute("disabled")) {
-          this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
-        }
+    // Attach mission listeners ONCE here instead of every render
+    const container = document.querySelector(".shadow-goal-list");
+    if (container) {
+      this._missionDelegateHandler = (e) => {
+        if (e.type === "click") {
+          const circleBtn = e.target.closest(".mission-circle-btn");
+          if (circleBtn && !circleBtn.hasAttribute("disabled")) {
+            this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
+          }
+          if (e.target.id === "btn-undo-cascade") this.undoCascade();
+          if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
 
-        // 2. Stopwatch Auto-start (Clicking the task text)
-        const missionLabel = e.target.closest(".mission-task-label");
-        if (missionLabel) {
-          const label = missionLabel.getAttribute("data-label");
-          const subtext = missionLabel.getAttribute("data-subtext");
-          // Robust reference to stopwatch manager
-          const sw = this.app.stopwatch || this.app.stopwatchManager;
-          if (sw?.startTaskFromRoadmap) {
-            sw.startTaskFromRoadmap(label, subtext);
+          // SE2: Auto-start stopwatch when clicking mission text
+          const missionLabel = e.target.closest(".mission-task-label");
+          if (missionLabel) {
+            const label = missionLabel.getAttribute("data-label");
+            const subtext = missionLabel.getAttribute("data-subtext");
+            if (this.app.stopwatchManager?.startTaskFromRoadmap) {
+              this.app.stopwatchManager.startTaskFromRoadmap(label, subtext);
+            }
           }
         }
-
-        // 3. Roadmap Slot Switcher (Tabs)
-        const slotBtn = e.target.closest(".roadmap-slot-btn");
-        if (slotBtn) {
-          const sIdx = parseInt(slotBtn.getAttribute("data-slot-idx"));
-          this.roadmapData.activeIndex = sIdx;
-          this.state.roadmap = this.roadmapData.roadmaps[sIdx];
-          this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.roadmapData);
-          this.renderRoadmap();
-        }
-
-        // 4. Utility Buttons
-        if (e.target.id === "btn-undo-cascade") this.undoCascade();
-        if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
-      });
-
-      document.addEventListener("change", (e) => {
-        // 5. Goal-to-Roadmap Mapping
-        const mappingSelect = e.target.closest(".roadmap-mapping-select");
-        if (mappingSelect) {
-          const slotKey = mappingSelect.getAttribute("data-slot-key");
-          const rIdx = parseInt(mappingSelect.value);
-          if (!this.state.slotRoadmapMap) this.state.slotRoadmapMap = {};
-          this.state.slotRoadmapMap[slotKey] = rIdx;
-          this.app.saveToStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE, this.state);
-        }
-      });
-      this._hasAttachedListeners = true;
+      };
+      // No longer need 'change' for checkboxes, just 'click' for circle buttons
+      container.addEventListener("click", this._missionDelegateHandler);
     }
 
     this.refresh();
-  }
-
-  escapeHtml(str) {
-    if (!str) return "";
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  _handleMissionClick(element) {
-    const label = element.getAttribute("data-label");
-    const subtext = element.getAttribute("data-subtext");
-    const sw = this.app.stopwatch || this.app.stopwatchManager;
-    if (sw?.startTaskFromRoadmap) {
-      sw.startTaskFromRoadmap(label, subtext);
-    }
   }
 
   getDailyProductiveMap() {
@@ -891,86 +842,68 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         html += `<section class="trainer-section"><div class="trainer-section-title">${this.escapeHtml(title)}</div>${rows}</section>`;
       }
     }
-    let mappingHtml = `
-      <div class="roadmap-mapping-section" style="margin-top:24px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border);">
-        <h3 style="font-size:0.9rem; color:var(--text-accent); margin-bottom:12px; border-bottom:1px solid var(--border-subtle); padding-bottom:6px; font-weight:700;">🎯 Goal-to-Roadmap Mapping</h3>
-        <div style="display:flex; flex-direction:column; gap:10px;">
-          ${[1, 2, 3].map(i => {
-            const slotKey = `slot${i}`;
-            const currentR = this.state.slotRoadmapMap?.[slotKey] ?? (i === 3 ? 1 : 0);
-            return `
-              <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.85rem;">
-                <span style="color:var(--text-secondary);">Mission Slot ${i}</span>
-                <select class="roadmap-mapping-select" data-slot-key="${slotKey}" 
-                  style="background:var(--bg-deep); color:var(--text-accent); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:0.75rem;">
-                  <option value="0" ${currentR === 0 ? "selected" : ""}>Roadmap A</option>
-                  <option value="1" ${currentR === 1 ? "selected" : ""}>Roadmap B</option>
-                </select>
-              </div>
-            `;
-          }).join("")}
-        </div>
-        <p style="font-size:0.7rem; color:var(--text-secondary); margin-top:10px; opacity:0.6;">* Changes take effect on next day or manual Advance.</p>
-      </div>
-    `;
-
-    content.innerHTML += mappingHtml;
+    content.innerHTML = html;
   }
 
   getRoadmapState() {
-    const createFromTemplate = (topic = "New Roadmap") => ({
-      topic: topic,
+    const createFromTemplate = () => ({
       modules: ANALOG_IC_ROADMAP_TEMPLATE.map((m) => ({
         name: m.module,
         days: m.days.map((task) => ({
           day: "",
           text: task,
           completed: false,
-          status: "locked"
         })),
       })),
       editMode: false,
       startedAt: Date.now(),
     });
 
-    const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE);
-    
-    // Check if new multi-roadmap format
-    if (stored && Array.isArray(stored.roadmaps)) {
-      // Ensure schema consistency for all roadmaps
-      stored.roadmaps.forEach(r => {
-        if (!r.modules) r.modules = createFromTemplate().modules;
+    const stored = this.app.loadFromStorage(
+      CONFIG.STORAGE_KEYS.ROADMAP_STATE,
+    );
+    if (!stored?.modules?.length) return createFromTemplate();
+
+    const allCompleted = stored.modules.every(
+      (mod) => mod.days?.length && mod.days.every((day) => day.completed),
+    );
+    if (allCompleted) return createFromTemplate();
+
+    const merged = createFromTemplate();
+    merged.editMode = !!stored.editMode;
+    merged.startedAt = stored.startedAt || merged.startedAt;
+    merged.modules.forEach((module, mi) => {
+      const fromStored = stored.modules[mi];
+      if (!fromStored) return;
+      module.name = fromStored.name || module.name;
+      module.days.forEach((day, di) => {
+        const storedDay = fromStored.days?.[di];
+        if (!storedDay) return;
+        day.text = storedDay.text || day.text;
+        day.completed = !!storedDay.completed;
       });
-      return stored;
-    }
-
-    // Migration from single roadmap
-    let roadmap0;
-    if (stored && stored.modules) {
-      roadmap0 = stored;
-    } else {
-      roadmap0 = createFromTemplate("Analog IC Design");
-    }
-
-    return {
-      activeIndex: 0,
-      roadmaps: [roadmap0, createFromTemplate("Secondary Roadmap")]
-    };
+    });
+    return merged;
   }
 
   normalizeRoadmapDays() {
-    this.roadmapData.roadmaps.forEach(roadmap => {
-      let counter = 1;
-      roadmap.modules.forEach((mod) => {
-        mod.days.forEach((day) => {
-          day.day = `Day ${counter++}`;
-        });
+    let counter = 1;
+    this.state.roadmap.modules.forEach((mod) => {
+      mod.days.forEach((day) => {
+        day.day = `Day ${counter++}`;
+        if (
+          day.day === "Day 29" &&
+          typeof day.text === "string" &&
+          day.text.includes("Differential Amplifier using OpAmp")
+        ) {
+          day.text = "Differential Amplifier using OpAmp\nActive Load";
+        }
       });
     });
   }
 
   ensureRoadmap() {
-    if (!this.roadmapData) this.roadmapData = this.getRoadmapState();
+    if (!this.state.roadmap) this.state.roadmap = this.getRoadmapState();
     this.normalizeRoadmapDays();
   }
 
@@ -1157,43 +1090,19 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const shouldReset = !cascade || !isSchemaValid || (isStaleDate && !isMidNightBuffer) || isFutureDate;
 
     if (shouldReset) {
-      const q0 = this.getFullRoadmapQueue(0);
-      const q1 = this.getFullRoadmapQueue(1);
-      const roadmapQueues = { 0: q0, 1: q1 };
-      const activeSlots = {};
-      const qPointers = { 0: 0, 1: 0 };
-
-      // Iterate ALL timetable slots and pull from roadmap if mapped
-      (this.state.timetable || []).forEach((slot, idx) => {
-        const slotKey = `slot${idx}`;
-        const mapping = this.state.slotRoadmapMap?.[slotKey];
-        
-        // If mapping is "0" or "1", it's a dynamic roadmap slot
-        if (mapping !== undefined && mapping !== -1) {
-          const rIdx = mapping;
-          const queue = roadmapQueues[rIdx] || [];
-          activeSlots[slotKey] = queue[qPointers[rIdx]++] || null;
-        } else {
-          // It's a static slot
-          activeSlots[slotKey] = null; 
-        }
-      });
-
+      const q = this.getFullRoadmapQueue();
       cascade = {
         date: today,
-        roadmapQueues,
-        activeSlots,
-        completion: {},
-        slotStatus: {},
+        roadmapQueue: q,
+        activeSlots: {
+          slot1: q[0] || null,
+          slot2: q[1] || null,
+          slot3: q[2] || null,
+        },
+        completion: { slot1: false, slot2: false, slot3: false },
+        slotStatus:  { slot1: "active", slot2: "active", slot3: "active" },
         stateHistory: [],
       };
-      
-      // Initialize statuses
-      (this.state.timetable || []).forEach((_, idx) => {
-        cascade.completion[`slot${idx}`] = false;
-        cascade.slotStatus[`slot${idx}`] = "active";
-      });
-
       this.app.saveToStorage("cascade_state", cascade);
     }
     return cascade;
@@ -1266,9 +1175,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     const completedTask = cascade.activeSlots[slotKey];
     if (completedTask) {
-      const rIdx = completedTask.roadmapIndex !== undefined ? completedTask.roadmapIndex : this.roadmapData.activeIndex;
-      this.setRoadmapDayStatus(completedTask.moduleIndex, completedTask.dayIndex, true, rIdx);
-      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.roadmapData);
+      this.setRoadmapDayStatus(completedTask.moduleIndex, completedTask.dayIndex, true);
+      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
     }
 
     // Mark completion. In SE2, the slot ONLY cascades to the next task 
@@ -1332,6 +1240,21 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     this._performDayFinalization(true);
   }
 
+  _performDayFinalization(isSilent = false) {
+    // 1. Run dynamic timetable shift based on behavior
+    const behavior = this.analyzeBehavior();
+    this.shiftTimetableTimes(behavior.state);
+    
+    // 2. Clear cascade state for fresh start
+    localStorage.removeItem("cascade_state");
+    
+    // 3. Save updated roadmap & refresh
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+    if (!isSilent) alert("Day finalized. Schedule updated based on your performance!");
+    this.refresh();
+  }
+
+
 
   // ── syncMissionFromRoadmap ───────────────────────────────────────────────
   // Performance: debounced via rAF + single container event delegation.
@@ -1346,10 +1269,31 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
   _doSyncMission() {
     try {
+      // Step 1: Canonical goals
+      CONFIG.DAILY_GOALS = [
+        {
+          id: "roadmap_learning", label: "Roadmap Tasks", minutesTarget: 270, sessionsTarget: 0,
+          keywords: ["deep work", "learn", "learning", "study"],
+          discipline_type: "strict", target_minutes: 270, category: "learning", priority: 0,
+        },
+        {
+          id: "project", label: "Project Work", minutesTarget: 180, sessionsTarget: 0,
+          keywords: ["project", "build"],
+          discipline_type: "flexible", target_minutes: 180, category: "deep_work", priority: 1,
+        },
+        {
+          id: "revision", label: "Revision", minutesTarget: 120, sessionsTarget: 0,
+          keywords: ["revision"],
+          discipline_type: "flexible", target_minutes: 120, category: "learning", priority: 2,
+        },
+      ];
+
+      // Step 2: State + slot statuses
       const cascade = this.ensureCascadeState();
       this._refreshSlotStatuses(cascade);
       this._scheduleAutoExpiry(cascade);
 
+      // Step 3: Slot display config
       const formatTime = (t) => {
         const [h, m] = t.split(":").map(Number);
         const ampm = h >= 12 ? "PM" : "AM";
@@ -1357,12 +1301,20 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
       };
 
-      // SE2: Build SLOT_CONFIG dynamically from current timetable
-      const SLOT_CONFIG = (this.state.timetable || []).map((slot, idx) => ({
-        slotKey: `slot${idx}`,
-        time: slot.time,
-        label: slot.label
-      }));
+      const SLOT_CONFIG = [];
+
+      if (this.state.timetable) {
+        let learningCount = 1;
+        this.state.timetable.forEach((slot, idx) => {
+          const type = slot.mapsTo === "learning" ? "learning" : "static";
+          SLOT_CONFIG.push({
+            slotKey: type === "learning" ? `slot${learningCount++}` : `static${idx}`,
+            time: slot.time,
+            label: slot.label,
+            type: type
+          });
+        });
+      }
 
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
@@ -1386,35 +1338,45 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         const color   = isDone ? "var(--success)" : isExp ? "var(--text-tertiary, #888)" : "var(--text-primary)";
         const circleIcon = isDone ? "●" : "○";
 
-        const taskObj = cascade.activeSlots[slot.slotKey];
-        const itemFilter = isExp ? "grayscale(1) brightness(0.7)" : filter;
-        const itemOpacity = isExp ? 0.4 : opacity;
-
-        if (taskObj) {
-          // Dynamic Roadmap Task assigned to this slot
-          html += `
-            <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.3s ease;">
-              <div style="display:flex; align-items:center;">
-                <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
-                  data-slot-key="${slot.slotKey}" 
-                  ${isDone ? "disabled" : ""}>
-                  ${circleIcon}
-                </button>
-                <span class="mission-task-label" 
-                      style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; position:relative; z-index:10; pointer-events:auto;"
-                      onmouseover="this.style.textShadow='0 0 8px var(--primary)'; this.style.opacity='0.8'" 
-                      onmouseout="this.style.textShadow='none'; this.style.opacity='1'"
-                      onclick="window.app.trainerEngine._handleMissionClick(this)"
-                      data-label="${this.escapeHtml(slot.label)}" 
-                      data-subtext="${this.escapeHtml(taskObj.text)}">
-                  ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
-                  <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
-                  <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
-                </span>
-              </div>
-            </div>`;
+        if (isLearning) {
+          const taskObj = cascade.activeSlots[slot.slotKey];
+          if (taskObj) {
+            const itemFilter = isExp ? "grayscale(1) brightness(0.7)" : filter;
+            const itemOpacity = isExp ? 0.4 : opacity;
+            html += `
+              <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.3s ease;">
+                <div style="display:flex; align-items:center;">
+                  <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
+                    data-slot-key="${slot.slotKey}" 
+                    ${isDone ? "disabled" : ""}>
+                    ${circleIcon}
+                  </button>
+                  <span class="mission-task-label" 
+                        style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: opacity 0.2s;"
+                        onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+                        data-label="${this.escapeHtml(slot.label)}" 
+                        data-subtext="${this.escapeHtml(taskObj.text)}">
+                    ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
+                    <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
+                    <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
+                  </span>
+                </div>
+              </div>`;
+          } else {
+            html += `
+              <div class="sd-mission-item shadow-goal-item" style="opacity:0.35; filter:grayscale(1);">
+                <div style="display:flex; align-items:center;">
+                  <button class="mission-circle-btn" disabled>○</button>
+                  <span style="font-size:0.85rem;color:var(--text-tertiary);">
+                    ${formatTime(slot.time)} → ${slot.label} [Empty queue]
+                  </span>
+                </div>
+              </div>`;
+          }
         } else {
-          // Static Slot
+          const itemFilter = isExp ? "grayscale(1) brightness(0.6)" : filter;
+          const itemOpacity = isExp ? 0.35 : opacity;
+          const labelColor = isExp ? "var(--text-tertiary)" : color;
           html += `
             <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}">
               <div style="display:flex; align-items:center;">
@@ -1424,10 +1386,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                   ${circleIcon}
                 </button>
                 <span class="mission-task-label" 
-                      style="font-size:0.85rem;color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; position:relative; z-index:10; pointer-events:auto;"
-                      onmouseover="this.style.textShadow='0 0 8px var(--primary)'; this.style.opacity='0.8'" 
-                      onmouseout="this.style.textShadow='none'; this.style.opacity='1'"
-                      onclick="window.app.trainerEngine._handleMissionClick(this)"
+                      style="font-size:0.85rem;color:${labelColor}; cursor:pointer; transition: opacity 0.2s;"
+                      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
                       data-label="${this.escapeHtml(slot.label)}" 
                       data-subtext="">
                   ${formatTime(slot.time)} → ${slot.label} 
@@ -1545,17 +1505,14 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     footer.innerHTML = `<span>roadmap penalty • ${pending} tasks pending</span><span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">${h}:${m}:${s}</span>`;
   }
 
-  getFullRoadmapQueue(roadmapIndex = null) {
+  getFullRoadmapQueue() {
     const queue = [];
-    const idx = (roadmapIndex !== null) ? roadmapIndex : this.roadmapData.activeIndex;
-    const roadmap = this.roadmapData.roadmaps[idx];
-    if (!roadmap?.modules) return queue;
+    if (!this.state.roadmap?.modules) return queue;
     
-    roadmap.modules.forEach((mod, mIdx) => {
+    this.state.roadmap.modules.forEach((mod, mIdx) => {
       mod.days.forEach((day, dIdx) => {
         if (day.status !== "completed" && !day.completed) {
           queue.push({
-            roadmapIndex: idx,
             moduleIndex: mIdx,
             dayIndex: dIdx,
             text: day.text
@@ -1567,20 +1524,18 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   }
 
   // Helper: manage completion and auto-unlock explicitly
-  setRoadmapDayStatus(moduleIdx, dayIdx, isCompleted, roadmapIndex = null) {
-    const idx = roadmapIndex !== null ? roadmapIndex : this.roadmapData.activeIndex;
-    const roadmap = this.roadmapData.roadmaps[idx];
-    const day = roadmap?.modules[moduleIdx]?.days[dayIdx];
+  setRoadmapDayStatus(moduleIdx, dayIdx, isCompleted) {
+    const day = this.state.roadmap.modules[moduleIdx]?.days[dayIdx];
     if (!day) return;
 
     if (isCompleted) {
       day.status = "completed";
-      day.completed = true;
+      day.completed = true; // For backwards compat
 
-      // Find next day in the same roadmap
+      // Find next day and set to active
       let nextDayFound = false;
-      for (let nextDi = dayIdx + 1; nextDi < roadmap.modules[moduleIdx].days.length; nextDi++) {
-        const nDay = roadmap.modules[moduleIdx].days[nextDi];
+      for (let nextDi = dayIdx + 1; nextDi < this.state.roadmap.modules[moduleIdx].days.length; nextDi++) {
+        const nDay = this.state.roadmap.modules[moduleIdx].days[nextDi];
         if (nDay.status !== "completed" && !nDay.completed) {
           nDay.status = "active";
           nextDayFound = true;
@@ -1588,8 +1543,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         }
       }
 
-      if (!nextDayFound && roadmap.modules[moduleIdx + 1]) {
-        const nDay = roadmap.modules[moduleIdx + 1].days[0];
+      // If no next day in module, check the next module
+      if (!nextDayFound && this.state.roadmap.modules[moduleIdx + 1]) {
+        const nDay = this.state.roadmap.modules[moduleIdx + 1].days[0];
         if (nDay && nDay.status !== "completed" && !nDay.completed) {
           nDay.status = "active";
         }
@@ -1636,9 +1592,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
   // Helper: save roadmap to state + Firebase + re-render
   _saveRoadmap(roadmap) {
-    this.roadmapData.roadmaps[this.roadmapData.activeIndex] = roadmap;
     this.state.roadmap = roadmap;
-    this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.roadmapData);
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, roadmap);
     this.refresh();
   }
 
@@ -1824,24 +1779,8 @@ Rules:
     const content = this.app.elements["trainer-content"];
     if (!overview || !content) return;
 
-    // Slot Switcher UI
-    let slotTabsHtml = `
-      <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
-        ${this.roadmapData.roadmaps.map((r, i) => `
-          <button class="roadmap-slot-btn" data-slot-idx="${i}" 
-            style="background:${this.roadmapData.activeIndex === i ? "var(--bg-accent)" : "transparent"}; 
-                   color:${this.roadmapData.activeIndex === i ? "#fff" : "var(--text-secondary)"};
-                   border:1px solid ${this.roadmapData.activeIndex === i ? "var(--text-accent)" : "var(--border)"};
-                   padding:5px 12px; border-radius:4px; font-size:0.75rem; cursor:pointer; font-weight:600;">
-            Slot ${String.fromCharCode(65 + i)}: ${this.escapeHtml(r.topic || "Empty")}
-          </button>
-        `).join("")}
-      </div>
-    `;
-    overview.parentElement.insertAdjacentHTML('afterbegin', ''); // placeholder if needed
-
     if (!this.state.roadmap || !this.state.roadmap.modules || this.state.roadmap.modules.length === 0) {
-      overview.innerHTML = slotTabsHtml;
+      overview.innerHTML = ``;
       content.innerHTML = `
                <div style="text-align: center; padding: 40px 20px;">
                  <h3 style="color: var(--text-accent); margin-bottom: 12px;">Roadmap not generated yet</h3>
@@ -1871,7 +1810,6 @@ Rules:
       : "No data";
 
     overview.innerHTML = `
-          <div style="grid-column: 1 / -1; margin-bottom: 5px;">${slotTabsHtml}</div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">View Date</div><div class="trainer-overview-value" style="color:var(--text-accent);">${dateLabel}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Active Module</div><div class="trainer-overview-value">${this.escapeHtml(activeModule?.name || "Completed")}</div></div>
           <div class="trainer-overview-card"><div class="trainer-overview-label">Modules Complete</div><div class="trainer-overview-value">${completedModules}/${this.state.roadmap.modules.length}</div></div>
@@ -1950,32 +1888,7 @@ Rules:
       html += `</section>`;
     });
 
-    let mappingHtml = `
-      <div class="roadmap-mapping-section" style="margin-top:24px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border);">
-        <h3 style="font-size:0.9rem; color:var(--text-accent); margin-bottom:12px; border-bottom:1px solid var(--border-subtle); padding-bottom:6px; font-weight:700;">🎯 Goal-to-Roadmap Mapping</h3>
-        <div style="display:flex; flex-direction:column; gap:10px; max-height:200px; overflow-y:auto; padding-right:5px;">
-          ${(this.state.timetable || []).map((slot, idx) => {
-            const slotKey = `slot${idx}`;
-            const currentR = this.state.slotRoadmapMap?.[slotKey] ?? -1;
-            return `
-              <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.85rem;">
-                <span style="color:var(--text-secondary); font-family:monospace; min-width:50px;">${slot.time}</span>
-                <span style="color:var(--text-secondary); flex:1; margin:0 10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${slot.label}</span>
-                <select class="roadmap-mapping-select" data-slot-key="${slotKey}" 
-                  style="background:var(--bg-deep); color:var(--text-accent); border:1px solid var(--border); border-radius:4px; padding:2px 5px; font-size:0.75rem;">
-                  <option value="-1" ${currentR === -1 ? "selected" : ""}>Static</option>
-                  <option value="0" ${currentR === 0 ? "selected" : ""}>Roadmap A</option>
-                  <option value="1" ${currentR === 1 ? "selected" : ""}>Roadmap B</option>
-                </select>
-              </div>
-            `;
-          }).join("")}
-        </div>
-        <p style="font-size:0.7rem; color:var(--text-secondary); margin-top:10px; opacity:0.6;">* Map a slot to a Roadmap to pull tasks dynamically.</p>
-      </div>
-    `;
-
-    content.innerHTML = scheduleHtml + html + mappingHtml;
+    content.innerHTML = scheduleHtml + html;
 
     content.querySelectorAll(".roadmap-check").forEach((cb) =>
       cb.addEventListener("change", (e) => {
@@ -1984,7 +1897,7 @@ Rules:
         this.setRoadmapDayStatus(m, d, !!e.target.checked);
         this.app.saveToStorage(
           CONFIG.STORAGE_KEYS.ROADMAP_STATE,
-          this.roadmapData,
+          this.state.roadmap,
         );
         this.refresh();
         this.app.shadowEngine?.refresh(false);
@@ -2145,15 +2058,11 @@ Rules:
 
     // 2. Unfinished Roadmap Task Carry-over (improve.md §8)
     const cascade = this.ensureCascadeState();
-    const unfinishedTasksByRoadmap = { 0: [], 1: [] };
-    
-    // Dynamically iterate all active slots
-    Object.keys(cascade.activeSlots || {}).forEach(key => {
+    const unfinishedTasks = [];
+    ["slot1", "slot2", "slot3"].forEach(key => {
       // Re-add to queue if not completed and an actual task was assigned
       if (!cascade.completion[key] && cascade.activeSlots[key]) {
-        const t = cascade.activeSlots[key];
-        const rIdx = t.roadmapIndex ?? 0;
-        unfinishedTasksByRoadmap[rIdx].push(t);
+        unfinishedTasks.push(cascade.activeSlots[key]);
       }
     });
 
@@ -2162,49 +2071,26 @@ Rules:
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = this.app.getDateString(tomorrow);
     
-    // Build hybrid queues for both roadmaps
-    const roadmapQueues = {};
-    const activeSlots = {};
-    const qPointers = { 0: 0, 1: 0 };
-
-    [0, 1].forEach(rIdx => {
-      const freshQueue = this.getFullRoadmapQueue(rIdx);
-      const carried = unfinishedTasksByRoadmap[rIdx] || [];
-      const combined = [...carried];
-      freshQueue.forEach(t => {
-        const exists = combined.some(u => u.moduleIndex === t.moduleIndex && u.dayIndex === t.dayIndex);
-        if (!exists) combined.push(t);
-      });
-      roadmapQueues[rIdx] = combined;
-    });
-
-    // Populate active slots for tomorrow based on universal mapping
-    (this.state.timetable || []).forEach((slot, idx) => {
-      const slotKey = `slot${idx}`;
-      const mapping = this.state.slotRoadmapMap?.[slotKey];
-
-      if (mapping !== undefined && mapping !== -1) {
-        const rIdx = mapping;
-        activeSlots[slotKey] = roadmapQueues[rIdx][qPointers[rIdx]++] || null;
-      } else {
-        activeSlots[slotKey] = null;
-      }
+    const freshQueue = this.getFullRoadmapQueue();
+    // Unique carry-over (don't duplicate if already in queue)
+    const carriedQueue = [...unfinishedTasks];
+    freshQueue.forEach(t => {
+      const exists = carriedQueue.some(u => u.moduleIndex === t.moduleIndex && u.dayIndex === t.dayIndex);
+      if (!exists) carriedQueue.push(t);
     });
 
     const nextCascade = {
       date: tomorrowStr,
-      roadmapQueues,
-      activeSlots,
-      completion: {},
-      slotStatus:  {},
+      roadmapQueue: carriedQueue,
+      activeSlots: {
+        slot1: carriedQueue[0] || null,
+        slot2: carriedQueue[1] || null,
+        slot3: carriedQueue[2] || null,
+      },
+      completion: { slot1: false, slot2: false, slot3: false },
+      slotStatus:  { slot1: "pending", slot2: "pending", slot3: "pending" },
       stateHistory: [],
     };
-
-    // Initialize statuses for all slots
-    (this.state.timetable || []).forEach((_, idx) => {
-      nextCascade.completion[`slot${idx}`] = false;
-      nextCascade.slotStatus[`slot${idx}`] = "pending";
-    });
     
     this.app.saveToStorage("cascade_state", nextCascade);
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE, this.state);
