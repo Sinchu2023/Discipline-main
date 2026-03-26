@@ -20,6 +20,10 @@ const CONFIG = {
     FIREBASE_USER: "discipline_tracker_firebase_user",
     CLIENT_VERSION: "discipline_tracker_client_version",
     TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
+    // Shadow Engine 2.0
+    BEHAVIOR_SIGNALS: "discipline_behavior_signals",
+    SLEEP_COMPROMISE_LOG: "discipline_sleep_compromise_log",
+    BEHAVIORAL_STATE: "discipline_behavioral_state",
   },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
@@ -31,6 +35,35 @@ const CONFIG = {
     MAX_TEXT_LEN: 180,
     MIN_MISSION_UPDATE_INTERVAL_MS: 2500,
   },
+
+  // ── Shadow Engine 2.0 Constants ─────────────────────────────────────────
+  SE2: {
+    // Learning rates (progressive correction)
+    LEARNING_RATE_FAILURE_SEVERE: 0.1,
+    LEARNING_RATE_FAILURE_MODERATE: 0.2,
+    LEARNING_RATE_STABLE: 0.3,
+    // Smart Success Evaluation — below this ratio, partial credit only
+    EFFORT_SUCCESS_THRESHOLD: 0.7,
+    // Flexible task buffer multiplier
+    FLEXIBLE_TASK_MULTIPLIER: 1.5,
+    // Max minutes a target may shift in a single day
+    MAX_DAILY_SHIFT_LIMIT: 30,
+    // Sleep limits (minutes)
+    MIN_SLEEP_LIMIT: 300,  // 5 hours — absolute floor
+    IDEAL_SLEEP: 420,      // 7 hours — target
+    // How many sleep compromises are allowed in a rolling 7-day window
+    MAX_SLEEP_COMPROMISES_PER_7_DAYS: 2,
+    // Behavioral state thresholds
+    STATE_RECOVERY_WIN_RATE_MAX: 0.40,
+    STATE_GROWTH_WIN_RATE_MIN: 0.70,
+    // Strict task violation window (minutes late = failure)
+    STRICT_TASK_GRACE_MINUTES: 5,
+    // Anti-misuse: if flexible skip rate exceeds this, reduce buffer
+    FLEX_ABUSE_SKIP_RATE_THRESHOLD: 0.60,
+    // Recovery load reduction factor
+    RECOVERY_LOAD_REDUCTION: 0.15,
+  },
+
   DAILY_GOALS: [
     {
       id: "project",
@@ -38,6 +71,12 @@ const CONFIG = {
       minutesTarget: 180,
       sessionsTarget: 0,
       keywords: ["project"],
+      // Shadow Engine 2.0 metadata
+      discipline_type: "flexible",
+      estimated_minutes: 120,
+      target_minutes: 180,
+      priority: 1,
+      category: "deep_work",
     },
     {
       id: "revision",
@@ -45,6 +84,12 @@ const CONFIG = {
       minutesTarget: 120,
       sessionsTarget: 0,
       keywords: ["revision"],
+      // Shadow Engine 2.0 metadata
+      discipline_type: "flexible",
+      estimated_minutes: 90,
+      target_minutes: 120,
+      priority: 2,
+      category: "learning",
     },
   ],
 };

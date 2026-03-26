@@ -116,6 +116,158 @@ class TrainerEngine {
           return Math.round((t - d) / 86400000);
         }
 
+        // ── SE2: Progressive Correction Formula ──────────────────────────────
+        // next_target = current + (ideal - current) * learning_rate
+        // Clamped to MAX_DAILY_SHIFT_LIMIT (30 min) per day.
+        progressiveCorrection(current, ideal, state) {
+          const { SE2 } = CONFIG;
+          let rate;
+          if (state === "RECOVERY") {
+            // Determine severity: if current < 50% of ideal → severe
+            rate = (current / Math.max(1, ideal)) < 0.5
+              ? SE2.LEARNING_RATE_FAILURE_SEVERE
+              : SE2.LEARNING_RATE_FAILURE_MODERATE;
+          } else {
+            rate = SE2.LEARNING_RATE_STABLE; // STABLE or GROWTH both use 0.3
+          }
+          const raw = current + (ideal - current) * rate;
+          // Clamp shift to MAX_DAILY_SHIFT_LIMIT
+          const shift = raw - current;
+          const clamped = Math.sign(shift) * Math.min(Math.abs(shift), SE2.MAX_DAILY_SHIFT_LIMIT);
+          return Math.max(0, Math.round(current + clamped));
+        }
+
+        // ── SE2: Behavioral Analysis ─────────────────────────────────────────
+        // Reads state from shadowEngine.detectBehavioralState() and returns
+        // a structured behavioral snapshot for decision making.
+        analyzeBehavior() {
+          const se = this.app.shadowEngine;
+          if (!se) return { state: "STABLE", winRate: 0, slope: 0 };
+          const state = se.detectBehavioralState();
+          const signals = se.behaviorStore ? se.behaviorStore.load() : {};
+          return {
+            state,
+            winRate: signals.weekly_win_rate || 0,
+            energyMap: signals.energy_map || {},
+            resistanceScores: signals.resistance_scores || {},
+            successProbs: signals.success_probability_map || {},
+            sleepCompromiseCount: se.behaviorStore
+              ? se.behaviorStore.getSleepCompromiseCount()
+              : 0,
+            flexibilityBuffer: signals.flexibility_buffer || CONFIG.SE2.FLEXIBLE_TASK_MULTIPLIER,
+          };
+        }
+
+        // ── SE2: Sleep Compromise Check ──────────────────────────────────────
+        // Returns true if a sleep compromise is approved for the given timetable result.
+        // Approves only when: high effort + not too frequent + above min sleep.
+        checkSleepCompromise(timetableResult) {
+          const { SE2 } = CONFIG;
+          const { sleepMinutes, highEffort } = timetableResult;
+          if (!highEffort) return false;
+          if (sleepMinutes < SE2.MIN_SLEEP_LIMIT) return false; // below absolute floor
+
+          const compromiseCount = this.app.shadowEngine?.behaviorStore
+            ? this.app.shadowEngine.behaviorStore.getSleepCompromiseCount()
+            : 0;
+          if (compromiseCount >= SE2.MAX_SLEEP_COMPROMISES_PER_7_DAYS) return false;
+
+          return true; // approved
+        }
+
+        // ── SE2: Anti-Misuse (Flexible Task Buffer Control) ──────────────────
+        // If flexible tasks are being skipped excessively, reduce the buffer multiplier.
+        // Buffer auto-decreases toward 1.0 (strict) when abuse is detected.
+        computeFlexibilityBuffer() {
+          const { SE2 } = CONFIG;
+          const signals = this.app.shadowEngine?.behaviorStore?.load() || {};
+          const skipCounts = signals.flex_abuse_skip_counts || {};
+          const goals = CONFIG.DAILY_GOALS.filter(
+            (g) => g.discipline_type === "flexible",
+          );
+          if (!goals.length) return SE2.FLEXIBLE_TASK_MULTIPLIER;
+
+          let abuseDetected = false;
+          goals.forEach((goal) => {
+            const skips = skipCounts[goal.label] || 0;
+            const totalDays = Math.max(1, Object.keys(signals.daily_win_rate || {}).length);
+            const skipRate = skips / Math.min(totalDays, 7);
+            if (skipRate > SE2.FLEX_ABUSE_SKIP_RATE_THRESHOLD) {
+              abuseDetected = true;
+            }
+          });
+
+          let buffer = signals.flexibility_buffer ?? SE2.FLEXIBLE_TASK_MULTIPLIER;
+          if (abuseDetected) {
+            // Reduce buffer gradually (floor at 1.0)
+            buffer = Math.max(1.0, parseFloat((buffer - 0.1).toFixed(2)));
+          } else if (buffer < SE2.FLEXIBLE_TASK_MULTIPLIER) {
+            // Recovery: restore buffer slowly when abuse stops
+            buffer = Math.min(
+              SE2.FLEXIBLE_TASK_MULTIPLIER,
+              parseFloat((buffer + 0.05).toFixed(2)),
+            );
+          }
+
+          // Persist updated buffer
+          if (this.app.shadowEngine?.behaviorStore) {
+            this.app.shadowEngine.behaviorStore.set("flexibility_buffer", buffer);
+            this.app.shadowEngine.behaviorStore.save();
+          }
+          return buffer;
+        }
+
+        // ── SE2: Mission Target Generator ────────────────────────────────────
+        // Returns adjusted daily mission targets for each DAILY_GOAL based on
+        // behavioral state, sleep compromise status, and flexibility buffer.
+        generateMissionTargets(behavioralState, sleepCompromised) {
+          const { SE2 } = CONFIG;
+          const flexBuffer = this.computeFlexibilityBuffer();
+          const goals = CONFIG.DAILY_GOALS || [];
+          const dailyMap = this.getDailyProductiveMap();
+
+          // Compute current 7-day average per-task (approximate via total)
+          const today = new Date();
+          let avgMinutes = 0;
+          for (let i = 1; i <= 7; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const ds = this.app.getDateString(d);
+            avgMinutes += dailyMap.get(ds) || 0;
+          }
+          avgMinutes = avgMinutes / 7;
+
+          return goals.map((goal) => {
+            const ideal = goal.target_minutes || goal.minutesTarget || 0;
+            let target = this.progressiveCorrection(avgMinutes, ideal, behavioralState);
+
+            // Apply sleep compromise load reduction (−15%)
+            if (sleepCompromised) {
+              target = Math.round(target * (1 - SE2.RECOVERY_LOAD_REDUCTION));
+            }
+            // Recovery state: additional load reduction
+            if (behavioralState === "RECOVERY") {
+              target = Math.round(target * (1 - SE2.RECOVERY_LOAD_REDUCTION));
+            }
+
+            // Flexible task: show buffer range
+            const isFlexible = goal.discipline_type === "flexible";
+            const displayMin = target;
+            const displayMax = isFlexible
+              ? Math.round(target * flexBuffer)
+              : target;
+
+            return {
+              id: goal.id,
+              label: goal.label,
+              discipline_type: goal.discipline_type || "flexible",
+              target_minutes: target,
+              display_range: isFlexible ? `${displayMin}–${displayMax} min` : `${target} min`,
+              buffer_multiplier: isFlexible ? flexBuffer : 1.0,
+            };
+          });
+        }
+
         computeAntiSandbagSignals(baseShadow) {
           const threshold = Math.max(1, baseShadow);
           const recentSeries = this.getDailySeries(45);
@@ -169,18 +321,20 @@ class TrainerEngine {
         }
 
         evaluateTimetable(tasks, dateStr) {
+          const { SE2 } = CONFIG;
           const todaysTasks = tasks.filter((t) => t.date === dateStr);
           let sleepMinutes = 0;
           let deepWorkMinutes = 0;
           let projectMinutes = 0;
           let learnRevisionMinutes = 0;
           let earlyDeepWorkStart = null;
+          const strictViolations = []; // SE2: strict task failure log
 
           todaysTasks.forEach((t) => {
-            const cat = t.category.toLowerCase();
+            const cat = (t.category || "").toLowerCase();
             const sub = (t.subcategory || "").toLowerCase();
-            const startHour = new Date(t.startTime).getHours();
-            
+            const startHour = t.startTime ? new Date(t.startTime).getHours() : 0;
+
             if (cat === "sleep" || cat === "rest") {
               sleepMinutes += t.duration;
             } else if (this.app.isProductiveCategory(t.category)) {
@@ -191,28 +345,61 @@ class TrainerEngine {
               } else {
                 deepWorkMinutes += t.duration;
                 if (startHour >= 4 && startHour <= 6) {
-                  if (!earlyDeepWorkStart || t.startTime < earlyDeepWorkStart) earlyDeepWorkStart = t.startTime;
+                  if (!earlyDeepWorkStart || t.startTime < earlyDeepWorkStart)
+                    earlyDeepWorkStart = t.startTime;
                 }
               }
             }
+
+            // SE2: Strict-task violation detection via TIMETABLE_LOGIC
+            if (t.startTime && typeof TIMETABLE_LOGIC !== "undefined") {
+              const tMin = new Date(t.startTime).getHours() * 60 + new Date(t.startTime).getMinutes();
+              TIMETABLE_LOGIC.forEach((slot) => {
+                if (!slot.time) return;
+                const [sH, sM] = slot.time.split(":").map(Number);
+                const slotMin = sH * 60 + sM;
+                const labelMatch = sub.includes((slot.label || "").toLowerCase())
+                  || cat.includes((slot.label || "").toLowerCase());
+                if (labelMatch && tMin > slotMin + SE2.STRICT_TASK_GRACE_MINUTES) {
+                  const isStrict = (CONFIG.DAILY_GOALS || []).some(
+                    (g) => g.discipline_type === "strict"
+                      && g.keywords?.some((k) => sub.includes(k) || cat.includes(k)),
+                  );
+                  if (isStrict) strictViolations.push({ task: slot.label, lateBy: tMin - slotMin });
+                }
+              });
+            }
           });
 
-          const missedEarlyStart = !earlyDeepWorkStart && new Date().getHours() >= 8; 
-          const highEffort = (deepWorkMinutes + projectMinutes) >= 300; 
-          const sleepSafetyMin = 300; 
-          const idealSleep = 420; 
-          
+          const missedEarlyStart = !earlyDeepWorkStart && new Date().getHours() >= 8;
+          const highEffort = (deepWorkMinutes + projectMinutes) >= 300;
+
+          // SE2: Sleep classification using config constants + rolling compromise check
           let sleepStatus = "OPTIMAL";
           if (sleepMinutes > 0) {
-            if (sleepMinutes < sleepSafetyMin) sleepStatus = "DANGER";
-            else if (sleepMinutes < idealSleep) {
-              sleepStatus = highEffort ? "COMPROMISED_OK" : "SHORT";
+            if (sleepMinutes < SE2.MIN_SLEEP_LIMIT) {
+              sleepStatus = "DANGER";
+            } else if (sleepMinutes < SE2.IDEAL_SLEEP) {
+              const approved = this.checkSleepCompromise({ sleepMinutes, highEffort });
+              if (approved) {
+                sleepStatus = "COMPROMISED_OK";
+                // Log to BehaviorStore so rolling count is accurate
+                if (this.app.shadowEngine?.behaviorStore) {
+                  this.app.shadowEngine.behaviorStore.logSleepCompromise(dateStr);
+                }
+              } else {
+                sleepStatus = "SHORT";
+              }
             }
           } else {
-             sleepStatus = "PENDING";
+            sleepStatus = "PENDING";
           }
 
-          return { missedEarlyStart, sleepStatus, highEffort, sleepMinutes, deepWorkMinutes, projectMinutes, learnRevisionMinutes };
+          return {
+            missedEarlyStart, sleepStatus, highEffort,
+            sleepMinutes, deepWorkMinutes, projectMinutes,
+            learnRevisionMinutes, strictViolations,
+          };
         }
 
         buildTrainerSnapshot() {
@@ -337,57 +524,76 @@ class TrainerEngine {
         }
 
         buildReport(d = this.buildTrainerSnapshot()) {
+          // SE2: Deterministic, command-based report. No emotional or motivational language.
           const trend = this.getShadowTrend(d.last3DayAverage, d.previous3DayAverage);
-          const nextPenalty = Math.max(15, Math.ceil(d.penaltyMinutes * 1.1));
           const anti = d.antiSandbag;
-          
           const phase1 = Math.min(60, Math.max(45, Math.ceil(d.minutesToWin * 0.5)));
 
-          let coachTone = "";
-          if (d.monthlyWinRate > 0.6) {
-             coachTone = "Progress is excellent. Maintain precision. The system is adapting to your high performance.";
-          } else if (d.monthlyWinRate < 0.4) {
-             coachTone = "We need to stabilize. Focus on execution over emotion. Hit the baseline consistently.";
-          } else {
-             coachTone = "Performance is stable. Push slightly further today to break the equilibrium.";
+          // SE2: Behavioral state from shadow engine
+          const behaviorAnalysis = this.analyzeBehavior();
+          const { state: behavioralState } = behaviorAnalysis;
+
+          // SE2: Mission targets per goal (progressive correction applied)
+          const sleepCompromised = d.timetable.sleepStatus === "COMPROMISED_OK";
+          const missionTargets = this.generateMissionTargets(behavioralState, sleepCompromised);
+          const targetsText = missionTargets.map((t) =>
+            `${t.label} [${t.discipline_type.toUpperCase()}]: ${t.display_range}`,
+          ).join("\n");
+
+          // SE2: Sleep status — structural, no emotional framing
+          let sleepReport = "";
+          const { sleepStatus, missedEarlyStart, strictViolations = [] } = d.timetable;
+          if (sleepStatus === "DANGER") {
+            sleepReport = `Sleep.Status: DANGER — recorded sleep below minimum (${CONFIG.SE2.MIN_SLEEP_LIMIT} min). Structural risk. Prioritize rest.`;
+          } else if (sleepStatus === "COMPROMISED_OK") {
+            sleepReport = `Sleep.Status: COMPROMISED_OK — high effort acknowledged. Load reduced by ${Math.round(CONFIG.SE2.RECOVERY_LOAD_REDUCTION * 100)}% tomorrow.`;
+          } else if (sleepStatus === "SHORT") {
+            sleepReport = `Sleep.Status: SHORT — below ideal (${CONFIG.SE2.IDEAL_SLEEP} min), no high-effort justification. Realign rest window.`;
+          } else if (sleepStatus === "PENDING") {
+            sleepReport = `Sleep.Status: PENDING — no sleep entry logged yet.`;
+          }
+          if (missedEarlyStart) {
+            sleepReport += (sleepReport ? "\n" : "") + `Strict.Violation: 05:00 deep-work block missed. Zero grace on this habit.`;
+          }
+          if (strictViolations.length > 0) {
+            strictViolations.forEach((v) => {
+              sleepReport += `\nStrict.Violation: ${v.task} — started ${v.lateBy} min late (grace: ${CONFIG.SE2.STRICT_TASK_GRACE_MINUTES} min).`;
+            });
           }
 
-          let timetableFeedback = "";
-          if (d.timetable.sleepStatus === "DANGER") {
-             timetableFeedback = "CRITICAL: Sleep deficit detected (<5 hours). Structural integrity compromised. You must prioritize minimum restorative rest tonight.";
-          } else if (d.timetable.sleepStatus === "COMPROMISED_OK") {
-             timetableFeedback = "High effort recognized. Minor sleep compromise accepted today without penalty. Mission load has been slightly reduced to allow recovery.";
-          } else if (d.timetable.sleepStatus === "SHORT") {
-             timetableFeedback = "Sleep was suboptimal without high effort justification. Realign rest timing.";
-          }
+          // SE2: Correction summary
+          const correctionNote = behavioralState === "RECOVERY"
+            ? `Correction.Mode: RECOVERY — load reduced. Learning rate: ${CONFIG.SE2.LEARNING_RATE_FAILURE_MODERATE}.`
+            : behavioralState === "GROWTH"
+            ? `Correction.Mode: GROWTH — targets incrementing. Learning rate: ${CONFIG.SE2.LEARNING_RATE_STABLE}.`
+            : `Correction.Mode: STABLE — targets held near current baseline. Learning rate: ${CONFIG.SE2.LEARNING_RATE_STABLE}.`;
 
-          if (d.timetable.missedEarlyStart) {
-             timetableFeedback += (timetableFeedback ? " " : "") + "5:00 AM Deep Work block missed. Strict rules apply here; recalibrate your start tomorrow.";
-          }
-
-          return `=== COACHING FEEDBACK ===
-${coachTone}
-${timetableFeedback ? timetableFeedback + "\n" : ""}Learning and revision blocks remain flexible. Focus on comprehension and depth; overruns here are accepted. Sleep and wake timings are strict.
-
-=== SHADOW ENGINE STATUS ===
-Level: ${d.shadowLevel.current.name} | L${d.shadowMicroLevel}/100
-Effective Target: ${this.app.formatDuration(d.effectiveShadow)}
+          return `=== SYSTEM STATE ===
+Behavioral.State: ${behavioralState}
+Shadow.Level: ${d.shadowLevel.current.name} | L${d.shadowMicroLevel}/100
+Effective.Target: ${this.app.formatDuration(d.effectiveShadow)}
 Trend: ${trend}
-Active Adjustments: ${anti.adaptivePressure.active ? "+3% Pressure" : "None"} | ${d.timetable.sleepStatus === "COMPROMISED_OK" ? "-5% Recovery Allowance" : ""}
+${correctionNote}
+${sleepReport ? sleepReport + "\n" : ""}
+=== MISSION TARGETS (TOMORROW) ===
+${targetsText}
+Flexible.Buffer: ${behaviorAnalysis.flexibilityBuffer.toFixed(2)}x — reduces if flexibility is abused.
+Strict.Tasks: no timing compromise permitted.
 
 === TRACKING SNAPSHOT ===
-Mission Score: ${d.missionScore}/100
-Distraction: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (+${this.app.formatDuration(d.distractionOverBudget)})` : ""}
-Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " ✓" : ""} • 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " ✓" : ""}
-Current Mode: ${d.mode}
-Gap to Target: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
+Mission.Score: ${d.missionScore}/100
+Distraction: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (over by ${this.app.formatDuration(d.distractionOverBudget)})` : ""}
+Win.Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " ✓" : ""} | 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " ✓" : ""}
+Mode: ${d.mode}
+Gap: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
+Adaptive.Pressure: ${anti.adaptivePressure.active ? `active — ${anti.adaptivePressure.daysLeft}d remaining` : "none"}
 
 === DAILY OBJECTIVE ===
-Minutes to Win: ${this.app.formatDuration(d.minutesToWin)}
-Required Average Pace: ${d.requiredPace} min/hour
+Minutes.To.Win: ${this.app.formatDuration(d.minutesToWin)}
+Required.Pace: ${d.requiredPace} min/hour
 
-=== SUGGESTED ACTION ===
-Commit to a focused ${this.app.formatDuration(phase1)} deep work session immediately.`;
+=== COMMAND ===
+Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log immediately after.`;
         }
 
         escapeHtml(value = "") {
@@ -1111,6 +1317,38 @@ Rules:
         }
 
         refresh() {
+          // ── SE2 Daily Cycle (deterministic, sequential) ──────────────────
+          // Step 1: readTodayData
+          const todayDate = this.app.getDateString(new Date());
+          const todayTasks = this.app.state.tasks || [];
+
+          // Step 2: analyzeBehavior — reads from BehaviorStore + shadowEngine
+          const behaviorSnapshot = this.analyzeBehavior();
+
+          // Step 3: detectBehavioralState (via shadow engine)
+          const behavioralState = behaviorSnapshot.state; // RECOVERY | STABLE | GROWTH
+
+          // Step 4: applyCorrection — evaluate timetable & sleep compromise
+          const timetable = this.evaluateTimetable(todayTasks, todayDate);
+          const sleepCompromised = timetable.sleepStatus === "COMPROMISED_OK";
+
+          // Step 5: generateMissions — produces corrected targets per goal
+          const missionTargets = this.generateMissionTargets(behavioralState, sleepCompromised);
+
+          // Step 6: applyRules — anti-misuse (computeFlexibilityBuffer already mutates BehaviorStore)
+          this.computeFlexibilityBuffer();
+
+          // Step 7: Persist all updated behavioral signals immediately
+          if (this.app.shadowEngine?.behaviorStore) {
+            const todayMinutes = this.getDailyProductiveMap().get(todayDate) || 0;
+            this.app.shadowEngine.updateBehaviorSignals(
+              todayDate,
+              todayMinutes,
+              this.app.shadowEngine.shadowSevenDayAverage || 0,
+            );
+          }
+
+          // Step 8: Render roadmap UI and mission panel
           this.ensureRoadmap();
           this.renderRoadmap();
           this.syncMissionFromRoadmap();
