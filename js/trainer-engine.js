@@ -932,8 +932,14 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         const manualDone = !!checks[checkId];
         const done = autoDone || manualDone;
         const labelId = idx < 3 ? ` id="${taskIds[idx]}"` : "";
-        const doneCls = done ? " shadow-goal-done" : "";
-        return `<div class="shadow-goal-item${doneCls}"><span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span><input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} /></div>`;
+        const dotCls = done ? " done" : "";
+        
+        return `
+          <div class="sd-mission-item shadow-goal-item">
+            <div class="sd-mission-dot${dotCls}"></div>
+            <span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span>
+            <input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" style="display:none;" ${done ? "checked" : ""} />
+          </div>`.trim();
       }).join("");
 
       container.querySelectorAll(".mission-check").forEach(checkbox => {
@@ -979,14 +985,17 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   updatePenaltyTimer() {
     const el = this.app.elements["roadmap-penalty-timer"];
     if (!el) return;
+    const footer = el.closest('.sd-mission-footer');
+    if (!footer) return;
+
     const { activeModule } = this.getRoadmapProgress();
     if (!activeModule) {
-      el.textContent = "No active penalty";
+      footer.innerHTML = `<span>No active penalty</span><span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">00:00:00</span>`;
       return;
     }
     const pending = activeModule.days.filter((d) => d.status !== "completed" && !d.completed).length;
     if (!pending) {
-      el.textContent = "Module complete • no penalty";
+      footer.innerHTML = `<span>Module complete • no penalty</span><span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">00:00:00</span>`;
       return;
     }
 
@@ -996,7 +1005,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const h = String(Math.floor(ms / 3600000)).padStart(2, "0");
     const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, "0");
     const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, "0");
-    el.textContent = `Pending ${pending} task(s) • penalty countdown ${h}:${m}:${s} (applies if module is incomplete at deadline)`;
+    footer.innerHTML = `<span>roadmap penalty • ${pending} tasks pending</span><span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">${h}:${m}:${s}</span>`;
   }
 
   // Helper: manage completion and auto-unlock explicitly
