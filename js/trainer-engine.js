@@ -1307,6 +1307,12 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
 
+      const headerTitle = document.getElementById("daily-mission-header");
+      if (headerTitle) {
+        const isToday = cascade.date === this.app.getDateString(new Date());
+        headerTitle.textContent = isToday ? "DAILY MISSION" : `DAILY MISSION (${cascade.date})`;
+      }
+
       // Step 4: Build HTML — handles both learning and static slots
       let html = "";
       SLOT_CONFIG.forEach(slot => {
@@ -2041,7 +2047,8 @@ Rules:
     });
 
     // Reset SE2 cascade for the new day
-    const tomorrow = new Date();
+    // Advance from logical date instead of real time so multiple clicks correctly fast-forward
+    const tomorrow = cascade.date ? new Date(cascade.date) : new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = this.app.getDateString(tomorrow);
     
