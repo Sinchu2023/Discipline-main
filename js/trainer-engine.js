@@ -178,7 +178,7 @@ class TrainerEngine {
     try {
       const timetable = targetTimetable || this.state.timetable;
       if (typeof IDEAL_TIMETABLE === "undefined" || !timetable) return;
-      
+
       const { SE2 } = CONFIG;
       const today = new Date();
       const last7Dates = [];
@@ -197,7 +197,7 @@ class TrainerEngine {
       timetable.forEach((slot, idx) => {
         const ideal = IDEAL_TIMETABLE[idx];
         if (!ideal) return;
-        if (slot.mapsTo === "static") return; 
+        if (slot.mapsTo === "static") return;
 
         const actualMins = [];
         last7Dates.forEach((dateStr) => {
@@ -213,7 +213,7 @@ class TrainerEngine {
 
         if (actualMins.length === 0) return;
         const avgActual = actualMins.reduce((s, v) => s + v, 0) / actualMins.length;
-        const idealMin  = toMin(ideal.time);
+        const idealMin = toMin(ideal.time);
         const currentMin = toMin(slot.time);
 
         const isRecovery = behavioralState === "RECOVERY";
@@ -236,7 +236,7 @@ class TrainerEngine {
           this.app.state.tasks.forEach((task) => {
             if (task.date !== dateStr || task.category !== "Sleep" || !task.startTime) return;
             let m = new Date(task.startTime).getHours() * 60 + new Date(task.startTime).getMinutes();
-            if (m < 480) m += 1440; 
+            if (m < 480) m += 1440;
             sleepMins.push(m);
           });
         });
@@ -244,8 +244,8 @@ class TrainerEngine {
         if (sleepMins.length > 0) {
           const avgSleep = sleepMins.reduce((s, v) => s + v, 0) / sleepMins.length;
           let idealMin = toMin(ideal.time);
-          if (idealMin < 480) idealMin += 1440; 
-          
+          if (idealMin < 480) idealMin += 1440;
+
           let currentMin = toMin(slot.time);
           if (currentMin < 480) currentMin += 1440;
 
@@ -277,9 +277,9 @@ class TrainerEngine {
       if (!todayTasks.length) return;
 
       // Earliest productive task today = effective wake/start time
-      const earliestMs  = Math.min(...todayTasks.map(t => new Date(t.startTime).getTime()));
+      const earliestMs = Math.min(...todayTasks.map(t => new Date(t.startTime).getTime()));
       const actualStart = new Date(earliestMs);
-      const actualMin   = actualStart.getHours() * 60 + actualStart.getMinutes();
+      const actualMin = actualStart.getHours() * 60 + actualStart.getMinutes();
 
       // Planned first slot time
       const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
@@ -288,13 +288,13 @@ class TrainerEngine {
         return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
       const plannedMin = toMin(TIMETABLE_LOGIC[0].time);
-      const delta = actualMin - plannedMin; 
+      const delta = actualMin - plannedMin;
 
       // If delta is +/- 5 mins, ignore (jitter)
-      if (Math.abs(delta) <= 5) return; 
-      
+      if (Math.abs(delta) <= 5) return;
+
       // Cap the shift (don't shift more than 2 hours in either direction)
-      const cappedDelta = Math.sign(delta) * Math.min(Math.abs(delta), 120); 
+      const cappedDelta = Math.sign(delta) * Math.min(Math.abs(delta), 120);
 
       // Shift all future slots by delta
       const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
@@ -596,7 +596,7 @@ class TrainerEngine {
   buildTrainerSnapshot(targetDate = null) {
     const cascade = this.ensureCascadeState();
     const todayDate = targetDate || cascade.date || this.app.getDateString(new Date());
-    
+
     // Step 2: analyzeBehavior — reads from BehaviorStore + shadowEngine
     const behaviorSnapshot = this.analyzeBehavior();
     const behavioralState = behaviorSnapshot.state;
@@ -615,7 +615,7 @@ class TrainerEngine {
     const now = new Date();
     // If it's a future logical date, timeRemaining is 0 or 24h? Use 0 for safety.
     const isFuture = todayDate > this.app.getDateString(now);
-    
+
     const dayEnd = new Date(now);
     dayEnd.setHours(23, 59, 59, 999);
     const timeRemainingToday = isFuture ? 0 : Math.max(
@@ -1077,14 +1077,14 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       && cascade.completion && cascade.slotStatus;
     const now = new Date();
     const nowHour = now.getHours();
-    
+
     // SE2: Don't auto-advance to a new day if it's currently between 12 AM and 4 AM
     // This allows the user to finish their "Night" (e.g. Sleep at 1:39 AM) 
     // without the system resetting to tomorrow prematurely.
     const isMidNightBuffer = nowHour < 4;
     const isStaleDate = cascade && cascade.date < today;
     const isFutureDate = cascade && cascade.date > today;
-    
+
     // Only reset if it's a completely new state, schema invalid, it's past 4 AM on a new day,
     // or if the user accidentally finalized their day early and jumped into the future.
     const shouldReset = !cascade || !isSchemaValid || (isStaleDate && !isMidNightBuffer) || isFutureDate;
@@ -1100,7 +1100,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           slot3: q[2] || null,
         },
         completion: { slot1: false, slot2: false, slot3: false },
-        slotStatus:  { slot1: "active", slot2: "active", slot3: "active" },
+        slotStatus: { slot1: "active", slot2: "active", slot3: "active" },
         stateHistory: [],
       };
       this.app.saveToStorage("cascade_state", cascade);
@@ -1116,18 +1116,18 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const realDate = this.app.getDateString(new Date());
     const isFutureDay = (cascade.date || realDate) > realDate;
-    
+
     // Use dynamic times from TIMETABLE_LOGIC
     const SLOT_MAP = [];
     if (this.state.timetable) {
       this.state.timetable.forEach((slot, idx) => {
         let finalKey;
         if (slot.mapsTo === "learning") {
-           const learningSlots = this.state.timetable.filter(s => s.mapsTo === "learning");
-           const lIdx = learningSlots.indexOf(slot);
-           finalKey = `slot${lIdx + 1}`;
+          const learningSlots = this.state.timetable.filter(s => s.mapsTo === "learning");
+          const lIdx = learningSlots.indexOf(slot);
+          finalKey = `slot${lIdx + 1}`;
         } else {
-           finalKey = `static${idx}`;
+          finalKey = `static${idx}`;
         }
         SLOT_MAP.push({ key: finalKey, time: slot.time });
       });
@@ -1138,8 +1138,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     SLOT_MAP.forEach(({ key, time }) => {
       let slotMin = toMin(time);
       // Treat early morning slots (00:00 - 04:00) as part of the night shift
-      if (slotMin < 240) slotMin += 1440; 
-      
+      if (slotMin < 240) slotMin += 1440;
+
       let compNowMinutes = nowMinutes;
 
       // SE2: Midnight status context (Problem 1:1 sleep expired)
@@ -1162,13 +1162,13 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     // Mirror statuses for UI rendering safety
     ["slot1", "slot2", "slot3"].forEach(key => {
-        cascade.slotStatus[key] = cascade.slotStatus[key] || "pending";
+      cascade.slotStatus[key] = cascade.slotStatus[key] || "pending";
     });
   }
 
   // ── Cascade: save non-destructive snapshot before any mutation ──────────
   // ── Restore: Core Action Methods ──────────────────────────────────────────
-  
+
   triggerCascadeComplete(slotKey) {
     const cascade = this.ensureCascadeState();
     this._pushCascadeHistory(cascade);
@@ -1210,9 +1210,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
     const lastState = cascade.stateHistory.pop();
     cascade.roadmapQueue = lastState.roadmapQueue;
-    cascade.activeSlots  = lastState.activeSlots;
-    cascade.completion   = lastState.completion;
-    cascade.slotStatus   = lastState.slotStatus;
+    cascade.activeSlots = lastState.activeSlots;
+    cascade.completion = lastState.completion;
+    cascade.slotStatus = lastState.slotStatus;
 
     this.app.saveToStorage("cascade_state", cascade);
     this.syncMissionFromRoadmap();
@@ -1222,9 +1222,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     cascade.stateHistory = cascade.stateHistory || [];
     cascade.stateHistory.push(JSON.parse(JSON.stringify({
       roadmapQueue: cascade.roadmapQueue,
-      activeSlots:  cascade.activeSlots,
-      completion:   cascade.completion,
-      slotStatus:   cascade.slotStatus,
+      activeSlots: cascade.activeSlots,
+      completion: cascade.completion,
+      slotStatus: cascade.slotStatus,
     })));
     if (cascade.stateHistory.length > 20) cascade.stateHistory.shift();
   }
@@ -1244,10 +1244,10 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     // 1. Run dynamic timetable shift based on behavior
     const behavior = this.analyzeBehavior();
     this.shiftTimetableTimes(behavior.state);
-    
+
     // 2. Clear cascade state for fresh start
     localStorage.removeItem("cascade_state");
-    
+
     // 3. Save updated roadmap & refresh
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
     if (!isSilent) alert("Day finalized. Schedule updated based on your performance!");
@@ -1331,11 +1331,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         const isLearning = slot.type === "learning";
         const status = cascade.slotStatus[slot.slotKey] || "pending";
         const isDone = status === "completed";
-        const isExp  = status === "expired";
-        
-        const opacity = isDone ? "0.4" : isExp ? "0.6" : "1";
-        const filter  = isExp ? "grayscale(1)" : "none";
-        const color   = isDone ? "var(--success)" : isExp ? "var(--text-tertiary, #888)" : "var(--text-primary)";
+        const isExp = status === "expired";
+
+        const opacity = isDone ? "0.4" : isExp ? "0.35" : "1";
+        const filter = isExp ? "grayscale(1) contrast(0.5) brightness(0.6)" : "none";
+        const color = isDone ? "var(--success)" : isExp ? "#555" : "var(--text-primary)";
         const circleIcon = isDone ? "●" : "○";
 
         if (isLearning) {
@@ -1455,7 +1455,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
 
       const slotMin = toMin(slot.time);
       const msUntilSlot = (slotMin - nowMin) * 60000;
-      
+
       // Schedule re-render 1 minute after slot window passes to show 'Expired'
       if (msUntilSlot > -60000 && msUntilSlot < 86400000) {
         let delay = msUntilSlot + 1000; // +1s buffer
@@ -1508,7 +1508,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   getFullRoadmapQueue() {
     const queue = [];
     if (!this.state.roadmap?.modules) return queue;
-    
+
     this.state.roadmap.modules.forEach((mod, mIdx) => {
       mod.days.forEach((day, dIdx) => {
         if (day.status !== "completed" && !day.completed) {
@@ -1804,9 +1804,9 @@ Rules:
     // Find last sleep session
     const lastSleep = (this.app.state.tasks || [])
       .filter(t => t.category === "Sleep")
-      .sort((a,b) => (b.endTime || 0) - (a.endTime || 0))[0];
-    const sleepDisplay = lastSleep 
-      ? `${new Date(lastSleep.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} (${lastSleep.duration}m)`
+      .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))[0];
+    const sleepDisplay = lastSleep
+      ? `${new Date(lastSleep.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${lastSleep.duration}m)`
       : "No data";
 
     overview.innerHTML = `
@@ -1827,7 +1827,7 @@ Rules:
     let scheduleHtml = `<div class="roadmap-schedule-preview" style="margin-bottom:24px; padding:15px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border);">
       <h3 style="font-size:0.9rem; color:var(--text-accent); margin-bottom:12px; border-bottom:1px solid var(--border-subtle, rgba(255,255,255,0.1)); padding-bottom:6px; font-weight:700;">📋 ${dateLabel} SE2 TIMETABLE</h3>
       <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">`;
-    
+
     const isToday = logicalDate === realDate;
     const analysis = this.analyzeBehavior();
     const { state: behavioralState } = analysis;
@@ -1838,7 +1838,7 @@ Rules:
       // Show what it WOULD be after correction
       this.shiftTimetableTimes(behavioralState, previewTimetable);
     }
-    
+
     if (typeof previewTimetable !== "undefined") {
       previewTimetable.forEach(slot => {
         scheduleHtml += `<div style="font-size:0.85rem; color:var(--text-secondary); display:flex; flex-direction:column;">
@@ -1870,7 +1870,7 @@ Rules:
         const checked = status === "completed" || day.completed ? "checked" : "";
         const stateIcon = status === "completed" ? "✔" : status === "active" ? "●" : "🔒";
         const stateLabel = status === "completed" ? "Completed" : status === "active" ? "Active" : "Locked";
-        
+
         const dayText = this.state.roadmap.editMode
           ? `<textarea class="roadmap-edit" data-module="${mi}" data-day="${di}">${this.escapeHtml(day.text)}</textarea>`
           : this.escapeHtml(day.text);
@@ -1942,7 +1942,7 @@ Rules:
     // ── Apply SE2 Timetable Shifting and Rerouting ──
     // Shifting always happens toward IDEAL based on the logical context
     this.shiftTimetableTimes(behavioralState);
-    
+
     // Only reroute if we are actually ON the real date. 
     // If we advanced to tomorrow, don't reroute yet.
     if (!isFutureDay) {
@@ -1957,7 +1957,7 @@ Rules:
     // SE2: Detect last night's sleep for fatigue reduction
     const lastSleepTask = (this.app.state.tasks || [])
       .filter(t => t.category === "Sleep" && t.date === realDate)
-      .sort((a,b) => (b.endTime || 0) - (a.endTime || 0))[0];
+      .sort((a, b) => (b.endTime || 0) - (a.endTime || 0))[0];
     const sleepMinutes = lastSleepTask ? lastSleepTask.duration : 720; // default to plenty if unknown
     const isFatigued = sleepMinutes < CONFIG.SE2.FATIGUE_THRESHOLD_MINUTES;
 
@@ -1996,21 +1996,21 @@ Rules:
     // Calculate mandatory 5-hour wake offset based on *current* time
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    
+
     // Use 48h timeline to handle midnight transitions safely
     // If it's early morning (0-8 AM), treat as 'late today' (1440 + min)
     let sleepTime48 = nowMin;
-    if (nowMin < 480) sleepTime48 += 1440; 
-    
+    if (nowMin < 480) sleepTime48 += 1440;
+
     const firstSlot = TIMETABLE_LOGIC[0];
     const [h, m] = firstSlot.time.split(":").map(Number);
-    const idealWake48 = 1440 + (h * 60 + m); 
-    
+    const idealWake48 = 1440 + (h * 60 + m);
+
     const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
     const wakeDeadline48 = sleepTime48 + minSleep;
-    
+
     const wakeOffset = Math.max(0, wakeDeadline48 - idealWake48);
-    
+
     console.log(`[SE2 Sleep Trigger] Sleep: ${nowMin}m, IdealWake: ${idealWake48}m, Offset: ${wakeOffset}m`);
     this._performDayFinalization(wakeOffset);
   }
@@ -2021,15 +2021,15 @@ Rules:
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
       let sleepTime48 = nowMin;
-      if (nowMin < 480) sleepTime48 += 1440; 
-      
+      if (nowMin < 480) sleepTime48 += 1440;
+
       const firstSlot = this.state.timetable[0];
       const [h, m] = (firstSlot?.time || "04:00").split(":").map(Number);
-      const idealWake48 = 1440 + (h * 60 + m); 
-      
+      const idealWake48 = 1440 + (h * 60 + m);
+
       const minSleep = CONFIG.SE2.MIN_SLEEP_LIMIT || 300;
       const wakeOffset = Math.max(0, (sleepTime48 + minSleep) - idealWake48);
-      
+
       this._performDayFinalization(wakeOffset);
     }
   }
@@ -2037,7 +2037,7 @@ Rules:
   _performDayFinalization(wakeOffset = 0) {
     const analysis = this.analyzeBehavior();
     const { state: behavioralState } = analysis;
-    
+
     // 1. Shift baseline timetable times for tomorrow
     this.shiftTimetableTimes(behavioralState);
 
@@ -2049,7 +2049,7 @@ Rules:
         const wrapped = ((Math.round(m) % 1440) + 1440) % 1440;
         return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
       };
-      
+
       this.state.timetable.forEach(slot => {
         const currentMin = toMin(slot.time);
         slot.time = toTime(currentMin + wakeOffset);
@@ -2067,10 +2067,14 @@ Rules:
     });
 
     // Reset SE2 cascade for the new day
-    const tomorrow = new Date();
+    // SE2: If we finalize before 4 AM, "Tomorrow" is technically the same physical day's morning.
+    const finalToday = new Date();
+    if (finalToday.getHours() < 4) finalToday.setDate(finalToday.getDate() - 1);
+
+    const tomorrow = new Date(finalToday);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = this.app.getDateString(tomorrow);
-    
+
     const freshQueue = this.getFullRoadmapQueue();
     // Unique carry-over (don't duplicate if already in queue)
     const carriedQueue = [...unfinishedTasks];
@@ -2088,13 +2092,13 @@ Rules:
         slot3: carriedQueue[2] || null,
       },
       completion: { slot1: false, slot2: false, slot3: false },
-      slotStatus:  { slot1: "pending", slot2: "pending", slot3: "pending" },
+      slotStatus: { slot1: "pending", slot2: "pending", slot3: "pending" },
       stateHistory: [],
     };
-    
+
     this.app.saveToStorage("cascade_state", nextCascade);
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE, this.state);
-    
+
     // 3. UI update
     this.refresh();
     this.app.shadowEngine?.refresh(false);
