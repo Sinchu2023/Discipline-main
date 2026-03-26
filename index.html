@@ -1633,7 +1633,6 @@
               </a>
               <button class="btn btn-danger" id="google-logout-btn" role="menuitem">Logout</button>
             </div>
-          </div>
           <input
             type="file"
             id="import-file"
@@ -1811,20 +1810,18 @@
         
         <!-- ZONE 4: BOTTOM GRID -->
         <div class="sd-bottom-grid">
-          
-          <!-- Left Column: Mission & Flow -->
+          <!-- Left Column: Mission -->
           <div style="display: flex; flex-direction: column; gap: 16px;">
-            <!-- Daily Mission -->
             <div class="sd-bot-panel">
               <div class="sd-panel-title">DAILY MISSION</div>
               <div class="sd-mission-list shadow-goal-list">
                 <div class="sd-mission-item shadow-goal-item">
                   <div class="sd-mission-dot done"></div>
-                  <span id="mission-task-1">Operating Point & Small Signal of Diode</span>
+                  <span id="mission-task-1">Shunt Clipper Circuits Clamper Circuits</span>
                   <input class="mission-check" type="checkbox" style="display:none;"/>
                 </div>
-                <div class="sd-mission-item shadow-goal-item" style="color: var(--text-secondary); text-decoration: line-through;">
-                  <div class="sd-mission-dot done"></div>
+                <div class="sd-mission-item shadow-goal-item">
+                  <div class="sd-mission-dot"></div>
                   <span id="mission-task-2">Project Work</span>
                   <input class="mission-check" type="checkbox" style="display:none;"/>
                 </div>
@@ -1843,7 +1840,6 @@
                 <span class="sd-mission-timer sd-num" id="roadmap-penalty-timer">00:00:00</span>
               </div>
             </div>
-            </div>
           </div>
           
           <!-- Right Column: Penalty & Battle -->
@@ -1857,7 +1853,7 @@
               </div>
               <div class="sd-penalty-reason" id="shadow-penalty-reason">win-rate <50% · untracked >5h</div>
               <div class="sd-penalty-reset">resets in <span class="sd-num" id="shadow-penalty-expiry">00:00:00</span> · carries if loss</div>
-              
+
               <div style="margin-top: 16px;">
                 <div class="sd-distraction-label">
                   <span>distraction budget</span>
@@ -1883,13 +1879,13 @@
                   <span class="sd-battle-num sd-num shadow" id="sd-battle-shadow">0</span>
                 </div>
               </div>
-              
+
               <div class="sd-battle-pills">
                 <span class="sd-row-label" id="shadow-duel">Leader: Even</span>
                 <span class="sd-battle-pill-label">win ladder</span>
                 <span class="sd-battle-pill"><span id="shadow-win-ladder">3/5: 0/3 · 5/7: 0/5</span></span>
               </div>
-              
+
               <!-- Hidden to preserve original JS elements -->
               <div style="display:none;">
                 <div id="shadow-duel-you-fill"></div>
@@ -1897,7 +1893,6 @@
               </div>
             </div>
           </div>
-          
         </div>
       </section>
 
