@@ -30,17 +30,19 @@ class TrainerEngine {
     const container = document.querySelector(".shadow-goal-list");
     if (container) {
       this._missionDelegateHandler = (e) => {
-        if (e.type === "change") {
-          const cb = e.target.closest(".mission-cascade-check");
-          if (cb && e.target.checked) this.triggerCascadeComplete(cb.getAttribute("data-slot-key"));
-        } else if (e.type === "click") {
+        if (e.type === "click") {
+          const circleBtn = e.target.closest(".mission-circle-btn");
+          if (circleBtn && !circleBtn.hasAttribute("disabled")) {
+            this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
+          }
           if (e.target.id === "btn-undo-cascade") this.undoCascade();
           if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
         }
       };
-      container.addEventListener("change", this._missionDelegateHandler);
+      // No longer need 'change' for checkboxes, just 'click' for circle buttons
       container.addEventListener("click", this._missionDelegateHandler);
     }
+
     this.refresh();
   }
 
@@ -1080,18 +1082,24 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
   _refreshSlotStatuses(cascade) {
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const realDate = this.app.getDateString(new Date());
+    const isFutureDay = (cascade.date || realDate) > realDate;
     
-    // Canonical slot times for checks
-    const SLOT_MAP = [
-      { key: "slot1", time: "04:00" },
-      { key: "slot2", time: "07:30" },
-      { key: "slot3", time: "16:00" },
-      { key: "static1", time: "06:15" },
-      { key: "static2", time: "11:00" },
-      { key: "static3", time: "19:30" },
-      { key: "static4", time: "21:45" },
-      { key: "static5", time: "23:30" }
-    ];
+    // Use dynamic times from TIMETABLE_LOGIC
+    const SLOT_MAP = [];
+    if (typeof TIMETABLE_LOGIC !== "undefined") {
+      TIMETABLE_LOGIC.forEach((slot, idx) => {
+        let finalKey;
+        if (slot.mapsTo === "learning") {
+           const learningSlots = TIMETABLE_LOGIC.filter(s => s.mapsTo === "learning");
+           const lIdx = learningSlots.indexOf(slot);
+           finalKey = `slot${lIdx + 1}`;
+        } else {
+           finalKey = `static${idx}`;
+        }
+        SLOT_MAP.push({ key: finalKey, time: slot.time });
+      });
+    }
 
     const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
@@ -1099,17 +1107,19 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       const slotMin = toMin(time);
       if (cascade.completion[key]) {
         cascade.slotStatus[key] = "completed";
-      } else if (nowMinutes > slotMin) {
+      } else if (!isFutureDay && nowMinutes > slotMin) {
         cascade.slotStatus[key] = "expired";
-      } else {
+      } else if (!isFutureDay && nowMinutes >= slotMin) {
         cascade.slotStatus[key] = "active";
+      } else {
+        cascade.slotStatus[key] = "pending";
       }
     });
 
-    // Mirror static statuses for the UI config
-    cascade.slotStatus.slot1 = cascade.slotStatus.slot1 || "active";
-    cascade.slotStatus.slot2 = cascade.slotStatus.slot2 || "active";
-    cascade.slotStatus.slot3 = cascade.slotStatus.slot3 || "active";
+    // Mirror statuses for UI rendering safety
+    ["slot1", "slot2", "slot3"].forEach(key => {
+        cascade.slotStatus[key] = cascade.slotStatus[key] || "pending";
+    });
   }
 
   // ── Cascade: save non-destructive snapshot before any mutation ──────────
@@ -1240,16 +1250,27 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       this._scheduleAutoExpiry(cascade);
 
       // Step 3: Slot display config
-      const SLOT_CONFIG = [
-        { slotKey: "slot1", time: "4:00 AM",  label: "Deep Work",       type: "learning" },
-        { slotKey: "static1", time: "6:15 AM", label: "Training",       type: "static"   },
-        { slotKey: "slot2", time: "7:30 AM",  label: "Deep Work",        type: "learning" },
-        { slotKey: "static2", time: "11:00 AM", label: "Build (Project)", type: "static"   },
-        { slotKey: "slot3", time: "4:00 PM",  label: "Learn",            type: "learning" },
-        { slotKey: "static3", time: "7:30 PM",  label: "Atomic Habits",    type: "static"   },
-        { slotKey: "static4", time: "9:45 PM",  label: "Revision",         type: "static"   },
-        { slotKey: "static5", time: "11:30 PM", label: "Sleep",            type: "static"   },
-      ];
+      const formatTime = (t) => {
+        const [h, m] = t.split(":").map(Number);
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 || 12;
+        return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+      };
+
+      const SLOT_CONFIG = [];
+
+      if (typeof TIMETABLE_LOGIC !== "undefined") {
+        let learningCount = 1;
+        TIMETABLE_LOGIC.forEach((slot, idx) => {
+          const type = slot.mapsTo === "learning" ? "learning" : "static";
+          SLOT_CONFIG.push({
+            slotKey: type === "learning" ? `slot${learningCount++}` : `static${idx}`,
+            time: slot.time,
+            label: slot.label,
+            type: type
+          });
+        });
+      }
 
       const container = document.querySelector(".shadow-goal-list");
       if (!container) return;
@@ -1258,43 +1279,63 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       let html = "";
       SLOT_CONFIG.forEach(slot => {
         const isLearning = slot.type === "learning";
-        const status = cascade.slotStatus[slot.slotKey] || "active";
+        const status = cascade.slotStatus[slot.slotKey] || "pending";
         const isDone = status === "completed";
         const isExp  = status === "expired";
         
         const opacity = isDone ? "0.4" : isExp ? "0.6" : "1";
         const filter  = isExp ? "grayscale(1)" : "none";
-        const color   = isDone ? "var(--success)" : isExp ? "var(--text-tertiary, #888)" : "var(--text-secondary)";
-        const icon    = isDone ? "✔" : isExp ? "○" : "●";
+        const color   = isDone ? "var(--success)" : isExp ? "var(--text-tertiary, #888)" : "var(--text-primary)";
+        const circleIcon = isDone ? "●" : "○";
 
         if (isLearning) {
           const taskObj = cascade.activeSlots[slot.slotKey];
           if (taskObj) {
             html += `
               <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}; transition: all 0.3s ease;">
-                <input class="mission-cascade-check" type="checkbox" data-slot-key="${slot.slotKey}"
-                  ${isDone ? "checked disabled" : ""}
-                  style="margin-right:8px;cursor:pointer;min-width:14px;min-height:14px;accent-color:var(--success);"/>
-                <span style="font-size:0.85rem;color:${color};">
-                  ${icon}&nbsp;${slot.time} → ${slot.label} 
-                  <span style="font-weight:500;">[${this.escapeHtml(taskObj.text)}]</span>
-                  <em style="font-size:0.7rem; margin-left:4px; opacity:0.6;">${status}</em>
-                </span>
+                <div style="display:flex; align-items:center;">
+                  <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
+                    data-slot-key="${slot.slotKey}" 
+                    ${isDone ? "disabled" : ""}>
+                    ${circleIcon}
+                  </button>
+                  <span style="font-size:0.85rem;color:${color};">
+                    ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
+                    <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
+                    <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
+                  </span>
+                </div>
               </div>`;
           } else {
             html += `
               <div class="sd-mission-item shadow-goal-item" style="opacity:0.35; filter:grayscale(1);">
-                <span style="font-size:0.85rem;color:var(--text-secondary);">○&nbsp;${slot.time} → ${slot.label} [Empty]</span>
+                <div style="display:flex; align-items:center;">
+                  <button class="mission-circle-btn" disabled>○</button>
+                  <span style="font-size:0.85rem;color:var(--text-tertiary);">
+                    ${formatTime(slot.time)} → ${slot.label} [Empty queue]
+                  </span>
+                </div>
               </div>`;
           }
         } else {
-          // Static slots also show expiry now
           html += `
-            <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}; padding-left:22px;">
-              <span style="font-size:0.85rem;color:${color};">${icon}&nbsp;${slot.time} → ${slot.label} <em style="font-size:0.7rem; opacity:0.5;">${status}</em></span>
+            <div class="sd-mission-item shadow-goal-item" style="opacity:${opacity}; filter:${filter}">
+              <div style="display:flex; align-items:center;">
+                <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
+                  data-slot-key="${slot.slotKey}" 
+                  ${isDone ? "disabled" : ""}>
+                  ${circleIcon}
+                </button>
+                <span style="font-size:0.85rem;color:${color};">
+                  ${formatTime(slot.time)} → ${slot.label} 
+                  <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
+                </span>
+              </div>
             </div>`;
         }
+
       });
+
 
       // Step 5: Single DOM write + persistent buttons
       const hasHistory = cascade.stateHistory?.length > 0;
@@ -1333,23 +1374,47 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     this._expiryTimers = [];
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    [
-      { key: "slot1", hour: 4,  min: 0  },
-      { key: "slot2", hour: 7,  min: 30 },
-      { key: "slot3", hour: 16, min: 0  },
-    ].forEach(({ key, hour, min }) => {
-      if (cascade.completion[key]) return;
-      const ms = ((hour * 60 + min) - nowMin) * 60000;
-      if (ms > 0) {
+
+    if (typeof TIMETABLE_LOGIC === "undefined") return;
+
+    const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+
+    TIMETABLE_LOGIC.forEach((slot, idx) => {
+      // Determine key for this slot
+      let key;
+      if (slot.mapsTo === "learning") {
+        const learningSlots = TIMETABLE_LOGIC.filter(s => s.mapsTo === "learning");
+        const lIdx = learningSlots.indexOf(slot);
+        key = `slot${lIdx + 1}`;
+      } else {
+        key = `static${idx}`;
+      }
+
+      const slotMin = toMin(slot.time);
+      const msUntilSlot = (slotMin - nowMin) * 60000;
+      
+      // Schedule re-render 1 minute after slot window passes to show 'Expired'
+      if (msUntilSlot > -60000 && msUntilSlot < 86400000) {
+        let delay = msUntilSlot + 1000; // +1s buffer
+        if (delay < 0) return; // already passed
+
         this._expiryTimers.push(setTimeout(() => {
           const c = this.ensureCascadeState();
           this._refreshSlotStatuses(c);
           this.app.saveToStorage("cascade_state", c);
           this.syncMissionFromRoadmap();
-        }, ms));
+        }, delay));
       }
     });
+
+    // Also schedule a re-render every minute for live time checks
+    this._expiryTimers.push(setInterval(() => {
+      const c = this.ensureCascadeState();
+      this._refreshSlotStatuses(c);
+      this.syncMissionFromRoadmap();
+    }, 60000));
   }
+
 
   updatePenaltyTimer() {
     const el = this.app.elements["roadmap-penalty-timer"];
@@ -1723,34 +1788,46 @@ Rules:
   }
 
   refresh() {
-    // ── SE2 Daily Cycle: Cache today's tasks ONCE for this cycle ──
-    const todayDate = this.app.getDateString(new Date());
-    this.todayTasksCache = (this.app.state.tasks || []).filter(t => t.date === todayDate);
+    // ── SE2 Daily Cycle: Use 'Logical Date' from cascade_state if available ──
+    const cascade = this.ensureCascadeState();
+    const logicalDate = cascade.date || this.app.getDateString(new Date());
+    const realDate = this.app.getDateString(new Date());
+    const isFutureDay = logicalDate > realDate;
+
+    this.todayTasksCache = (this.app.state.tasks || []).filter(t => t.date === logicalDate);
 
     // Step 2: analyzeBehavior — reads from BehaviorStore + shadowEngine
     const behaviorSnapshot = this.analyzeBehavior();
     const behavioralState = behaviorSnapshot.state;
 
     // ── Apply SE2 Timetable Shifting and Rerouting ──
+    // Shifting always happens toward IDEAL based on the logical context
     this.shiftTimetableTimes(behavioralState);
-    this.rerouteScheduleForToday();
+    
+    // Only reroute if we are actually ON the real date. 
+    // If we advanced to tomorrow, don't reroute yet.
+    if (!isFutureDay) {
+      this.rerouteScheduleForToday();
+    }
 
     // Step 4: applyCorrection
-    const timetable = this.evaluateTimetable(this.todayTasksCache, todayDate);
+    const timetable = this.evaluateTimetable(this.todayTasksCache, logicalDate);
     const sleepCompromised = timetable.sleepStatus === "COMPROMISED_OK";
 
     // Step 5: generateMissions
     const missionTargets = this.generateMissionTargets(behavioralState, sleepCompromised);
 
+
     // Step 6: applyRules
     this.computeFlexibilityBuffer();
 
-    // Step 7: Persist behavioral signals
-    if (this.app.shadowEngine?.behaviorStore) {
+    // Step 7: Persist behavioral signals (only if real-time today)
+    if (this.app.shadowEngine?.behaviorStore && !isFutureDay) {
       const todayMinutes = this.todayTasksCache.reduce((sum, t) => sum + (this.app.isProductiveCategory(t.category) ? t.duration : 0), 0);
       this.app.shadowEngine.updateBehaviorSignals(
-        todayDate,
+        logicalDate,
         todayMinutes,
+
         this.app.shadowEngine.shadowSevenDayAverage || 0,
       );
     }
@@ -1766,6 +1843,67 @@ Rules:
   showWindow() {
     this.refresh();
     this.app.elements["trainer-modal"].style.display = "flex";
+  }
+
+  autoFinalizeAtSleep() {
+    this._performDayFinalization();
+  }
+
+  triggerFinalizeDay() {
+    if (confirm("Finalize today's performance and generate tomorrow's schedule?")) {
+      this._performDayFinalization();
+    }
+  }
+
+  _performDayFinalization() {
+    const analysis = this.analyzeBehavior();
+    const { state: behavioralState } = analysis;
+    
+    // 1. Shift baseline timetable times for tomorrow
+    this.shiftTimetableTimes(behavioralState);
+
+    // 2. Unfinished Roadmap Task Carry-over (improve.md §8)
+    const cascade = this.ensureCascadeState();
+    const unfinishedTasks = [];
+    ["slot1", "slot2", "slot3"].forEach(key => {
+      // Re-add to queue if not completed and an actual task was assigned
+      if (!cascade.completion[key] && cascade.activeSlots[key]) {
+        unfinishedTasks.push(cascade.activeSlots[key]);
+      }
+    });
+
+    // Reset SE2 cascade for the new day
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = this.app.getDateString(tomorrow);
+    
+    const freshQueue = this.getFullRoadmapQueue();
+    // Unique carry-over (don't duplicate if already in queue)
+    const carriedQueue = [...unfinishedTasks];
+    freshQueue.forEach(t => {
+      const exists = carriedQueue.some(u => u.moduleIndex === t.moduleIndex && u.dayIndex === t.dayIndex);
+      if (!exists) carriedQueue.push(t);
+    });
+
+    const nextCascade = {
+      date: tomorrowStr,
+      roadmapQueue: carriedQueue,
+      activeSlots: {
+        slot1: carriedQueue[0] || null,
+        slot2: carriedQueue[1] || null,
+        slot3: carriedQueue[2] || null,
+      },
+      completion: { slot1: false, slot2: false, slot3: false },
+      slotStatus:  { slot1: "pending", slot2: "pending", slot3: "pending" },
+      stateHistory: [],
+    };
+    
+    this.app.saveToStorage("cascade_state", nextCascade);
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE, this.state);
+    
+    // 3. UI update
+    this.app.uiManager.showStreakPopup(this.app.state.streak);
+    this.refresh();
   }
 
   // SE2: ADVANCE TO NEXT DAY (manual trigger from Roadmap Console)

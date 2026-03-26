@@ -534,6 +534,38 @@
         height: 18px;
         accent-color: var(--success);
       }
+      .mission-circle-btn {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid var(--text-secondary);
+        background: transparent;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        padding: 0;
+        margin-right: 10px;
+        flex-shrink: 0;
+        font-size: 12px;
+        line-height: 1;
+        color: var(--text-secondary);
+        user-select: none;
+      }
+      .mission-circle-btn.done {
+        background: var(--success);
+        border-color: var(--success);
+        color: white;
+      }
+      .mission-circle-btn.expired {
+        border-color: var(--text-tertiary);
+        opacity: 0.6;
+      }
+      .mission-circle-btn:hover {
+        transform: scale(1.1);
+        border-color: var(--success);
+      }
       .shadow-goal-done {
         color: var(--success) !important;
       }
