@@ -362,7 +362,6 @@ class FirebaseCloudManager {
             completedDays: [],
           },
           revision: { status: "pending", timeSpent: 0 },
-          flowProtocol: this.app.flowEngine?.state || { byDate: {} },
           trainerState: this.app.trainerEngine?.state || {},
           shadowAvg: this.app.shadowEngine?.shadowSevenDayAverage || 0,
           updatedAt: Date.now(),
@@ -372,7 +371,6 @@ class FirebaseCloudManager {
     }
 
     const data = snap.exists() ? snap.data() || {} : {};
-    if (data.flowProtocol) this.app.flowEngine.state = data.flowProtocol;
     if (data.trainerState)
       this.app.trainerEngine.state = {
         ...this.app.trainerEngine.state,
@@ -404,7 +402,6 @@ class FirebaseCloudManager {
 
     this.app.shadowEngine.refresh(false);
     this.app.trainerEngine.refresh();
-    this.app.flowEngine.refresh();
     if (this.app.graphManager) this.app.graphManager.updateCharts();
   }
 
@@ -480,8 +477,6 @@ class FirebaseCloudManager {
       window.FirebaseServices.setDoc(ref, value || { modules: [], editMode: false }, { merge: true })
         .catch(e => console.warn("Roadmap sync failed", e));
     }
-    if (key === CONFIG.STORAGE_KEYS.FLOW_PROTOCOL)
-      patch.flowProtocol = value || { byDate: {} };
     if (key === CONFIG.STORAGE_KEYS.TRAINER_STATE) {
       patch.trainerState = value || {};
       // Fulfill explicit request to store daily mission per user safely
