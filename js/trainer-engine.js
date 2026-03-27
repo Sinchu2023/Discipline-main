@@ -1344,9 +1344,9 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         const isDone = status === "completed";
         const isExp = status === "expired";
 
-        const opacity = isDone ? "0.4" : isExp ? "0.35" : "1";
-        const filter = isExp ? "grayscale(1) contrast(0.5) brightness(0.6)" : "none";
-        const color = isDone ? "var(--success)" : isExp ? "#555" : "var(--text-primary)";
+        const opacity = isDone ? "0.4" : isExp ? "0.45" : "1";
+        const filter = isExp ? "grayscale(1) contrast(0.7) brightness(0.8)" : "none";
+        const color = isDone ? "var(--success)" : isExp ? "var(--text-tertiary)" : "var(--text-primary)";
         const circleIcon = isDone ? "●" : "○";
 
         if (isLearning) {
@@ -1363,7 +1363,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                     ${circleIcon}
                   </button>
                   <span class="mission-task-label" 
-                        style="font-size:0.85rem; color:${isExp ? "#555" : color}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
+                        style="font-size:0.85rem; color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
                         onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'"
                         data-label="${this.escapeHtml(slot.label)}" 
                         data-subtext="${this.escapeHtml(taskObj.text)}">
