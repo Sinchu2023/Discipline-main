@@ -159,43 +159,6 @@ class EventManager {
             this.app.taskManager.editingTaskId = null;
           });
 
-          // Global Mission Delegation (Bulletproof)
-          document.addEventListener("click", (e) => {
-            // 1. Mission button (Circle)
-            const circleBtn = e.target.closest(".mission-circle-btn");
-            if (circleBtn && !circleBtn.hasAttribute("disabled")) {
-              e.preventDefault();
-              e.stopPropagation();
-              
-              // Instant Visual Feedback
-              circleBtn.classList.add("clicked");
-              setTimeout(() => circleBtn.classList.remove("clicked"), 400);
-              
-              console.log("[EventManager] Mission click detected:", circleBtn.getAttribute("data-slot-key"));
-              this.app.trainerEngine.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
-              return;
-            }
-            
-            // 2. Mission Label (Auto-start stopwatch)
-            const missionLabel = e.target.closest(".mission-task-label");
-            if (missionLabel) {
-              const label = missionLabel.getAttribute("data-label");
-              const subtext = missionLabel.getAttribute("data-subtext");
-              if (this.app.stopwatch?.startTaskFromRoadmap) {
-                this.app.stopwatch.startTaskFromRoadmap(label, subtext);
-              }
-              return;
-            }
-            
-            // 3. Footer buttons
-            if (e.target.id === "btn-undo-cascade") { 
-              e.preventDefault(); 
-              this.app.trainerEngine.undoCascade(); 
-            }
-            if (e.target.id === "btn-finalize-day") { 
-              e.preventDefault(); 
-              this.app.trainerEngine.triggerFinalizeDay(); 
-            }
-          });
+          // Inline handlers are now used for 100% reliability in missions.
         }
       }
