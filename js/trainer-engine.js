@@ -27,14 +27,11 @@ class TrainerEngine {
   }
 
   initialize() {
-    // SE2: Expose a global, hyper-reliable marked-done function
-    window.SD_MARK_DONE = (slotKey, el) => {
-      if (el && !el.hasAttribute("disabled")) {
-        el.classList.add("clicked");
-        setTimeout(() => el.classList.remove("clicked"), 400);
-      }
-      this.triggerCascadeComplete(slotKey);
-    };
+    // SE2: Expose a global, hyper-reliable alias for direct access from HTML onclick
+    window.Trainer = this;
+    
+    // Compatibility: Also keep the previous helper for any existing references
+    window.SD_MARK_DONE = (slotKey, el) => this.triggerCascadeComplete(slotKey);
 
     this.refresh();
   }
@@ -1362,18 +1359,20 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
             const itemFilter = isExp ? "grayscale(1) brightness(0.7)" : filter;
             const itemOpacity = isExp ? 0.4 : opacity;
             listHtml += `
-              <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.3s ease;">
-                <div style="display:flex; align-items:center; padding: 4px 0;">
+              <div class="sd-mission-item shadow-goal-item ${isDone ? "item-done" : ""}" 
+                style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;"
+                onmouseover="this.style.background='rgba(40, 167, 69, 0.04)'; this.style.borderColor='rgba(40, 167, 69, 0.1)';" 
+                onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.03)';"
+                onclick="event.stopPropagation(); window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
+                <div style="display:flex; align-items:center; padding: 4px 0; pointer-events:none;">
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
-                    ${(isDone || isExp) ? "disabled" : ""}>
+                    ${(isDone || isExp) ? "disabled" : ""}
+                    tabindex="-1">
                     <span style="pointer-events:none;">${circleIcon}</span>
                   </button>
                   <span class="mission-task-label" 
-                        style="font-size:0.85rem; color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'"
-                        data-label="${this.escapeHtml(slot.label)}" 
-                        data-subtext="${this.escapeHtml(taskObj.text)}">
+                        style="font-size:0.85rem; color:${isExp ? "var(--text-tertiary)" : color}; transition: all 0.2s; padding: 2px 6px; border-radius: 4px; pointer-events:none;">
                     ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
                     <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
                     ${taskObj.cascaded ? `<span style="font-size:0.6rem; color:var(--warning); margin-left:4px; border:1px solid var(--warning); padding:1px 4px; border-radius:3px; opacity:0.8;">CASCADED</span>` : ""}
@@ -1397,19 +1396,20 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           const itemOpacity = isExp ? 0.35 : opacity;
           const labelColor = isExp ? "var(--text-tertiary)" : color;
           listHtml += `
-            <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}">
-              <div style="display:flex; align-items:center;">
+            <div class="sd-mission-item shadow-goal-item" 
+              style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;"
+              onmouseover="this.style.background='rgba(40, 167, 69, 0.04)'; this.style.borderColor='rgba(40, 167, 69, 0.1)';" 
+              onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.03)';"
+              onclick="event.stopPropagation(); window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
+              <div style="display:flex; align-items:center; pointer-events:none;">
                 <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                   data-slot-key="${slot.slotKey}" 
                   ${(isDone || isExp) ? "disabled" : ""}
-                  onclick="SD_MARK_DONE('${slot.slotKey}', this)">
+                  tabindex="-1">
                   <span style="pointer-events:none;">${circleIcon}</span>
                 </button>
                 <span class="mission-task-label" 
-                      style="font-size:0.85rem; color:${labelColor}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
-                      onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'"
-                      data-label="${this.escapeHtml(slot.label)}" 
-                      data-subtext="">
+                      style="font-size:0.85rem; color:${labelColor}; transition: all 0.2s; padding: 2px 6px; border-radius: 4px; pointer-events:none;">
                   ${formatTime(slot.time)} → ${slot.label} 
                   <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
                 </span>
@@ -1427,11 +1427,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                    border:1px solid var(--border); border-radius:4px; font-size:0.7rem;
                    cursor:${hasHistory ? "pointer" : "default"}; opacity:${hasHistory ? 1 : 0.4};"
             ${hasHistory ? "" : "disabled"}
-            onclick="app.trainerEngine.undoCascade()">↩ Undo</button>
+            onclick="window.Trainer.undoCascade()">↩ Undo</button>
           <button id="btn-finalize-day"
             style="flex:1; padding:6px; background:var(--bg-card); color:var(--success);
                    border:1px solid var(--success); border-radius:4px; font-size:0.75rem; cursor:pointer;"
-            onclick="app.trainerEngine.triggerFinalizeDay()">
+            onclick="window.Trainer.triggerFinalizeDay()">
             Finalize Day & Next Schedule
           </button>
         </div>`;
