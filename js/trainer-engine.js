@@ -1363,16 +1363,16 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                 style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;"
                 onmouseover="this.style.background='rgba(40, 167, 69, 0.04)'; this.style.borderColor='rgba(40, 167, 69, 0.1)';" 
                 onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.03)';"
-                onclick="event.stopPropagation(); window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
-                <div style="display:flex; align-items:center; padding: 4px 0; pointer-events:none;">
+                onclick="window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
+                <div style="display:flex; align-items:center; padding: 4px 0;">
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
                     ${(isDone || isExp) ? "disabled" : ""}
-                    tabindex="-1">
+                    onclick="event.stopPropagation(); window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
                     <span style="pointer-events:none;">${circleIcon}</span>
                   </button>
                   <span class="mission-task-label" 
-                        style="font-size:0.85rem; color:${isExp ? "var(--text-tertiary)" : color}; transition: all 0.2s; padding: 2px 6px; border-radius: 4px; pointer-events:none;">
+                        style="font-size:0.85rem; color:${isExp ? "var(--text-tertiary)" : color}; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;">
                     ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
                     <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
                     ${taskObj.cascaded ? `<span style="font-size:0.6rem; color:var(--warning); margin-left:4px; border:1px solid var(--warning); padding:1px 4px; border-radius:3px; opacity:0.8;">CASCADED</span>` : ""}
@@ -1400,16 +1400,16 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
               style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;"
               onmouseover="this.style.background='rgba(40, 167, 69, 0.04)'; this.style.borderColor='rgba(40, 167, 69, 0.1)';" 
               onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.03)';"
-              onclick="event.stopPropagation(); window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
-              <div style="display:flex; align-items:center; pointer-events:none;">
+              onclick="window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
+              <div style="display:flex; align-items:center;">
                 <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                   data-slot-key="${slot.slotKey}" 
                   ${(isDone || isExp) ? "disabled" : ""}
-                  tabindex="-1">
+                  onclick="event.stopPropagation(); window.Trainer.triggerCascadeComplete('${slot.slotKey}')">
                   <span style="pointer-events:none;">${circleIcon}</span>
                 </button>
                 <span class="mission-task-label" 
-                      style="font-size:0.85rem; color:${labelColor}; transition: all 0.2s; padding: 2px 6px; border-radius: 4px; pointer-events:none;">
+                      style="font-size:0.85rem; color:${labelColor}; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;">
                   ${formatTime(slot.time)} → ${slot.label} 
                   <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
                 </span>

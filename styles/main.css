@@ -831,7 +831,6 @@ header {
 .sd-bottom-grid > * {
   min-width: 0;
   width: 100%;
-  overflow: hidden;
 }
 .sd-bot-panel {
   background: linear-gradient(145deg, rgba(25, 25, 25, 0.95), rgba(30, 30, 30, 0.95));
@@ -841,6 +840,7 @@ header {
   min-width: 0;
   box-sizing: border-box;
   width: 100%;
+  overflow: visible;
 }
 .sd-bot-panel.penalty {
   border: 1px solid rgba(220, 53, 69, 0.3);
