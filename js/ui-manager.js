@@ -81,6 +81,215 @@ class UIManager {
           const popup = this.app.elements["streak-popup"];
           if (popup) popup.style.display = "none";
         }
+        showYearlyReport(year = new Date().getFullYear()) {
+          const r = AnalyticsService.buildYearlyReport(this.app.state.tasks, year);
+          
+          // 1. Total Dashboard Header
+          const growthColor = r.growthScore >= 0 ? "var(--success)" : "var(--danger)";
+          const growthIcon = r.growthScore >= 0 ? "fa-arrow-up" : "fa-arrow-down";
+          
+          const dashboardHtml = `
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:2rem;">
+              <div class="stat-card">
+                <div class="stat-label">Total Annual Productive</div>
+                <div class="stat-value stat-productive">${this.app.formatDuration(r.totalProductive)}</div>
+                <div style="font-size:0.85rem; color:${growthColor};"><i class="fas ${growthIcon}"></i> ${Math.abs(r.growthScore).toFixed(1)}% vs H1</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Total Annual Sleep</div>
+                <div class="stat-value stat-sleep">${this.app.formatDuration(r.totalSleep)}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Iron Streak</div>
+                <div class="stat-value stat-streak">${r.ironStreak} Days</div>
+                <div class="stat-label">Longest Consistent Focus</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Annual Efficiency</div>
+                <div class="stat-value stat-total">${((r.totalProductive / Math.max(1, r.totalMinutes - r.totalSleep)) * 100).toFixed(1)}%</div>
+              </div>
+            </div>
+          `;
+
+          // 2. Heatmap Rendering (365 Days)
+          const heatmapHtml = this.renderYearlyHeatmap(r.daily, year);
+
+          // 3. Monthly Trend Chart (SVG)
+          const trendHtml = this.renderMonthlyTrend(r.monthlyData);
+
+          // 4. Hall of Fame & Gateway
+          const goldenMonthName = new Date(year, r.goldenMonth?.month || 0).toLocaleString("default", { month: "long" });
+          const hallOfFameHtml = `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; margin-top:2rem;">
+              <div class="stat-card" style="background:rgba(255,193,7,0.05); border-color:rgba(255,193,7,0.2);">
+                <h4 style="color:var(--warning); margin-bottom:1rem;"><i class="fas fa-crown"></i> Hall of Fame</h4>
+                <div style="margin-bottom:0.8rem;"><strong>Golden Month:</strong> ${goldenMonthName} (${(r.goldenMonth?.ratio * 100).toFixed(1)}%)</div>
+                <div style="margin-bottom:0.8rem;"><strong>Most Focused Area:</strong> ${r.topCategory ? r.topCategory[0] : "N/A"}</div>
+                <div><strong>Annual Productivity:</strong> ${Math.round(r.totalProductive / 60)} Hours</div>
+              </div>
+              <div class="stat-card" style="background:rgba(220,53,45,0.05); border-color:rgba(220,53,45,0.2);">
+                <h4 style="color:var(--danger); margin-bottom:1rem;"><i class="fas fa-biohazard"></i> Gateway Activities</h4>
+                <ul style="list-style:none; font-size:0.9rem;">
+                  ${r.topGateways.map(([name, count]) => `<li style="margin-bottom:0.4rem; color:var(--text-secondary);">${name} <span style="float:right; color:var(--danger);">${count}x</span></li>`).join("")}
+                </ul>
+              </div>
+            </div>
+          `;
+
+          // 5. Correlation Analysis
+          const correlationHtml = `
+            <div style="margin-top:2rem; padding:1.5rem; background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid var(--border);">
+              <h4 style="margin-bottom:1rem;"><i class="fas fa-project-diagram"></i> Sleep vs. Productivity Correlation</h4>
+              <p style="font-size:0.85rem; color:var(--text-tertiary); margin-bottom:1rem;">Analyzing how your sleep on Night N impacts your productive focus on Day N+1.</p>
+              ${this.renderCorrelationChart(r.correlations)}
+            </div>
+          `;
+
+          const contentEl = this.app.elements["report-content"];
+          if (contentEl) {
+            contentEl.innerHTML = `
+              <h2 style="margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">${year} Annual Performance Audit</h2>
+              ${dashboardHtml}
+              <h4 style="margin-bottom:1rem;"><i class="fas fa-th"></i> 365-Day Productivity Heatmap</h4>
+              ${heatmapHtml}
+              <h4 style="margin-top:2rem; margin-bottom:1rem;"><i class="fas fa-chart-bar"></i> Monthly Productivity Trends</h4>
+              ${trendHtml}
+              ${hallOfFameHtml}
+              ${correlationHtml}
+            `;
+          }
+
+          const modal = this.app.elements["report-modal"];
+          if (modal) {
+            modal.style.display = "flex";
+            // Scroll to top
+            modal.querySelector(".modal").scrollTop = 0;
+          }
+        }
+
+        renderYearlyHeatmap(daily, year) {
+          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const daysPerRow = 7;
+          const cellSize = 12;
+          const gap = 3;
+          
+          let svgContent = "";
+          
+          // Generate days of the year
+          const startDate = new Date(year, 0, 1);
+          const startDayOfWeek = startDate.getDay(); // 0(Sun) to 6(Sat)
+          
+          // We'll align it so each column is a week
+          // GitHub style: Rows = Day of week (Sun-Sat), Columns = Weeks
+          
+          for (let week = 0; week <= 53; week++) {
+            for (let day = 0; day < 7; day++) {
+              const currentDayOffset = week * 7 + day - startDayOfWeek;
+              const d = new Date(year, 0, 1 + currentDayOffset);
+              
+              if (d.getFullYear() !== year) continue;
+              
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              const data = daily[dateStr] || { productive: 0 };
+              const hours = data.productive / 60;
+              
+              let color = "rgba(42, 42, 42, 0.4)"; // Empty
+              if (hours > 0) color = "rgba(40, 167, 69, 0.2)";
+              if (hours >= 2) color = "rgba(40, 167, 69, 0.4)";
+              if (hours >= 4) color = "rgba(40, 167, 69, 0.7)";
+              if (hours >= 7) color = "rgba(40, 167, 69, 1.0)";
+              
+              const x = week * (cellSize + gap);
+              const y = day * (cellSize + gap);
+              
+              svgContent += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" fill="${color}" rx="2" title="${dateStr}: ${hours.toFixed(1)}h">
+                <title>${dateStr}: ${hours.toFixed(1)}h</title>
+              </rect>`;
+            }
+          }
+          
+          return `
+            <div style="overflow-x:auto; padding:10px; background:rgba(0,0,0,0.2); border-radius:8px;">
+              <svg width="${54 * (cellSize + gap)}" height="${7 * (cellSize + gap)}" style="display:block;">
+                ${svgContent}
+              </svg>
+            </div>
+          `;
+        }
+
+        renderMonthlyTrend(monthlyData) {
+          const maxProd = Math.max(...monthlyData.map(m => m.productive), 1);
+          const height = 150;
+          const barWidth = 40;
+          const gap = 15;
+          const totalWidth = 12 * (barWidth + gap);
+          
+          let bars = "";
+          monthlyData.forEach((m, i) => {
+            const h = (m.productive / maxProd) * height;
+            const x = i * (barWidth + gap);
+            const y = height - h;
+            const monthLabel = new Date(2024, i).toLocaleString("default", { month: "short" });
+            
+            bars += `
+              <rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="var(--primary)" rx="4" opacity="0.8">
+                <title>${this.app.formatDuration(m.productive)}</title>
+              </rect>
+              <text x="${x + barWidth/2}" y="${height + 15}" fill="var(--text-tertiary)" font-size="10" text-anchor="middle">${monthLabel}</text>
+            `;
+          });
+          
+          return `
+            <div style="overflow-x:auto; padding:20px 0;">
+              <svg width="${totalWidth}" height="${height + 25}" style="overflow:visible;">
+                ${bars}
+              </svg>
+            </div>
+          `;
+        }
+
+        renderCorrelationChart(correlations) {
+          // Simple visualization: Group sleep into bands and show average productive next day
+          const bands = {
+             "<5h": { sum: 0, count: 0 },
+             "5-6h": { sum: 0, count: 0 },
+             "6-7h": { sum: 0, count: 0 },
+             "7-8h": { sum: 0, count: 0 },
+             ">8h": { sum: 0, count: 0 }
+          };
+          
+          correlations.forEach(c => {
+            const h = c.sleep / 60;
+            let band = "";
+            if (h < 5) band = "<5h";
+            else if (h < 6) band = "5-6h";
+            else if (h < 7) band = "6-7h";
+            else if (h < 8) band = "7-8h";
+            else band = ">8h";
+            
+            bands[band].sum += c.productiveNextDay;
+            bands[band].count++;
+          });
+          
+          const rows = Object.entries(bands).map(([label, data]) => {
+            const avg = data.count > 0 ? data.sum / data.count : 0;
+            const width = Math.min(100, (avg / 600) * 100); // Scale to 10h (600m)
+            return `
+              <div style="margin-bottom:0.8rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.3rem;">
+                  <span>${label} Sleep</span>
+                  <span>${this.app.formatDuration(avg)} productive focus</span>
+                </div>
+                <div style="height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
+                  <div style="width:${width}%; height:100%; background:var(--primary); transition:width 1s ease;"></div>
+                </div>
+              </div>
+            `;
+          }).join("");
+          
+          return `<div>${rows}</div>`;
+        }
+
         showReport() {
           const now = new Date();
           const r = AnalyticsService.buildMonthlyReport(

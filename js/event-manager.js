@@ -33,6 +33,9 @@ class EventManager {
           this.app.elements["view-report"].addEventListener("click", () =>
             this.app.uiManager.showReport(),
           );
+          this.app.elements["view-yearly-report"].addEventListener("click", () =>
+            this.app.uiManager.showYearlyReport(),
+          );
           this.app.elements["open-trainer"].addEventListener("click", () => {
             this.app.trainerEngine.showWindow();
             const keyInput = this.app.elements["gemini-api-key"];

@@ -62,6 +62,7 @@ class DisciplineTracker {
             "streak-message",
             "close-streak",
             "view-report",
+            "view-yearly-report",
             "export-data",
             "import-data",
             "import-file",

@@ -183,6 +183,125 @@ class AnalyticsService {
           return best;
         }
 
+        static buildYearlyReport(tasks, year) {
+          const yearTasks = tasks.filter((t) => {
+            const d = new Date(t.startTime);
+            return d.getFullYear() === year;
+          });
+
+          const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+            month: i,
+            productive: 0,
+            sleep: 0,
+            waste: 0,
+          }));
+
+          const daily = {};
+          
+          yearTasks.forEach((t) => {
+            const d = new Date(t.startTime);
+            const m = d.getMonth();
+            const dateStr = t.date;
+
+            if (!daily[dateStr]) {
+              daily[dateStr] = { productive: 0, sleep: 0, waste: 0, total: 0 };
+            }
+
+            if (PRODUCTIVE_CATEGORIES.has(t.category)) {
+              monthlyData[m].productive += t.duration;
+              daily[dateStr].productive += t.duration;
+            } else if (t.category === "Sleep") {
+              monthlyData[m].sleep += t.duration;
+              daily[dateStr].sleep += t.duration;
+            } else if (t.category === "Time Waste / Distraction") {
+              monthlyData[m].waste += t.duration;
+              daily[dateStr].waste += t.duration;
+            }
+            daily[dateStr].total += t.duration;
+          });
+
+          // Inferred waste
+          let totalInferredWaste = 0;
+          Object.values(daily).forEach((day) => {
+            const inferred = Math.max(0, 1440 - Math.min(1440, day.total));
+            day.waste += inferred;
+            day.total += inferred;
+            totalInferredWaste += inferred;
+          });
+
+          const totalProductive = monthlyData.reduce((a, b) => a + b.productive, 0);
+          const totalSleep = monthlyData.reduce((a, b) => a + b.sleep, 0);
+          const totalWaste = monthlyData.reduce((a, b) => a + b.waste, 0) + totalInferredWaste;
+
+          // Golden Month
+          const goldenMonth = [...monthlyData]
+            .map(m => ({
+                ...m,
+                ratio: m.productive / Math.max(1, (m.productive + m.waste))
+            }))
+            .sort((a, b) => b.ratio - a.ratio)[0];
+
+          // Most Focused Category
+          const focusedBreakdown = AnalyticsService.breakdown(yearTasks, "Productive Work");
+          const topCategory = Object.entries(focusedBreakdown).sort((a, b) => b[1] - a[1])[0];
+
+          // Iron Streak
+          let currentStreak = 0;
+          let maxStreak = 0;
+          const sortedDates = Object.keys(daily).sort();
+          sortedDates.forEach((date) => {
+            if (daily[date].productive >= CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES) {
+              currentStreak++;
+              maxStreak = Math.max(maxStreak, currentStreak);
+            } else {
+              currentStreak = 0;
+            }
+          });
+
+          // Sleep vs Work Correlation
+          const correlations = [];
+          for (let i = 0; i < sortedDates.length - 1; i++) {
+            correlations.push({
+              sleep: daily[sortedDates[i]].sleep,
+              productiveNextDay: daily[sortedDates[i + 1]].productive,
+            });
+          }
+
+          // Growth Score (H2 vs H1)
+          const h1Prod = monthlyData.slice(0, 6).reduce((a, b) => a + b.productive, 0);
+          const h2Prod = monthlyData.slice(6).reduce((a, b) => a + b.productive, 0);
+          const growthScore = h1Prod > 0 ? ((h2Prod - h1Prod) / h1Prod) * 100 : 0;
+
+          // Gateway Activities
+          const gateways = {};
+          const sortedTasks = [...yearTasks].sort((a, b) => a.startTime - b.startTime);
+          for (let i = 0; i < sortedTasks.length - 1; i++) {
+            const curr = sortedTasks[i];
+            const next = sortedTasks[i+1];
+            if (PRODUCTIVE_CATEGORIES.has(curr.category) && next.category === "Time Waste / Distraction") {
+              const key = `${curr.subcategory} → ${next.subcategory}`;
+              gateways[key] = (gateways[key] || 0) + 1;
+            }
+          }
+          const topGateways = Object.entries(gateways).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+          return {
+            year,
+            totalProductive,
+            totalSleep,
+            totalWaste,
+            totalMinutes: totalProductive + totalSleep + totalWaste,
+            monthlyData,
+            daily,
+            goldenMonth,
+            topCategory,
+            ironStreak: maxStreak,
+            correlations,
+            growthScore,
+            topGateways
+          };
+        }
+
         static buildSleepInsights(tasks) {
           const today = new Date();
           const daily = new Map();
