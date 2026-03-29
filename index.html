@@ -538,6 +538,41 @@
       .shadow-goal-done {
         color: var(--success) !important;
       }
+      /* §16 – expired: time window passed, task not completed */
+      .mission-expired {
+        opacity: 0.45;
+        text-decoration: line-through;
+        color: #666 !important;
+        pointer-events: none;
+      }
+      .mission-expired .mission-check {
+        pointer-events: none;
+        opacity: 0.3;
+      }
+      /* time badge shown next to each mission */
+      .mission-time-badge {
+        font-size: 0.72rem;
+        color: var(--text-muted, #888);
+        margin-left: 4px;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      .mission-expired .mission-time-badge {
+        color: #555;
+      }
+      /* active (within window) pulse dot */
+      .mission-active-now::before {
+        content: "●";
+        color: var(--success);
+        margin-right: 4px;
+        animation: mission-pulse 1.4s ease-in-out infinite;
+        display: inline-block;
+      }
+      @keyframes mission-pulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
+      }
+
       .shadow-gap-positive {
         color: var(--danger);
       }
@@ -1835,6 +1870,31 @@
         CLIENT_VERSION: "2026.03.12.3",
         DAILY_PRODUCTIVITY_THRESHOLD_MINUTES: 240,
         DISTRACTION_BUDGET_MINUTES: 90,
+
+        // ── Shadow Engine 2.0 constants (§6 of improve.md) ──────────────────
+        LEARNING_RATE_FAILURE_SEVERE:   0.1,   // RECOVERY state
+        LEARNING_RATE_FAILURE_MODERATE: 0.2,   // moderate slippage
+        LEARNING_RATE_STABLE:           0.3,   // STABLE / GROWTH state
+        EFFORT_SUCCESS_THRESHOLD:       0.7,   // actual/target >= 0.7 = success
+        FLEXIBLE_TASK_MULTIPLIER:       1.5,   // buffer for flexible tasks
+        MAX_DAILY_SHIFT_MINUTES:        30,    // max schedule shift per day
+        MIN_SLEEP_MINUTES:              360,   // 6 h absolute floor
+        MAX_SLEEP_COMPROMISES_PER_7_DAYS: 2,
+
+        // Ideal target times (used by time-shift engine)
+        IDEAL_WAKE_HOUR:       6,   // 06:00 AM
+        IDEAL_SLEEP_HOUR:      23,  // 11:00 PM
+        IDEAL_DEEP_WORK_HOUR:  8,   // 08:00 AM
+
+        // Mission time-windows for expiry logic (24-h, [startH, endH])
+        MISSION_TIME_WINDOWS: {
+          learning:  [9,  13],  // 09:00 – 13:00
+          project:   [14, 18],  // 14:00 – 18:00
+          revision:  [19, 21],  // 19:00 – 21:00
+          default:   [8,  22],
+        },
+        // ────────────────────────────────────────────────────────────────────
+
         STORAGE_KEYS: {
           TASKS: "discipline_tracker_tasks",
           FAVORITES: "discipline_tracker_favorites",
@@ -1852,6 +1912,7 @@
           FIREBASE_USER: "discipline_tracker_firebase_user",
           CLIENT_VERSION: "discipline_tracker_client_version",
           TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
+          SHADOW_ENGINE_STATE: "discipline_tracker_shadow_engine_state",
         },
         MOTIVATION_INTERVAL: 15000,
         CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
@@ -4525,6 +4586,115 @@
           return series;
         }
 
+        // ══════════════════════════════════════════════════════════════════
+        // §7  Phase 2 — Behavioral State Detection
+        // Returns: 'RECOVERY' | 'STABLE' | 'GROWTH'
+        // ══════════════════════════════════════════════════════════════════
+        detectBehavioralState() {
+          const series7 = [];
+          const dailyMap = this.getDailyProductiveMap();
+          const today = new Date(this.app.getDateString());
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            series7.push(dailyMap.get(this.app.getDateString(d)) || 0);
+          }
+          const target = Math.max(1, this.shadowSevenDayAverage || 120);
+          // ratio = how many minutes completed vs target, average over 7 days
+          const avgRatio = series7.reduce((s, m) => s + m / target, 0) / 7;
+          // success = days where actual/target >= EFFORT_SUCCESS_THRESHOLD
+          const successDays = series7.filter(m => m / target >= CONFIG.EFFORT_SUCCESS_THRESHOLD).length;
+          // momentum: last3 > prev3?
+          const last3 = series7.slice(4).reduce((s, v) => s + v, 0) / 3;
+          const prev3 = series7.slice(0, 3).reduce((s, v) => s + v, 0) / 3;
+
+          let state;
+          if (avgRatio < 0.6 || successDays <= 2) {
+            state = "RECOVERY";
+          } else if (avgRatio >= 0.9 && last3 >= prev3 && successDays >= 5) {
+            state = "GROWTH";
+          } else {
+            state = "STABLE";
+          }
+
+          // store for other methods to consume
+          this._behavioralState = state;
+          return state;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // §3/4  Phase 3 — Progressive Time-Shift Engine
+        // Shifts currentHour toward idealHour using learning_rate.
+        // Cap: MAX_DAILY_SHIFT_MINUTES. Returns next hour (fractional).
+        // ══════════════════════════════════════════════════════════════════
+        applyTimeShift(currentHour, idealHour, state) {
+          const rates = {
+            RECOVERY: CONFIG.LEARNING_RATE_FAILURE_SEVERE,   // 0.1
+            STABLE:   CONFIG.LEARNING_RATE_STABLE,           // 0.3
+            GROWTH:   CONFIG.LEARNING_RATE_STABLE,           // 0.3
+          };
+          const rate = rates[state] || CONFIG.LEARNING_RATE_STABLE;
+          const rawShift = (idealHour - currentHour) * rate;   // hours
+          const maxShiftH = CONFIG.MAX_DAILY_SHIFT_MINUTES / 60;
+          const clampedShift = Math.sign(rawShift) * Math.min(Math.abs(rawShift), maxShiftH);
+          return currentHour + clampedShift;
+        }
+
+        // Compute recommended schedule targets for today
+        // Returns { wakeHour, sleepHour, deepWorkHour, state }
+        computeAdaptiveSchedule() {
+          const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+          const state  = this.detectBehavioralState();
+          // fallback to ideal if no history
+          const currentWake     = stored.wakeHour     ?? CONFIG.IDEAL_WAKE_HOUR;
+          const currentSleep    = stored.sleepHour    ?? CONFIG.IDEAL_SLEEP_HOUR;
+          const currentDeepWork = stored.deepWorkHour ?? CONFIG.IDEAL_DEEP_WORK_HOUR;
+
+          const nextWake     = this.applyTimeShift(currentWake,     CONFIG.IDEAL_WAKE_HOUR,      state);
+          const nextSleep    = this.applyTimeShift(currentSleep,    CONFIG.IDEAL_SLEEP_HOUR,     state);
+          const nextDeepWork = this.applyTimeShift(currentDeepWork, CONFIG.IDEAL_DEEP_WORK_HOUR, state);
+
+          const schedule = { wakeHour: nextWake, sleepHour: nextSleep, deepWorkHour: nextDeepWork, state };
+          this.app.saveToStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE, { ...stored, ...schedule });
+          return schedule;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // §10  Phase 4 — Sleep Compromise Tracker
+        // ══════════════════════════════════════════════════════════════════
+        getSleepCompromiseData() {
+          const today = new Date(this.app.getDateString());
+          const results = [];
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const ds = this.app.getDateString(d);
+            const sleepTasks = this.app.state.tasks.filter(t => t.date === ds && t.category === "Sleep");
+            const totalSleep = sleepTasks.reduce((s, t) => s + t.duration, 0);
+            const compromised = totalSleep > 0 && totalSleep < CONFIG.MIN_SLEEP_MINUTES;
+            results.push({ date: ds, totalSleep, compromised });
+          }
+          return results;
+        }
+
+        countSleepCompromisesLast7() {
+          return this.getSleepCompromiseData().filter(d => d.compromised).length;
+        }
+
+        // Returns load multiplier (1.0 normal, 0.85 if yesterday was compromised)
+        getTodayLoadMultiplier() {
+          const data = this.getSleepCompromiseData();
+          const yesterday = data[data.length - 2]; // index 5 = yesterday
+          if (yesterday?.compromised) return 0.85; // §10: reduce 15% next day
+          return 1.0;
+        }
+
+        // Is another sleep compromise allowed today?
+        sleepCompromiseAllowed() {
+          const count = this.countSleepCompromisesLast7();
+          return count < CONFIG.MAX_SLEEP_COMPROMISES_PER_7_DAYS;
+        }
+
         computeRollingMetrics() {
           const series = this.buildDailyProductiveSeries();
           if (!series.length)
@@ -5627,8 +5797,50 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           ].slice(0, 4);
         }
 
+        // ── §16/17/18: resolve time-window for a mission item ─────────────
+        getMissionTimeWindow(item) {
+          const wins = CONFIG.MISSION_TIME_WINDOWS;
+          if (item.type === "learning") return wins.learning;
+          if (item.type === "project")  return wins.project;
+          if (item.type === "revision") return wins.revision;
+          return wins.default;
+        }
+
+        // §16: format time like "9–13h" for the badge
+        formatTimeWindow([startH, endH]) {
+          const fmt = h => `${h < 10 ? "0" : ""}${h}:00`;
+          return `${fmt(startH)}–${fmt(endH)}`;
+        }
+
+        // §16/18: apply live time-based state to every mission row
+        // Only toggles CSS classes — never replaces innerHTML.
+        applyMissionTimeStates(container) {
+          if (!container) return;
+          const now = new Date();
+          const nowH = now.getHours() + now.getMinutes() / 60;
+          container.querySelectorAll(".shadow-goal-item[data-win-start]").forEach(el => {
+            const startH = parseFloat(el.dataset.winStart);
+            const endH   = parseFloat(el.dataset.winEnd);
+            const done   = el.classList.contains("shadow-goal-done");
+            const expired = !done && nowH > endH;
+            const active  = !done && nowH >= startH && nowH <= endH;
+            el.classList.toggle("mission-expired",     expired);
+            el.classList.toggle("mission-active-now",  active && !expired && !done);
+          });
+        }
+
+        // §16/17: start (or restart) the 30-second live-update loop.
+        // Separated from structural re-render per §17.
+        startMissionLiveLoop() {
+          if (this._missionLiveLoopId) clearInterval(this._missionLiveLoopId);
+          this._missionLiveLoopId = setInterval(() => {
+            const container = document.querySelector(".shadow-goal-list");
+            this.applyMissionTimeStates(container);
+          }, 30000);
+        }
+
         syncMissionFromRoadmap() {
-          const tasks = this.getDailyMissionTasks();
+          const tasks     = this.getDailyMissionTasks();
           const container = document.querySelector(".shadow-goal-list");
           if (!container) return;
 
@@ -5639,31 +5851,59 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             "mission-task-4",
           ];
           const checks = this.getTodayManualMissionChecks();
+          const now    = new Date();
+          const nowH   = now.getHours() + now.getMinutes() / 60;
+
+          // ── §16: full structural render with time badges ──────────────────
           container.innerHTML = tasks
             .map((item, idx) => {
-              const autoDone = !!item.done;
-              const checkId = this.getMissionCheckId(item.topic);
+              const autoDone  = !!item.done;
+              const checkId   = this.getMissionCheckId(item.topic);
               const manualDone = !!checks[checkId];
-              const done = autoDone || manualDone;
-              const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
-              const doneCls = done ? " shadow-goal-done" : "";
-              return `<div class="shadow-goal-item${doneCls}"><span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}</span><input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} /></div>`;
+              const done      = autoDone || manualDone;
+              const labelId   = idx < 4 ? ` id="${taskIds[idx]}"` : "";
+              const win       = this.getMissionTimeWindow(item);  // [startH, endH]
+              const [startH, endH] = win;
+
+              // derive initial CSS classes
+              const expired    = !done && nowH > endH;
+              const activeNow  = !done && !expired && nowH >= startH && nowH <= endH;
+              let cls = "shadow-goal-item";
+              if (done)      cls += " shadow-goal-done";
+              if (expired)   cls += " mission-expired";
+              if (activeNow) cls += " mission-active-now";
+
+              const badge = `<span class="mission-time-badge">${this.formatTimeWindow(win)}</span>`;
+              return `<div class="${cls}" data-win-start="${startH}" data-win-end="${endH}" data-check-id="${this.escapeHtml(checkId)}">` +
+                       `<span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}${badge}</span>` +
+                       `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} />` +
+                     `</div>`;
             })
             .join("");
 
+          // ── re-bind checkboxes (§18: checkbox state independent of expiry) ─
           container.querySelectorAll(".mission-check").forEach((checkbox) => {
             checkbox.addEventListener("change", (e) => {
               const checkId = e.target.getAttribute("data-mission-check-id");
               if (!checkId) return;
               checks[checkId] = !!e.target.checked;
-              e.target.closest(".shadow-goal-item")?.classList.toggle("shadow-goal-done", !!e.target.checked);
+              const row = e.target.closest(".shadow-goal-item");
+              if (row) {
+                row.classList.toggle("shadow-goal-done", !!e.target.checked);
+                // if now manually checked, clear expired visual
+                if (e.target.checked) row.classList.remove("mission-expired", "mission-active-now");
+              }
               this.saveTrainerState();
             });
           });
 
+          // ── §17: start live-time-state loop (separated from structural render)
+          this.startMissionLiveLoop();
+
+          // ── auto-complete active roadmap day via progress ─────────────────
           const active = this.getActiveRoadmapDay();
           if (active) {
-            const topic = (active.day.text || "").split("\n")[0].trim();
+            const topic    = (active.day.text || "").split("\n")[0].trim();
             const progress = this.getTopicProgress(topic);
             if (
               !active.day.completed &&
@@ -5879,11 +6119,143 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           }
         }
 
+        // ══════════════════════════════════════════════════════════════════
+        // §8  Phase 6 — Full 7-Step Daily Sequence Pipeline
+        // ══════════════════════════════════════════════════════════════════
+
+        // Step 1: read today's raw data
+        readTodayData() {
+          const today = this.app.getDateString(new Date());
+          const tasks = this.app.state.tasks.filter(t => t.date === today);
+          const sleepTasks = tasks.filter(t => t.category === "Sleep");
+          const prodTasks  = tasks.filter(t => this.app.isProductiveCategory(t.category));
+          const totalSleep    = sleepTasks.reduce((s, t) => s + t.duration, 0);
+          const totalProd     = prodTasks.reduce((s, t) => s + t.duration, 0);
+          const latestWake    = sleepTasks.length
+            ? Math.max(...sleepTasks.map(t => t.endTime))
+            : null;
+          return { today, tasks, totalSleep, totalProd, latestWake };
+        }
+
+        // Step 2: analyze behavior (skips, delays, completion ratio)
+        analyzeBehavior(todayData) {
+          const shadow = Math.max(1, this.app.shadowEngine?.shadowSevenDayAverage || 120);
+          const completionRatio = todayData.totalProd / shadow;
+          const skipCount = todayData.tasks.filter(t =>
+            t.category !== "Sleep" && t.duration === 0
+          ).length;
+          // check if user woke late vs adaptive schedule
+          const schedState = this.app.shadowEngine?.computeAdaptiveSchedule();
+          let wakeDelayMins = 0;
+          if (todayData.latestWake && schedState) {
+            const targetWakeMs = new Date().setHours(schedState.wakeHour, 0, 0, 0);
+            wakeDelayMins = Math.max(0, Math.round((todayData.latestWake - targetWakeMs) / 60000));
+          }
+          return { completionRatio, skipCount, wakeDelayMins, schedState };
+        }
+
+        // Step 3: detect behavioral state (delegates to ShadowEngine)
+        detectStateForSequence() {
+          return this.app.shadowEngine?.detectBehavioralState() || "STABLE";
+        }
+
+        // Step 4: apply corrections (load multiplier + schedule shift)
+        applyCorrection(state) {
+          const sleepMultiplier = this.app.shadowEngine?.getTodayLoadMultiplier() || 1.0;
+          const loadMultipliers = { RECOVERY: 0.8, STABLE: 1.0, GROWTH: 1.05 };
+          const stateMultiplier = loadMultipliers[state] || 1.0;
+          const effectiveLoad   = sleepMultiplier * stateMultiplier;
+          return { effectiveLoad, sleepMultiplier, stateMultiplier };
+        }
+
+        // Step 5: generate missions — adjusts threshold based on load
+        generateMissions(effectiveLoad) {
+          const missionTasks = this.getDailyMissionTasks();
+          return missionTasks.map(task => ({
+            ...task,
+            adjustedThreshold: Math.max(
+              15,
+              this.getThresholdForTopic(task.topic) * effectiveLoad
+            ),
+          }));
+        }
+
+        // Step 6: apply strict / flexible / sleep rules (§9, §10)
+        applyRules(missions, behaviorData) {
+          const compromisesLeft = CONFIG.MAX_SLEEP_COMPROMISES_PER_7_DAYS -
+            (this.app.shadowEngine?.countSleepCompromisesLast7() || 0);
+          // §11 anti-misuse: track how many missions used full 1.5x buffer
+          return missions.map(m => {
+            const progress  = this.getTopicProgress(m.topic);
+            const ratio     = progress.minutes / Math.max(1, m.adjustedThreshold);
+            // §9: strict tasks: delay >5 min = failure signal
+            const isStrict  = m.type === "learning";
+            const strictFail = isStrict && behaviorData.wakeDelayMins > 5;
+            // §11: detect flexibility abuse (ratio < 0.7 by buffer window end)
+            const abused = !isStrict && ratio < CONFIG.EFFORT_SUCCESS_THRESHOLD;
+            return { ...m, progress, ratio, strictFail, abused, compromisesLeft };
+          });
+        }
+
+        // Step 7: produce the final mission plan object
+        outputPlan(missions, state, correction, todayData) {
+          return {
+            state,
+            effectiveLoad: correction.effectiveLoad,
+            sleepStatus: {
+              totalSleep: todayData.totalSleep,
+              belowMin: todayData.totalSleep > 0 && todayData.totalSleep < CONFIG.MIN_SLEEP_MINUTES,
+              compromisesAllowed: this.app.shadowEngine?.sleepCompromiseAllowed() ?? true,
+            },
+            missions,
+            generatedAt: Date.now(),
+          };
+        }
+
+        // Full pipeline — run once per day (§17: separated from UI re-renders)
+        runDailySequence() {
+          const today = this.app.getDateString(new Date());
+          // §17: skip if already ran today
+          if (this._lastSequenceDate === today) return this._lastPlan || null;
+
+          const todayData    = this.readTodayData();                          // Step 1
+          const behaviorData = this.analyzeBehavior(todayData);               // Step 2
+          const state        = this.detectStateForSequence();                 // Step 3
+          const correction   = this.applyCorrection(state);                   // Step 4
+          const rawMissions  = this.generateMissions(correction.effectiveLoad); // Step 5
+          const finalMissions= this.applyRules(rawMissions, behaviorData);    // Step 6
+          const plan         = this.outputPlan(finalMissions, state, correction, todayData); // Step 7
+
+          this._lastSequenceDate = today;
+          this._lastPlan         = plan;
+
+          // §11 Phase 7: anti-misuse — count abused flexible tasks
+          this._flexAbuseDays = this._flexAbuseDays || 0;
+          const abuseCount = finalMissions.filter(m => m.abused && !m.isStrict).length;
+          if (abuseCount > 0) {
+            this._flexAbuseDays += 1;
+          } else {
+            this._flexAbuseDays = Math.max(0, this._flexAbuseDays - 1);
+          }
+          // §11: if abused 3+ days, tighten flexible multiplier
+          if (this._flexAbuseDays >= 3) {
+            // reduce buffer: approaching strict (1.0x instead of 1.5x)
+            const tighter = Math.max(1.0, CONFIG.FLEXIBLE_TASK_MULTIPLIER - 0.1 * this._flexAbuseDays);
+            this._antiMisuseMult = tighter;
+          } else {
+            this._antiMisuseMult = CONFIG.FLEXIBLE_TASK_MULTIPLIER;
+          }
+
+          return plan;
+        }
+
         refresh() {
           this.ensureRoadmap();
           this.renderRoadmap();
           this.syncMissionFromRoadmap();
           this.updatePenaltyTimer();
+          // §8/§17: run full pipeline once per calendar day, not on every render
+          this.runDailySequence();
         }
 
         showWindow() {

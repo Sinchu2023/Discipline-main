@@ -1,88 +1,170 @@
-### 10. Critical Fixes Required
+## Shadow Engine 2.0 — Master Implementation Prompt (Point-Wise)
+## **REMOVE THE ANDAVCED ANALYSIS OF SHADOW SECTION FROM FRONT END ANd backend it might be PRocessed if elements are required okay *
+### 1. Role
 
-The following issues must be fixed in the application.
+* Act as a senior system architect, behavioral scientist, and control-system engineer.
+* Design a deterministic self-learning discipline engine.
+* Do not behave like an AI assistant.
+* Work as a system designer.
 
----
+### 2. Core Objective
 
-### Cross-Device Timer Stop Synchronization
+* Track user behavior.
+* Learn patterns from history.
+* Adjust daily missions.
+* Gradually shift the user toward ideal habits.
+* Prevent burnout and misuse.
+* Keep the system deterministic and explainable.
 
-Currently the timer starts correctly across devices, but stopping the timer does not synchronize properly.
+### 3. Core Behavior Model
 
-Requirements:
+* The system must gradually shift the timetable toward an ideal schedule.
+* Never jump directly from current to ideal.
+* Always improve in small steps.
+* Use this model for sleep, wake, and deep work timing.
+* If the user fails, do not punish with a large rollback.
+* Apply a smaller adjustment instead.
 
-* When the timer is stopped on **any device**, it must stop immediately on **all other logged-in devices**.
-* The stop action must update the timer state in Firebase.
-* All devices must listen to the timer state using a realtime listener.
-* When the timer state changes to **stopped**, the local timer must stop immediately.
+### 4. Time Shifting Rule
 
-Important rule:
+* Use: `next_time = current_time + (ideal_time - current_time) * learning_rate`
+* Maximum shift per day must not exceed 30 minutes.
+* Use a smaller shift when the user is struggling.
+* Use a slightly larger shift when the user is improving, but still keep the limit.
 
-The UI must stop the timer **locally first**, then update Firebase asynchronously.
+### 5. Critical Design Rules
 
-Example flow:
+* No sudden correction jumps.
+* Behavior must depend on historical data.
+* Use strict mode for habits that require exact timing.
+* Use flexible mode for learning tasks that need buffers.
+* Use only rules and measurable signals.
+* Keep every output explainable.
 
-```
-User presses STOP
-→ local timer stops instantly
-→ Firebase timer state updated
-→ other devices receive snapshot
-→ their timers stop
-```
+### 6. Configuration Layer
 
-Do not wait for Firebase before stopping the timer locally.
+* Each task must include: discipline_type, estimated_minutes, target_minutes, priority.
+* Use these constants:
 
-Ensure snapshot listeners correctly detect changes in timer state.
+  * `LEARNING_RATE_FAILURE_SEVERE = 0.1`
+  * `LEARNING_RATE_FAILURE_MODERATE = 0.2`
+  * `LEARNING_RATE_STABLE = 0.3`
+  * `EFFORT_SUCCESS_THRESHOLD = 0.7`
+  * `FLEXIBLE_TASK_MULTIPLIER = 1.5`
+  * `MAX_DAILY_SHIFT_LIMIT = 30`
+  * `MIN_SLEEP_LIMIT` must exist
+  * `MAX_SLEEP_COMPROMISES_PER_7_DAYS = 2`
 
----
+### 7. Shadow Engine Logic
 
-### User-Specific Roadmaps
+* Treat success as non-binary.
+* A task succeeds when `actual / target >= 0.7`.
+* Detect behavioral states:
 
-Each user must have their **own independent roadmap**.
+  * RECOVERY
+  * STABLE
+  * GROWTH
+* Track sleep, delays, completion, skips, and time-of-day performance.
+* Derive energy map, resistance score, and success probability.
 
-Requirements:
+### 8. Trainer Engine Logic
 
-* A user's roadmap must never be visible to other users.
-* Roadmap data must be stored using the logged-in user's ID.
+* Apply progressive correction using: `next_target = current + (ideal - current) * learning_rate`.
+* Follow this daily sequence:
 
-Example structure:
+  1. readTodayData()
+  2. analyzeBehavior()
+  3. detectBehavioralState()
+  4. applyCorrection()
+  5. generateMissions()
+  6. applyRules()
+  7. output plan
+* In RECOVERY, reduce load and use smaller shifts.
+* In STABLE, maintain level and use moderate shifts.
+* In GROWTH, increase slightly and use slightly larger shifts.
 
-```
-users/{user.uid}/roadmap
-```
+### 9. Task Handling
 
-When a user logs in:
+* Strict tasks require fixed timing.
+* A delay greater than 5 minutes counts as failure for strict tasks.
+* Strict tasks include sleep timing, wake timing, and deep work start.
+* Flexible tasks allow buffer time.
+* Flexible tasks should use 1.5x to 2x estimated duration.
+* Flexible tasks should not get strict penalties for normal overruns.
 
-* Load only the roadmap belonging to that user.
-* Never load or display another user's roadmap.
+### 10. Sleep Control
 
----
+* Sleep compromise is allowed only when the task is high-value.
+* Sleep compromise is allowed only when effort is genuine.
+* Sleep compromise must not become frequent.
+* The system must never ignore `MIN_SLEEP_LIMIT`.
+* Limit compromise to 2 times per 7 days.
+* If sleep is compromised, mark it as `COMPROMISED_OK`.
+* Reduce the next day load by 15%.
 
-### Roadmap Not Generated State
+### 11. Anti-Misuse Logic
 
-If the user has not generated a roadmap yet, the application must clearly show:
+* If flexibility is abused, reduce flexibility.
+* If misuse continues, increase strictness automatically.
+* Protect the system from becoming too permissive.
 
-```
-Roadmap not generated yet
-```
+### 12. Decision Flow
 
-Requirements:
+* Load stored data.
+* Read today’s performance.
+* Compute trends.
+* Detect state.
+* Apply correction for time and workload.
+* Apply strict and flexible rules.
+* Apply sleep constraints.
+* Generate the next timetable and tasks.
+* Save state.
+* Output the mission plan.
 
-* When no roadmap exists in Firebase for the user, display a placeholder message.
-* Show a button allowing the user to generate their roadmap using AI.
-* Do not show another user's roadmap.
+### 13. Daily Update Logic
 
----
+* If failed, reduce load slightly and reduce shift size.
+* If stable, keep the level steady and make small improvements.
+* If improving, increase slightly and shift the timetable faster within limits.
+* If sleep is compromised, allow it only conditionally and reduce next day load.
 
-### Firebase Read/Write Optimization
+### 14. Final System Behavior
 
-The system must continue to minimize Firebase usage.
+* The system should behave like a coach adjusting the schedule daily.
+* The system should behave like a GPS rerouting habits gradually.
+* The system should behave like a control system moving toward the ideal state.
+* The system should not force sudden discipline.
+* The system should not punish harshly.
+* The system should not jump schedules.
 
-Rules:
+### 15. One-Line Philosophy
 
-* Timer must write to Firebase **only on start and stop events**.
-* Do not write timer updates every second.
-* Calculate elapsed time locally.
-* Avoid unnecessary snapshot listeners.
-* Ensure roadmap and favorites sync do not trigger excessive reads.
+* Move the user toward the ideal schedule step by step, never by force.
 
-The application must remain efficient enough to run continuously (24×7) within Firebase free tier limits.
+### 16. Mission UI Refresh and Expiry Logic
+
+* The Daily Mission UI must update immediately when the current time passes a task slot.
+* If a mission is not completed and its scheduled time has passed, mark it as expired and show it in grey.
+* The checkbox state must reflect the real completion state instantly.
+* Do not wait until the end of the day to change the UI color or status.
+* The mission list must re-render whenever time, completion state, or schedule state changes.
+* If a task is completed, the tick must appear immediately.
+* If a task is not completed by its time window, the task must grey out immediately.
+
+### 17. End-of-Day Schedule Generation
+
+* Do not regenerate the full timetable on every small time change.
+* Regenerate the next timetable only at the correct day boundary or when the user continues to the next cycle.
+* Mission UI state and timetable generation must be separated.
+* UI status updates should happen live.
+* Next-day roadmap generation should happen once after the day is finalized.
+
+### 18. Required Fix Behavior
+
+* The current issue is that the mission UI updates too slowly.
+* Fix the mission state flow so the visible mission list reflects current time without delay.
+* Ensure the grey state, checkbox state, and expired state are derived from live data and not from stale cached state.
+* Ensure the UI does not jump directly to the next task without first updating the current task status correctly.
+* Ensure the schedule remains visible and accurate throughout the day.
+######  tell me what is done and what is not 
+ tell me what is done and what is not 
