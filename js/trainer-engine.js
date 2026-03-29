@@ -1459,6 +1459,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         // We use a wrapper for the list to keep it separate from the footer
         container.innerHTML = `<div class="mission-list-content">${listHtml}</div><div class="mission-footer-content">${footerHtml}</div>`;
         container.setAttribute("data-last-list-html", listHtml);
+        this._bindMissionClickHandler(container);
       } else {
         // Only update the footer if list didn't change (e.g. undo state might have changed)
         const footerCont = container.querySelector(".mission-footer-content");
@@ -1474,6 +1475,22 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     } catch (err) {
       console.error("[_doSyncMission] failed:", err);
     }
+  }
+
+  _bindMissionClickHandler(container) {
+    if (!container) return;
+    if (container._missionClickHandlerBound) return;
+    container.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-mission-slot]");
+      if (!target) return;
+      const slotKey = target.getAttribute("data-mission-slot");
+      if (!slotKey) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      this.triggerCascadeComplete(slotKey);
+    });
+    container._missionClickHandlerBound = true;
   }
 
   // ── Auto-expiry: fires re-render at each slot's scheduled time ───────────
