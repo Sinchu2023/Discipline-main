@@ -34,12 +34,9 @@ class TrainerEngine {
         if (e.type === "click" || e.type === "dblclick") {
           const circleBtn = e.target.closest(".mission-circle-btn");
           if (circleBtn && !circleBtn.hasAttribute("disabled")) {
-            if (this._processingMission) return;
-            this._processingMission = true;
             e.preventDefault();
+            e.stopPropagation();
             this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
-            // Re-render will typically happen via refresh, which clears the flag
-            setTimeout(() => { this._processingMission = false; }, 300);
           }
           if (e.target.id === "btn-undo-cascade") { e.preventDefault(); this.undoCascade(); }
           if (e.target.id === "btn-finalize-day") { e.preventDefault(); this.triggerFinalizeDay(); }
@@ -1386,7 +1383,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
             const itemOpacity = isExp ? 0.4 : opacity;
             listHtml += `
               <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.3s ease;">
-                <div style="display:flex; align-items:center;">
+                <div style="display:flex; align-items:center; padding: 4px 0;">
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
                     ${(isDone || isExp) ? "disabled" : ""}>

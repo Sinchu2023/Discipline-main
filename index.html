@@ -511,9 +511,9 @@
         font-size: 0.86rem;
       }
       .shadow-goal-list {
-        margin-top: 0.6rem;
+        margin-top: 0.8rem;
         display: grid;
-        gap: 0.4rem;
+        gap: 0.8rem;
       }
       .shadow-goal-item {
         display: grid;
@@ -536,8 +536,8 @@
         accent-color: var(--success);
       }
       .mission-circle-btn {
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         border: 2px solid var(--text-secondary);
         background: transparent;
@@ -545,11 +545,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s ease;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         padding: 0;
-        margin-right: 10px;
+        margin-right: 12px;
         flex-shrink: 0;
-        font-size: 12px;
+        font-size: 14px;
         line-height: 1;
         color: var(--text-secondary);
         user-select: none;
@@ -558,6 +558,7 @@
         background: var(--success);
         border-color: var(--success);
         color: white;
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.4);
       }
       .mission-circle-btn.expired {
         border-color: var(--text-tertiary);
