@@ -3212,6 +3212,7 @@
         }
         getDateString(date = new Date()) {
           const d = new Date(date);
+          if (d.getHours() < 5) d.setDate(d.getDate() - 1); // Bind 12AM-5AM metrics natively to previous active day
           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         }
         getInferredWasteMinutesForDate(
@@ -5781,57 +5782,35 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             if (!learning.length) learning.push(active.day);
           }
 
-          const learningTasks = learning.slice(0, 2).map((day) => {
-            const topic = (day.text || "").split("\n")[0].trim();
-            const progress = this.getTopicProgress(topic);
-            const done = progress.minutes >= progress.threshold;
-            return {
-              type: "learning",
-              topic,
-              progress,
-              done,
-              discipline_type: "STRICT",
-              priority: "HIGH",
-              target_minutes: progress.threshold,
-              estimated_minutes: progress.threshold
-            };
-          });
+          const getTopic = (idx, fallback) => {
+             if (learning[idx]) return (learning[idx].text || "").split("\n")[0].trim();
+             return fallback;
+          };
 
-          const projectProgress = this.getTopicProgress("Project Work");
-          const projectThreshold = this.getThresholdForTopic("Project Work");
-          const projectDone = projectProgress.minutes >= projectThreshold;
-          const allLearningDone =
-            (learningTasks.length > 0
-              ? learningTasks.every((t) => t.done)
-              : true) && projectDone;
-          const revisionProgress = this.getTopicProgress("Revision");
-          const revisionThreshold = this.getThresholdForTopic("Revision");
-          const revisionDone = revisionProgress.minutes >= revisionThreshold;
+          const d1_topic = getTopic(0, "Deep Work Phase 1");
+          const d2_topic = getTopic(1, "Deep Work Phase 2");
+          const learn_topic = getTopic(2, "Learning Session");
+
+          const makeTask = (labelPrefix, topic, win, priority, dType, target) => {
+              const progress = this.getTopicProgress(topic);
+              const done = progress.minutes >= target;
+              const label = labelPrefix && topic ? `${labelPrefix}: ${topic}` : (labelPrefix || topic);
+              return {
+                 type: "custom", topic, label, progress, done, win, priority, discipline_type: dType,
+                 target_minutes: target,
+                 estimated_minutes: dType === "FLEXIBLE" ? Math.round(target * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER)) : target
+              };
+          };
 
           return [
-            ...learningTasks,
-            {
-              type: "project",
-              topic: "Project Work",
-              progress: projectProgress,
-              done: projectDone,
-              discipline_type: "FLEXIBLE",
-              priority: "MEDIUM",
-              target_minutes: projectThreshold,
-              estimated_minutes: Math.round(projectThreshold * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER))
-            },
-            {
-              type: "revision",
-              topic: "Revision",
-              progress: revisionProgress,
-              done: revisionDone,
-              active: allLearningDone,
-              discipline_type: "FLEXIBLE",
-              priority: "LOW",
-              target_minutes: revisionThreshold,
-              estimated_minutes: Math.round(revisionThreshold * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER))
-            },
-          ].slice(0, 4);
+              makeTask("DEEP WORK", d1_topic, [5, 6.25], "HIGH", "STRICT", 75),
+              makeTask("TRAIN", "TRAIN", [6.25, 7.5], "HIGH", "STRICT", 75),
+              makeTask("DEEP WORK", d2_topic, [7.5, 11], "HIGH", "STRICT", 210),
+              makeTask("BUILD", "BUILD", [11, 16], "MEDIUM", "FLEXIBLE", 300),
+              makeTask("LEARN", learn_topic, [16, 19.5], "MEDIUM", "FLEXIBLE", 210),
+              makeTask("ATOMIC HABITS", "ATOMIC HABITS", [19.5, 22.75], "LOW", "FLEXIBLE", 195),
+              makeTask("REST", "REST", [22.75, 29], "HIGH", "STRICT", 375),
+          ];
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -5840,15 +5819,15 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
         // §16/17/18: resolve time-window for a mission item
         getMissionTimeWindow(item) {
-          const wins = CONFIG.MISSION_TIME_WINDOWS;
-          if (item.type === "learning") return wins.learning;
-          if (item.type === "project")  return wins.project;
-          if (item.type === "revision") return wins.revision;
-          return wins.default;
+          return item.win || [8, 22];
         }
 
         formatTimeWindow([startH, endH]) {
-          const fmt = h => `${h < 10 ? "0" : ""}${h}:00`;
+          const fmt = h => {
+            let hour = Math.floor(h) % 24;
+            let mins = Math.round((h - Math.floor(h)) * 60);
+             return `${hour < 10 ? "0" : ""}${hour}:${mins < 10 ? "0" : ""}${mins}`;
+          };
           return `${fmt(startH)}–${fmt(endH)}`;
         }
 
@@ -5880,7 +5859,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         // ── Phase 0.4: live expiry ticker — only CSS toggles, never innerHTML ─
         applyMissionTimeStates(container) {
           if (!container) return;
-          const nowH = new Date().getHours() + new Date().getMinutes() / 60;
+          let nowH = new Date().getHours() + new Date().getMinutes() / 60;
+          if (nowH < 5) nowH += 24; // map cross-midnight REST tasks
           container.querySelectorAll(".shadow-goal-item[data-win-start]").forEach(el => {
             const startH = parseFloat(el.dataset.winStart);
             const endH   = parseFloat(el.dataset.winEnd);
@@ -5914,7 +5894,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             // Phase 0.3: update only THIS row — no innerHTML, no loop
             const row = e.target.closest(".shadow-goal-item");
             if (row) {
-              const nowH = new Date().getHours() + new Date().getMinutes() / 60;
+              let nowH = new Date().getHours() + new Date().getMinutes() / 60;
+              if (nowH < 5) nowH += 24;
               const endH = parseFloat(row.dataset.winEnd || "22");
               const startH = parseFloat(row.dataset.winStart || "8");
               const done = !!e.target.checked;
@@ -5938,12 +5919,13 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
           const tasks  = this.getDailyMissionTasks();
           const checks = this.getTodayManualMissionChecks();
-          const nowH   = new Date().getHours() + new Date().getMinutes() / 60;
+          let nowH     = new Date().getHours() + new Date().getMinutes() / 60;
+          if (nowH < 5) nowH += 24;
 
           // Phase 0.2: rebuild local state cache
           this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
 
-          const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4"];
+          const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
           container.innerHTML = tasks.map((item, idx) => {
@@ -5956,7 +5938,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             if (state.activeNow) cls += " mission-active-now";
             const badge = `<span class="mission-time-badge">${this.formatTimeWindow(state.win)}</span>`;
             return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}">` +
-                     `<span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}${badge}</span>` +
+                     `<span${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}${badge}</span>` +
                      `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
                    `</div>`;
           }).join("");
