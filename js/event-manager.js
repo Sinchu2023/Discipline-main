@@ -166,6 +166,12 @@ class EventManager {
             if (circleBtn && !circleBtn.hasAttribute("disabled")) {
               e.preventDefault();
               e.stopPropagation();
+              
+              // Instant Visual Feedback
+              circleBtn.classList.add("clicked");
+              setTimeout(() => circleBtn.classList.remove("clicked"), 400);
+              
+              console.log("[EventManager] Mission click detected:", circleBtn.getAttribute("data-slot-key"));
               this.app.trainerEngine.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
               return;
             }

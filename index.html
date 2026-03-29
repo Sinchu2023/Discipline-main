@@ -536,8 +536,8 @@
         accent-color: var(--success);
       }
       .mission-circle-btn {
-        width: 24px;
-        height: 24px;
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
         border: 2px solid var(--text-secondary);
         background: transparent;
@@ -547,18 +547,28 @@
         justify-content: center;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         padding: 0;
-        margin-right: 12px;
+        margin-right: 14px;
         flex-shrink: 0;
-        font-size: 14px;
+        font-size: 16px;
         line-height: 1;
         color: var(--text-secondary);
         user-select: none;
+      }
+      .mission-circle-btn:active {
+        transform: scale(0.85);
+      }
+      .mission-circle-btn.clicked {
+        animation: missionPulse 0.4s ease-out;
+      }
+      @keyframes missionPulse {
+        0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.6); }
+        100% { box-shadow: 0 0 0 15px rgba(40, 167, 69, 0); }
       }
       .mission-circle-btn.done {
         background: var(--success);
         border-color: var(--success);
         color: white;
-        box-shadow: 0 0 10px rgba(40, 167, 69, 0.4);
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
       }
       .mission-circle-btn.expired {
         border-color: var(--text-tertiary);
@@ -883,10 +893,12 @@
         background: linear-gradient(145deg, rgba(25, 25, 25, 0.95), rgba(30, 30, 30, 0.95));
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 24px;
+        padding: 26px;
         display: flex;
         flex-direction: column;
+        min-height: 460px;
         height: 100%;
+        box-shadow: var(--shadow);
       }
       .sd-bot-panel.penalty {
         border: 1px solid rgba(220, 53, 69, 0.3);

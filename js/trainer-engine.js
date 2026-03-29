@@ -232,6 +232,8 @@ class TrainerEngine {
           slot.time = toTime(currentMin + clamped);
         }
       }
+
+
     } catch (err) {
       console.warn("[shiftTimetableTimes] failed:", err);
     }
@@ -1440,7 +1442,27 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         }
       }
 
+      // Step 6: Performance Summary (Fill Gap)
+      let summaryCont = container.querySelector(".mission-summary-content");
+      if (!summaryCont) {
+        summaryCont = document.createElement("div");
+        summaryCont.className = "mission-summary-content";
+        summaryCont.style.marginTop = "auto";
+        summaryCont.style.paddingTop = "24px";
+        container.appendChild(summaryCont);
+      }
 
+      const momentum = (this.state.momentum || 1.0).toFixed(2) + "x";
+      const shadowBuff = this.state.shadowBuffDays || 0;
+      summaryCont.innerHTML = `
+        <div style="background: rgba(40, 167, 69, 0.05); border: 1px solid rgba(40, 167, 69, 0.1); border-radius: 8px; padding: 14px;">
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 6px;">Shadow Engine Status</div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.88rem; color: var(--success); font-weight: 600;">Momentum: ${momentum}</span>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Shadow Buff: ${shadowBuff}d</span>
+          </div>
+        </div>
+      `;
 
     } catch (err) {
       console.error("[_doSyncMission] failed:", err);
