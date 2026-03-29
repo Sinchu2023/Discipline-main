@@ -183,6 +183,8 @@ const CATEGORY_ALIASES = {
   study: "Study / Skill Development",
   skill: "Study / Skill Development",
   learning: "Study / Skill Development",
+  learn: "Study / Skill Development",
+  revision: "Study / Skill Development",
   waste: "Time Waste / Distraction",
   distraction: "Time Waste / Distraction",
   misc: "Miscellaneous",

@@ -31,14 +31,15 @@ class TrainerEngine {
     const container = document.querySelector(".shadow-goal-list");
     if (container) {
       this._missionDelegateHandler = (e) => {
-        if (e.type === "click") {
+        if (e.type === "click" || e.type === "dblclick") {
           const circleBtn = e.target.closest(".mission-circle-btn");
           if (circleBtn && !circleBtn.hasAttribute("disabled")) {
+            e.preventDefault();
             this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
           }
-          if (e.target.id === "btn-undo-cascade") this.undoCascade();
-          if (e.target.id === "btn-finalize-day") this.triggerFinalizeDay();
-          if (e.target.id === "btn-revert-yesterday") this.switchToYesterday();
+          if (e.target.id === "btn-undo-cascade") { e.preventDefault(); this.undoCascade(); }
+          if (e.target.id === "btn-finalize-day") { e.preventDefault(); this.triggerFinalizeDay(); }
+          if (e.target.id === "btn-revert-yesterday") { e.preventDefault(); this.switchToYesterday(); }
 
           // SE2: Auto-start stopwatch when clicking mission text
           const missionLabel = e.target.closest(".mission-task-label");
@@ -53,6 +54,7 @@ class TrainerEngine {
       };
       // No longer need 'change' for checkboxes, just 'click' for circle buttons
       container.addEventListener("click", this._missionDelegateHandler);
+      container.addEventListener("dblclick", this._missionDelegateHandler);
     }
 
     this.refresh();
@@ -1385,7 +1387,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
                     ${isDone ? "disabled" : ""}>
-                    ${circleIcon}
+                    <span style="pointer-events:none;">${circleIcon}</span>
                   </button>
                   <span class="mission-task-label" 
                         style="font-size:0.85rem; color:${isExp ? "var(--text-tertiary)" : color}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"
@@ -1403,7 +1405,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
             html += `
               <div class="sd-mission-item shadow-goal-item" style="opacity:0.35; filter:grayscale(1);">
                 <div style="display:flex; align-items:center;">
-                  <button class="mission-circle-btn" disabled>○</button>
+                  <button class="mission-circle-btn" disabled><span style="pointer-events:none;">○</span></button>
                   <span style="font-size:0.85rem;color:var(--text-tertiary);">
                     ${formatTime(slot.time)} → ${slot.label} <span style="font-size:0.6rem; opacity:0.6; margin-left:4px;">[Missed - Shifted Down]</span>
                   </span>
@@ -1420,7 +1422,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                 <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                   data-slot-key="${slot.slotKey}" 
                   ${isDone ? "disabled" : ""}>
-                  ${circleIcon}
+                  <span style="pointer-events:none;">${circleIcon}</span>
                 </button>
                 <span class="mission-task-label" 
                       style="font-size:0.85rem; color:${labelColor}; cursor:pointer; transition: all 0.2s; padding: 2px 6px; border-radius: 4px;"

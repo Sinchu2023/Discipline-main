@@ -31,6 +31,8 @@ class ActivityClassifier {
             "project",
             "study",
             "learning",
+            "learn",
+            "revision",
             "course",
             "workout",
             "exercise",
