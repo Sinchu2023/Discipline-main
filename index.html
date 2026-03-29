@@ -543,10 +543,8 @@
         opacity: 0.45;
         text-decoration: line-through;
         color: #666 !important;
-        pointer-events: none;
       }
       .mission-expired .mission-check {
-        pointer-events: none;
         opacity: 0.3;
       }
       /* time badge shown next to each mission */
@@ -679,11 +677,37 @@
         }
       }
       /* Graphs Container */
+      /* Graphs Container */
       .graphs-container {
         display: flex;
         flex-direction: column;
         gap: 2rem;
       }
+      /* GitHub 365-day Heatmap */
+      .github-heatmap-container {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        padding-bottom: 0.8rem;
+        scrollbar-width: thin;
+      }
+      .github-weeks-col {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .github-cell {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        background-color: #161b22;
+        transition: transform 0.1s;
+      }
+      .github-cell[data-level="1"] { background-color: #0e4429; }
+      .github-cell[data-level="2"] { background-color: #006d32; }
+      .github-cell[data-level="3"] { background-color: #26a641; }
+      .github-cell[data-level="4"] { background-color: #39d353; }
+      .github-cell:hover { opacity: 0.8; transform: scale(1.1); cursor: crosshair; }
       .graph-card {
         background: linear-gradient(
           160deg,
@@ -1779,6 +1803,16 @@
             <div class="graph-canvas-container">
               <canvas id="sleep-chart"></canvas>
             </div>
+          </div>
+          <!-- GitHub Style Heatmap -->
+          <div class="graph-card">
+            <div class="graph-header">
+              <div class="graph-title">
+                <i class="fas fa-calendar-alt"></i>
+                365-Day Activity Heatmap
+              </div>
+            </div>
+            <div class="github-heatmap-container" id="github-heatmap-container"></div>
           </div>
         </div>
       </div>
@@ -5771,19 +5805,19 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
         getDailyMissionTasks() {
           const active = this.getActiveRoadmapDay();
-          const learning = [];
+          const today = this.app.getDateString(new Date());
+          let learningSlots = this.state.roadmapSlotsDate === today ? this.state.roadmapSlots : null;
 
-          if (active) {
-            const moduleDays = active.module.days;
-            for (let i = 0; i <= active.dayIndex; i++) {
-              const day = moduleDays[i];
-              if (!day.completed) learning.push(day);
-            }
-            if (!learning.length) learning.push(active.day);
+          if (!learningSlots && active) {
+            const uncompleted = active.module.days.filter(d => !d.completed);
+            learningSlots = uncompleted.slice(0, 3).map(d => (d.text || "").split("\n")[0].trim());
+            this.state.roadmapSlotsDate = today;
+            this.state.roadmapSlots = learningSlots;
+            this.saveTrainerState();
           }
 
           const getTopic = (idx, fallback) => {
-             if (learning[idx]) return (learning[idx].text || "").split("\n")[0].trim();
+             if (learningSlots && learningSlots[idx]) return learningSlots[idx];
              return fallback;
           };
 
@@ -6576,6 +6610,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.lastFilteredTotalMinutes = this.getCurrentFilteredTotalMinutes();
           this.animateFilteredTotal(0, this.lastFilteredTotalMinutes);
           this.updateGraphKpis();
+          this.renderGithubHeatmap();
         }
 
         getRangeDates(range) {
@@ -6968,6 +7003,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.lastFilteredTotalMinutes = toMinutes;
           this.animateFilteredTotal(fromMinutes, toMinutes);
           this.updateGraphKpis();
+          this.renderGithubHeatmap();
           setTimeout(() => {
             if (prodContainer)
               prodContainer.classList.remove("filter-updating");
@@ -6981,6 +7017,55 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.app.elements["sleep-range"].addEventListener("change", () =>
             this.updateCharts(),
           );
+        }
+
+        renderGithubHeatmap() {
+          const container = document.getElementById("github-heatmap-container");
+          if (!container) return;
+          container.innerHTML = "";
+          
+          const dailyMap = new Map();
+          this.app.state.tasks.forEach((task) => {
+            if (!this.app.isProductiveCategory(task.category)) return;
+            dailyMap.set(task.date, (dailyMap.get(task.date) || 0) + task.duration);
+          });
+
+          const target = 150; // default heat map scaling target
+          const days = 365;
+          const today = new Date();
+          const dates = [];
+          
+          for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            dates.push(this.app.getDateString(d));
+          }
+          
+          const weeks = [];
+          for(let i=0; i<dates.length; i+=7) {
+            weeks.push(dates.slice(i, i+7));
+          }
+          
+          weeks.forEach(week => {
+            const weekCol = document.createElement("div");
+            weekCol.className = "github-weeks-col";
+            week.forEach(dateStr => {
+              const minutes = dailyMap.get(dateStr) || 0;
+              let level = 0;
+              if (minutes > 0) level = 1;
+              if (minutes >= target * 0.5) level = 2;
+              if (minutes >= target) level = 3;
+              if (minutes >= target * 1.5) level = 4;
+              
+              const cell = document.createElement("div");
+              cell.className = "github-cell";
+              cell.dataset.level = level;
+              cell.title = `${dateStr}: ${this.app.formatDuration(minutes)}`;
+              weekCol.appendChild(cell);
+            });
+            container.appendChild(weekCol);
+          });
+          setTimeout(() => container.scrollLeft = container.scrollWidth, 50);
         }
       }
       class EventManager {
