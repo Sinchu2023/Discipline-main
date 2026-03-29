@@ -883,7 +883,10 @@
         background: linear-gradient(145deg, rgba(25, 25, 25, 0.95), rgba(30, 30, 30, 0.95));
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 20px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
       }
       .sd-bot-panel.penalty {
         border: 1px solid rgba(220, 53, 69, 0.3);
@@ -907,8 +910,17 @@
       .sd-mission-item {
         display: flex;
         align-items: center;
-        gap: 12px;
-        font-size: 0.95rem;
+        gap: 16px;
+        font-size: 0.98rem;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+      .sd-mission-item:last-child {
+        border-bottom: none;
+      }
+      .mission-list-content {
+        flex: 1;
+        overflow-y: auto;
       }
       .sd-mission-dot {
         width: 8px;

@@ -158,10 +158,37 @@ class EventManager {
             this.app.elements["task-editor-modal"].style.display = "none";
             this.app.taskManager.editingTaskId = null;
           });
-          this.app.elements["task-editor-modal"].addEventListener("click", (e) => {
-            if (e.target === this.app.elements["task-editor-modal"]) {
-              this.app.elements["task-editor-modal"].style.display = "none";
-              this.app.taskManager.editingTaskId = null;
+
+          // Global Mission Delegation (Bulletproof)
+          document.addEventListener("click", (e) => {
+            // 1. Mission button (Circle)
+            const circleBtn = e.target.closest(".mission-circle-btn");
+            if (circleBtn && !circleBtn.hasAttribute("disabled")) {
+              e.preventDefault();
+              e.stopPropagation();
+              this.app.trainerEngine.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
+              return;
+            }
+            
+            // 2. Mission Label (Auto-start stopwatch)
+            const missionLabel = e.target.closest(".mission-task-label");
+            if (missionLabel) {
+              const label = missionLabel.getAttribute("data-label");
+              const subtext = missionLabel.getAttribute("data-subtext");
+              if (this.app.stopwatch?.startTaskFromRoadmap) {
+                this.app.stopwatch.startTaskFromRoadmap(label, subtext);
+              }
+              return;
+            }
+            
+            // 3. Footer buttons
+            if (e.target.id === "btn-undo-cascade") { 
+              e.preventDefault(); 
+              this.app.trainerEngine.undoCascade(); 
+            }
+            if (e.target.id === "btn-finalize-day") { 
+              e.preventDefault(); 
+              this.app.trainerEngine.triggerFinalizeDay(); 
             }
           });
         }

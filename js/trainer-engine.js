@@ -27,37 +27,6 @@ class TrainerEngine {
   }
 
   initialize() {
-    // Attach mission listeners ONCE here instead of every render
-    const container = document.querySelector(".shadow-goal-list");
-    if (container) {
-      this._missionDelegateHandler = (e) => {
-        if (e.type === "click" || e.type === "dblclick") {
-          const circleBtn = e.target.closest(".mission-circle-btn");
-          if (circleBtn && !circleBtn.hasAttribute("disabled")) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
-          }
-          if (e.target.id === "btn-undo-cascade") { e.preventDefault(); this.undoCascade(); }
-          if (e.target.id === "btn-finalize-day") { e.preventDefault(); this.triggerFinalizeDay(); }
-          if (e.target.id === "btn-revert-yesterday") { e.preventDefault(); this.switchToYesterday(); }
-
-          // SE2: Auto-start stopwatch when clicking mission text
-          const missionLabel = e.target.closest(".mission-task-label");
-          if (missionLabel) {
-            const label = missionLabel.getAttribute("data-label");
-            const subtext = missionLabel.getAttribute("data-subtext");
-            if (this.app.stopwatch?.startTaskFromRoadmap) {
-              this.app.stopwatch.startTaskFromRoadmap(label, subtext);
-            }
-          }
-        }
-      };
-      // No longer need 'change' for checkboxes, just 'click' for circle buttons
-      container.addEventListener("click", this._missionDelegateHandler);
-      container.addEventListener("dblclick", this._missionDelegateHandler);
-    }
-
     this.refresh();
   }
 
