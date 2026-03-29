@@ -29,8 +29,7 @@ class TrainerEngine {
   initialize() {
     // Expose stable global entry points for inline mission interactions.
     window.Trainer = this;
-    window.SD_MARK_DONE = (slotKey, evt) => {
-      evt?.stopPropagation?.();
+    window.SD_MARK_DONE = (slotKey) => {
       window.app?.trainerEngine?.triggerCascadeComplete?.(slotKey);
     };
     window.SD_UNDO_CASCADE = () => {
@@ -1370,12 +1369,12 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                 style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;"
                 onmouseover="this.style.background='rgba(40, 167, 69, 0.04)'; this.style.borderColor='rgba(40, 167, 69, 0.1)';" 
                 onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.03)';"
-                data-mission-slot="${slot.slotKey}">
+                onclick="window.SD_MARK_DONE('${slot.slotKey}')">
                 <div style="display:flex; align-items:center; padding: 4px 0;">
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
-                    ${isDone ? "disabled" : ""}
-                    data-mission-slot="${slot.slotKey}">
+                    ${(isDone || isExp) ? "disabled" : ""}
+                    onclick="event.stopPropagation(); window.SD_MARK_DONE('${slot.slotKey}')">
                     <span style="pointer-events:none;">${circleIcon}</span>
                   </button>
                   <span class="mission-task-label" 
@@ -1407,12 +1406,12 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
               style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor:pointer;"
               onmouseover="this.style.background='rgba(40, 167, 69, 0.04)'; this.style.borderColor='rgba(40, 167, 69, 0.1)';" 
               onmouseout="this.style.background='transparent'; this.style.borderColor='rgba(255,255,255,0.03)';"
-              data-mission-slot="${slot.slotKey}">
+              onclick="window.SD_MARK_DONE('${slot.slotKey}')">
               <div style="display:flex; align-items:center;">
                 <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                   data-slot-key="${slot.slotKey}" 
-                  ${isDone ? "disabled" : ""}
-                  data-mission-slot="${slot.slotKey}">
+                  ${(isDone || isExp) ? "disabled" : ""}
+                  onclick="event.stopPropagation(); window.SD_MARK_DONE('${slot.slotKey}')">
                   <span style="pointer-events:none;">${circleIcon}</span>
                 </button>
                 <span class="mission-task-label" 
