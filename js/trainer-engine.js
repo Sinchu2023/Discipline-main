@@ -34,8 +34,12 @@ class TrainerEngine {
         if (e.type === "click" || e.type === "dblclick") {
           const circleBtn = e.target.closest(".mission-circle-btn");
           if (circleBtn && !circleBtn.hasAttribute("disabled")) {
+            if (this._processingMission) return;
+            this._processingMission = true;
             e.preventDefault();
             this.triggerCascadeComplete(circleBtn.getAttribute("data-slot-key"));
+            // Re-render will typically happen via refresh, which clears the flag
+            setTimeout(() => { this._processingMission = false; }, 300);
           }
           if (e.target.id === "btn-undo-cascade") { e.preventDefault(); this.undoCascade(); }
           if (e.target.id === "btn-finalize-day") { e.preventDefault(); this.triggerFinalizeDay(); }
@@ -1339,8 +1343,6 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
       };
 
-      const SLOT_CONFIG = [];
-
       if (this.state.timetable) {
         let learningCount = 1;
         this.state.timetable.forEach((slot, idx) => {
@@ -1364,7 +1366,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       }
 
       // Step 4: Build HTML — handles both learning and static slots
-      let html = "";
+      let listHtml = "";
       SLOT_CONFIG.forEach(slot => {
         const isLearning = slot.type === "learning";
         const status = cascade.slotStatus[slot.slotKey] || "pending";
@@ -1381,12 +1383,12 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           if (taskObj) {
             const itemFilter = isExp ? "grayscale(1) brightness(0.7)" : filter;
             const itemOpacity = isExp ? 0.4 : opacity;
-            html += `
+            listHtml += `
               <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}; transition: all 0.3s ease;">
                 <div style="display:flex; align-items:center;">
                   <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                     data-slot-key="${slot.slotKey}" 
-                    ${isDone ? "disabled" : ""}>
+                    ${(isDone || isExp) ? "disabled" : ""}>
                     <span style="pointer-events:none;">${circleIcon}</span>
                   </button>
                   <span class="mission-task-label" 
@@ -1402,7 +1404,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                 </div>
               </div>`;
           } else {
-            html += `
+            listHtml += `
               <div class="sd-mission-item shadow-goal-item" style="opacity:0.35; filter:grayscale(1);">
                 <div style="display:flex; align-items:center;">
                   <button class="mission-circle-btn" disabled><span style="pointer-events:none;">○</span></button>
@@ -1416,12 +1418,12 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           const itemFilter = isExp ? "grayscale(1) brightness(0.6)" : filter;
           const itemOpacity = isExp ? 0.35 : opacity;
           const labelColor = isExp ? "var(--text-tertiary)" : color;
-          html += `
+          listHtml += `
             <div class="sd-mission-item shadow-goal-item" style="opacity:${itemOpacity}; filter:${itemFilter}">
               <div style="display:flex; align-items:center;">
                 <button class="mission-circle-btn ${isDone ? "done" : ""} ${isExp ? "expired" : ""}" 
                   data-slot-key="${slot.slotKey}" 
-                  ${isDone ? "disabled" : ""}>
+                  ${(isDone || isExp) ? "disabled" : ""}>
                   <span style="pointer-events:none;">${circleIcon}</span>
                 </button>
                 <span class="mission-task-label" 
@@ -1435,13 +1437,11 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
               </div>
             </div>`;
         }
-
       });
 
-
-      // Step 5: Single DOM write + persistent buttons
+      // Step 5: Persistent footer rendering
       const hasHistory = cascade.stateHistory?.length > 0;
-      html += `
+      let footerHtml = `
         <div style="display:flex; gap:8px; margin-top:16px;">
           <button id="btn-undo-cascade"
             style="padding:6px 12px; background:var(--bg-card); color:${hasHistory ? "var(--warning)" : "var(--text-tertiary)"};
@@ -1455,12 +1455,23 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
           </button>
         </div>`;
 
-      container.innerHTML = html;
-
-      // Step 5: Render (only if changed)
-      if (container.getAttribute("data-last-html") === html) return;
-      container.innerHTML = html;
-      container.setAttribute("data-last-html", html);
+      // Optimized rendering: skip re-writing list if identical (prevents flicker)
+      if (container.getAttribute("data-last-list-html") !== listHtml) {
+        // We use a wrapper for the list to keep it separate from the footer
+        container.innerHTML = `<div class="mission-list-content">${listHtml}</div><div class="mission-footer-content">${footerHtml}</div>`;
+        container.setAttribute("data-last-list-html", listHtml);
+      } else {
+        // Only update the footer if list didn't change (e.g. undo state might have changed)
+        const footerCont = container.querySelector(".mission-footer-content");
+        if (footerCont) {
+          // Inner check for footer content to avoid unnecessary DOM writes
+          const currentFooterHtml = footerCont.getAttribute("data-last-footer-html");
+          if (currentFooterHtml !== footerHtml) {
+            footerCont.innerHTML = footerHtml;
+            footerCont.setAttribute("data-last-footer-html", footerHtml);
+          }
+        }
+      }
 
 
 
