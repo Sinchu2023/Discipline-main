@@ -1343,6 +1343,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
         return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
       };
 
+      const SLOT_CONFIG = [];
       if (this.state.timetable) {
         let learningCount = 1;
         this.state.timetable.forEach((slot, idx) => {
