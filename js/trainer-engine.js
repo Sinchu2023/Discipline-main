@@ -1128,52 +1128,76 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
     const realDate = this.app.getDateString(new Date());
     const isFutureDay = (cascade.date || realDate) > realDate;
 
-    // Use dynamic times from TIMETABLE_LOGIC
-    const SLOT_MAP = [];
-    if (this.state.timetable) {
-      this.state.timetable.forEach((slot, idx) => {
-        let finalKey;
-        if (slot.mapsTo === "learning") {
-          const learningSlots = this.state.timetable.filter(s => s.mapsTo === "learning");
-          const lIdx = learningSlots.indexOf(slot);
-          finalKey = `slot${lIdx + 1}`;
-        } else {
-          finalKey = `static${idx}`;
-        }
-        SLOT_MAP.push({ key: finalKey, time: slot.time });
-      });
-    }
-
+    // 1. Identify all learning slots and their physical status
     const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-
-    SLOT_MAP.forEach(({ key, time }) => {
-      let slotMin = toMin(time);
-      // Treat early morning slots (00:00 - 04:00) as part of the night shift
-      if (slotMin < 240) slotMin += 1440;
+    const learningSlots = (this.state.timetable || []).filter(s => s.mapsTo === "learning").map((slot, idx) => {
+      let slotMin = toMin(slot.time);
+      if (slotMin < 240) slotMin += 1440; // Night shift buffer
 
       let compNowMinutes = nowMinutes;
-
-      // SE2: Midnight status context (Problem 1:1 sleep expired)
-      // If we are looking at a Cascade from "Yesterday", treat 'now' as +24h
       if (!isFutureDay && cascade.date < realDate && nowMinutes < 480) {
         compNowMinutes += 1440;
       }
 
-      if (cascade.completion[key]) {
-        cascade.slotStatus[key] = "completed";
-      } else if (!isFutureDay && compNowMinutes > slotMin + 30) {
-        // Expire if window passed (+30m grace)
-        cascade.slotStatus[key] = "expired";
-      } else if (!isFutureDay && compNowMinutes >= slotMin) {
-        cascade.slotStatus[key] = "active";
+      const key = `slot${idx + 1}`;
+      let status = "pending";
+      if (cascade.completion[key]) status = "completed";
+      else if (!isFutureDay && compNowMinutes > slotMin + 30) status = "expired";
+      else if (!isFutureDay && compNowMinutes >= slotMin) status = "active";
+
+      return { key, status, slotMin, originalLabel: slot.label };
+    });
+
+    // 2. Dynamic Task Allocation (Cascading)
+    // We treat the roadmapQueue as a FIFO queue that flows into the first available non-expired slots.
+    let queueIdx = 0;
+    const roadmapQueue = cascade.roadmapQueue || [];
+    const newActiveSlots = {};
+
+    learningSlots.forEach(slot => {
+      cascade.slotStatus[slot.key] = slot.status;
+
+      if (slot.status === "completed") {
+        // If it was completed here, it consumed the task that was in it.
+        // We preserve whatever was in activeSlots to avoid state drift.
+        newActiveSlots[slot.key] = cascade.activeSlots[slot.key];
+        queueIdx++; 
+      } else if (slot.status === "expired") {
+        // Expired incomplete slots are "Missed". They DON'T consume a task.
+        // Instead, the task moves to the next available slot.
+        newActiveSlots[slot.key] = null;
       } else {
-        cascade.slotStatus[key] = "pending";
+        // Active or Pending slots take the next available task from the queue.
+        const task = roadmapQueue[queueIdx++];
+        if (task) {
+          // Identify if it's cascaded (pushed from its original priority)
+          // Original priority for a slot index X is roadmapQueue[X]
+          const originalTaskIdx = parseInt(slot.key.replace("slot", "")) - 1;
+          const isShifted = roadmapQueue.indexOf(task) !== originalTaskIdx;
+          newActiveSlots[slot.key] = { ...task, cascaded: isShifted };
+        } else {
+          newActiveSlots[slot.key] = null;
+        }
       }
     });
 
-    // Mirror statuses for UI rendering safety
-    ["slot1", "slot2", "slot3"].forEach(key => {
-      cascade.slotStatus[key] = cascade.slotStatus[key] || "pending";
+    // Update the cascade state with the new dynamic assignments
+    cascade.activeSlots = { ...cascade.activeSlots, ...newActiveSlots };
+
+    // Standard static slots (non-cascading)
+    (this.state.timetable || []).forEach((slot, idx) => {
+      if (slot.mapsTo !== "learning") {
+        const key = `static${idx}`;
+        let slotMin = toMin(slot.time);
+        if (slotMin < 240) slotMin += 1440;
+        let compNow = nowMinutes;
+        if (!isFutureDay && cascade.date < realDate && nowMinutes < 480) compNow += 1440;
+
+        if (cascade.completion[key]) cascade.slotStatus[key] = "completed";
+        else if (!isFutureDay && compNow > slotMin + 30) cascade.slotStatus[key] = "expired";
+        else if (!isFutureDay && compNow >= slotMin) cascade.slotStatus[key] = "active";
+        else cascade.slotStatus[key] = "pending";
+      }
     });
   }
 
@@ -1302,6 +1326,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       // Step 2: State + slot statuses
       const cascade = this.ensureCascadeState();
       this._refreshSlotStatuses(cascade);
+      this.app.saveToStorage("cascade_state", cascade);
       this._scheduleAutoExpiry(cascade);
 
       // Step 3: Slot display config
@@ -1369,6 +1394,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                         data-subtext="${this.escapeHtml(taskObj.text)}">
                     ${formatTime(slot.time)} → <span style="font-weight:600;">${slot.label}</span>
                     <span style="font-weight:400; opacity:0.9;"> [${this.escapeHtml(taskObj.text)}]</span>
+                    ${taskObj.cascaded ? `<span style="font-size:0.6rem; color:var(--warning); margin-left:4px; border:1px solid var(--warning); padding:1px 4px; border-radius:3px; opacity:0.8;">CASCADED</span>` : ""}
                     <em style="font-size:0.7rem; margin-left:6px; opacity:0.5;">${status}</em>
                   </span>
                 </div>
@@ -1379,7 +1405,7 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
                 <div style="display:flex; align-items:center;">
                   <button class="mission-circle-btn" disabled>○</button>
                   <span style="font-size:0.85rem;color:var(--text-tertiary);">
-                    ${formatTime(slot.time)} → ${slot.label} [Empty queue]
+                    ${formatTime(slot.time)} → ${slot.label} <span style="font-size:0.6rem; opacity:0.6; margin-left:4px;">[Missed - Shifted Down]</span>
                   </span>
                 </div>
               </div>`;
