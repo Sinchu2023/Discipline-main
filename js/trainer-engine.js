@@ -1440,8 +1440,8 @@ Execute ${this.app.formatDuration(phase1)} focused session. No distractions. Log
       const momentum = (this.state.momentum || 1.0).toFixed(2) + "x";
       const shadowBuff = this.state.shadowBuffDays || 0;
       listHtml += `
-        <div style="margin-top: 16px; background: rgba(40, 167, 69, 0.04); border: 1px solid rgba(40, 167, 69, 0.08); border-radius: 8px; padding: 10px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem;">
+        <div style="margin-top: 20px; background: rgba(40, 167, 69, 0.05); border: 1px solid rgba(40, 167, 69, 0.1); border-radius: 8px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
             <span style="color: var(--success); font-weight: 600;">Momentum: ${momentum}</span>
             <span style="color: var(--text-tertiary);">Buff: ${shadowBuff}d</span>
           </div>
