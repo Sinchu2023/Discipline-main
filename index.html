@@ -4665,14 +4665,33 @@
         getSleepCompromiseData() {
           const today = new Date(this.app.getDateString());
           const results = [];
+          // Target matches behavioral state logic
+          const target = Math.max(1, this.shadowSevenDayAverage || 120);
+          const highValueKeys = ["study", "project work", "work", "learning", "coding", "nptel", "project"];
+
           for (let i = 6; i >= 0; i--) {
             const d = new Date(today);
             d.setDate(today.getDate() - i);
             const ds = this.app.getDateString(d);
-            const sleepTasks = this.app.state.tasks.filter(t => t.date === ds && t.category === "Sleep");
+            
+            const dayTasks = this.app.state.tasks.filter(t => t.date === ds);
+            const sleepTasks = dayTasks.filter(t => t.category === "Sleep");
             const totalSleep = sleepTasks.reduce((s, t) => s + t.duration, 0);
-            const compromised = totalSleep > 0 && totalSleep < CONFIG.MIN_SLEEP_MINUTES;
-            results.push({ date: ds, totalSleep, compromised });
+            
+            const prodTasks = dayTasks.filter(t => this.app.isProductiveCategory(t.category));
+            const effort = prodTasks.reduce((s, t) => s + t.duration, 0);
+            
+            const hasEffort = (effort / target) >= CONFIG.EFFORT_SUCCESS_THRESHOLD;
+            const hasHighValue = prodTasks.some(t => {
+              const cat = (t.category || "").toLowerCase();
+              const topic = (t.missionTopic || t.topic || "").toLowerCase();
+              return highValueKeys.some(k => cat.includes(k) || topic.includes(k));
+            });
+
+            const isShortSleep = totalSleep > 0 && totalSleep < CONFIG.MIN_SLEEP_MINUTES;
+            // Phase 5: must have effort >= 70% and high value tasks
+            const compromised = isShortSleep && hasEffort && hasHighValue;
+            results.push({ date: ds, totalSleep, compromised, hasEffort, hasHighValue });
           }
           return results;
         }
@@ -5202,6 +5221,8 @@
               userBuffDays: 0,
               lastProcessedDate: null,
               manualMissionChecks: {},
+              flexAbuseDays: 0,
+              antiMisuseMult: CONFIG.FLEXIBLE_TASK_MULTIPLIER
             }
           );
         }
@@ -5764,13 +5785,21 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const topic = (day.text || "").split("\n")[0].trim();
             const progress = this.getTopicProgress(topic);
             const done = progress.minutes >= progress.threshold;
-            return { type: "learning", topic, progress, done };
+            return {
+              type: "learning",
+              topic,
+              progress,
+              done,
+              discipline_type: "STRICT",
+              priority: "HIGH",
+              target_minutes: progress.threshold,
+              estimated_minutes: progress.threshold
+            };
           });
 
           const projectProgress = this.getTopicProgress("Project Work");
-          const projectDone =
-            projectProgress.minutes >=
-            this.getThresholdForTopic("Project Work");
+          const projectThreshold = this.getThresholdForTopic("Project Work");
+          const projectDone = projectProgress.minutes >= projectThreshold;
           const allLearningDone =
             (learningTasks.length > 0
               ? learningTasks.every((t) => t.done)
@@ -5786,6 +5815,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               topic: "Project Work",
               progress: projectProgress,
               done: projectDone,
+              discipline_type: "FLEXIBLE",
+              priority: "MEDIUM",
+              target_minutes: projectThreshold,
+              estimated_minutes: Math.round(projectThreshold * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER))
             },
             {
               type: "revision",
@@ -5793,11 +5826,19 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               progress: revisionProgress,
               done: revisionDone,
               active: allLearningDone,
+              discipline_type: "FLEXIBLE",
+              priority: "LOW",
+              target_minutes: revisionThreshold,
+              estimated_minutes: Math.round(revisionThreshold * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER))
             },
           ].slice(0, 4);
         }
 
-        // ── §16/17/18: resolve time-window for a mission item ─────────────
+        // ══════════════════════════════════════════════════════════════════
+        // Phase 0 — Performance & UI Stability
+        // ══════════════════════════════════════════════════════════════════
+
+        // §16/17/18: resolve time-window for a mission item
         getMissionTimeWindow(item) {
           const wins = CONFIG.MISSION_TIME_WINDOWS;
           if (item.type === "learning") return wins.learning;
@@ -5806,114 +5847,131 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           return wins.default;
         }
 
-        // §16: format time like "9–13h" for the badge
         formatTimeWindow([startH, endH]) {
           const fmt = h => `${h < 10 ? "0" : ""}${h}:00`;
           return `${fmt(startH)}–${fmt(endH)}`;
         }
 
-        // §16/18: apply live time-based state to every mission row
-        // Only toggles CSS classes — never replaces innerHTML.
+        // ── Phase 0.2: local mission state cache (Map) ────────────────────
+        // Never recomputed on checkbox click — only rebuilt on topology change.
+        _buildMissionCache(tasks, checks, nowH) {
+          const cache = new Map();
+          tasks.forEach((item, idx) => {
+            const checkId    = this.getMissionCheckId(item.topic);
+            const autoDone   = !!item.done;
+            const manualDone = !!checks[checkId];
+            const done       = autoDone || manualDone;
+            const win        = this.getMissionTimeWindow(item);
+            const [startH, endH] = win;
+            const expired    = !done && nowH > endH;
+            const activeNow  = !done && !expired && nowH >= startH && nowH <= endH;
+            cache.set(checkId, { idx, item, checkId, done, win, startH, endH, expired, activeNow });
+          });
+          return cache;
+        }
+
+        // ── Phase 0.3: targeted single-row DOM update (no innerHTML rebuild) ─
+        _applyRowState(row, done, expired, activeNow) {
+          row.classList.toggle("shadow-goal-done",    done);
+          row.classList.toggle("mission-expired",     expired && !done);
+          row.classList.toggle("mission-active-now",  activeNow && !done && !expired);
+        }
+
+        // ── Phase 0.4: live expiry ticker — only CSS toggles, never innerHTML ─
         applyMissionTimeStates(container) {
           if (!container) return;
-          const now = new Date();
-          const nowH = now.getHours() + now.getMinutes() / 60;
+          const nowH = new Date().getHours() + new Date().getMinutes() / 60;
           container.querySelectorAll(".shadow-goal-item[data-win-start]").forEach(el => {
             const startH = parseFloat(el.dataset.winStart);
             const endH   = parseFloat(el.dataset.winEnd);
             const done   = el.classList.contains("shadow-goal-done");
-            const expired = !done && nowH > endH;
-            const active  = !done && nowH >= startH && nowH <= endH;
-            el.classList.toggle("mission-expired",     expired);
-            el.classList.toggle("mission-active-now",  active && !expired && !done);
+            this._applyRowState(el, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH);
           });
         }
 
-        // §16/17: start (or restart) the 30-second live-update loop.
-        // Separated from structural re-render per §17.
+        // ── Phase 0.5: live loop — 30s, never triggers a full re-render ──────
         startMissionLiveLoop() {
-          if (this._missionLiveLoopId) clearInterval(this._missionLiveLoopId);
+          if (this._missionLiveLoopId) return; // only one loop ever — never restart on re-render
           this._missionLiveLoopId = setInterval(() => {
-            const container = document.querySelector(".shadow-goal-list");
-            this.applyMissionTimeStates(container);
+            this.applyMissionTimeStates(document.querySelector(".shadow-goal-list"));
           }, 30000);
         }
 
+        // ── Phase 0.1: single delegated listener — attached ONCE, never re-added
+        _initMissionDelegation() {
+          if (this._missionDelegationBound) return;
+          this._missionDelegationBound = true;
+          // Use document-level delegation so re-renders never break the listener
+          document.addEventListener("change", (e) => {
+            if (!e.target.classList.contains("mission-check")) return;
+            const checkId = e.target.getAttribute("data-mission-check-id");
+            if (!checkId) return;
+
+            // Phase 0.2: update local cache immediately (< 1ms)
+            const cached = this._missionStateCache?.get(checkId);
+            if (cached) cached.done = !!e.target.checked;
+
+            // Phase 0.3: update only THIS row — no innerHTML, no loop
+            const row = e.target.closest(".shadow-goal-item");
+            if (row) {
+              const nowH = new Date().getHours() + new Date().getMinutes() / 60;
+              const endH = parseFloat(row.dataset.winEnd || "22");
+              const startH = parseFloat(row.dataset.winStart || "8");
+              const done = !!e.target.checked;
+              this._applyRowState(row, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH);
+            }
+
+            // Persist manual check state
+            const checks = this.getTodayManualMissionChecks();
+            checks[checkId] = !!e.target.checked;
+            this.saveTrainerState();
+          }, { passive: true });
+        }
+
+        // ── Main sync: rebuilds innerHTML ONLY when task topology changes ─────
         syncMissionFromRoadmap() {
-          const tasks     = this.getDailyMissionTasks();
           const container = document.querySelector(".shadow-goal-list");
           if (!container) return;
 
-          const taskIds = [
-            "mission-task-1",
-            "mission-task-2",
-            "mission-task-3",
-            "mission-task-4",
-          ];
+          // Phase 0.1: guarantee ONE delegated listener — never per-element
+          this._initMissionDelegation();
+
+          const tasks  = this.getDailyMissionTasks();
           const checks = this.getTodayManualMissionChecks();
-          const now    = new Date();
-          const nowH   = now.getHours() + now.getMinutes() / 60;
+          const nowH   = new Date().getHours() + new Date().getMinutes() / 60;
 
-          // ── §16: full structural render with time badges ──────────────────
-          container.innerHTML = tasks
-            .map((item, idx) => {
-              const autoDone  = !!item.done;
-              const checkId   = this.getMissionCheckId(item.topic);
-              const manualDone = !!checks[checkId];
-              const done      = autoDone || manualDone;
-              const labelId   = idx < 4 ? ` id="${taskIds[idx]}"` : "";
-              const win       = this.getMissionTimeWindow(item);  // [startH, endH]
-              const [startH, endH] = win;
+          // Phase 0.2: rebuild local state cache
+          this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
 
-              // derive initial CSS classes
-              const expired    = !done && nowH > endH;
-              const activeNow  = !done && !expired && nowH >= startH && nowH <= endH;
-              let cls = "shadow-goal-item";
-              if (done)      cls += " shadow-goal-done";
-              if (expired)   cls += " mission-expired";
-              if (activeNow) cls += " mission-active-now";
+          const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4"];
 
-              const badge = `<span class="mission-time-badge">${this.formatTimeWindow(win)}</span>`;
-              return `<div class="${cls}" data-win-start="${startH}" data-win-end="${endH}" data-check-id="${this.escapeHtml(checkId)}">` +
-                       `<span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}${badge}</span>` +
-                       `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${done ? "checked" : ""} />` +
-                     `</div>`;
-            })
-            .join("");
+          // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
+          container.innerHTML = tasks.map((item, idx) => {
+            const checkId = this.getMissionCheckId(item.topic);
+            const state   = this._missionStateCache.get(checkId);
+            const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
+            let cls = "shadow-goal-item";
+            if (state.done)      cls += " shadow-goal-done";
+            if (state.expired)   cls += " mission-expired";
+            if (state.activeNow) cls += " mission-active-now";
+            const badge = `<span class="mission-time-badge">${this.formatTimeWindow(state.win)}</span>`;
+            return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}">` +
+                     `<span${labelId}>${idx + 1}. ${this.escapeHtml(item.topic)}${badge}</span>` +
+                     `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
+                   `</div>`;
+          }).join("");
 
-          // ── re-bind checkboxes (§18: checkbox state independent of expiry) ─
-          container.querySelectorAll(".mission-check").forEach((checkbox) => {
-            checkbox.addEventListener("change", (e) => {
-              const checkId = e.target.getAttribute("data-mission-check-id");
-              if (!checkId) return;
-              checks[checkId] = !!e.target.checked;
-              const row = e.target.closest(".shadow-goal-item");
-              if (row) {
-                row.classList.toggle("shadow-goal-done", !!e.target.checked);
-                // if now manually checked, clear expired visual
-                if (e.target.checked) row.classList.remove("mission-expired", "mission-active-now");
-              }
-              this.saveTrainerState();
-            });
-          });
-
-          // ── §17: start live-time-state loop (separated from structural render)
+          // Phase 0.5: start live loop (guard inside prevents duplicate)
           this.startMissionLiveLoop();
 
-          // ── auto-complete active roadmap day via progress ─────────────────
+          // Auto-complete active roadmap day if progress crosses threshold
           const active = this.getActiveRoadmapDay();
           if (active) {
             const topic    = (active.day.text || "").split("\n")[0].trim();
             const progress = this.getTopicProgress(topic);
-            if (
-              !active.day.completed &&
-              progress.minutes >= this.getThresholdForTopic(topic)
-            ) {
+            if (!active.day.completed && progress.minutes >= this.getThresholdForTopic(topic)) {
               active.day.completed = true;
-              this.app.saveToStorage(
-                CONFIG.STORAGE_KEYS.ROADMAP_STATE,
-                this.state.roadmap,
-              );
+              this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
               this.normalizeRoadmapDays();
             }
           }
@@ -6189,7 +6247,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const progress  = this.getTopicProgress(m.topic);
             const ratio     = progress.minutes / Math.max(1, m.adjustedThreshold);
             // §9: strict tasks: delay >5 min = failure signal
-            const isStrict  = m.type === "learning";
+            const isStrict  = m.discipline_type === "STRICT";
             const strictFail = isStrict && behaviorData.wakeDelayMins > 5;
             // §11: detect flexibility abuse (ratio < 0.7 by buffer window end)
             const abused = !isStrict && ratio < CONFIG.EFFORT_SUCCESS_THRESHOLD;
@@ -6230,21 +6288,22 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this._lastPlan         = plan;
 
           // §11 Phase 7: anti-misuse — count abused flexible tasks
-          this._flexAbuseDays = this._flexAbuseDays || 0;
+          this.state.flexAbuseDays = this.state.flexAbuseDays || 0;
           const abuseCount = finalMissions.filter(m => m.abused && !m.isStrict).length;
           if (abuseCount > 0) {
-            this._flexAbuseDays += 1;
+            this.state.flexAbuseDays += 1;
           } else {
-            this._flexAbuseDays = Math.max(0, this._flexAbuseDays - 1);
+            this.state.flexAbuseDays = Math.max(0, this.state.flexAbuseDays - 1);
           }
           // §11: if abused 3+ days, tighten flexible multiplier
-          if (this._flexAbuseDays >= 3) {
+          if (this.state.flexAbuseDays >= 3) {
             // reduce buffer: approaching strict (1.0x instead of 1.5x)
-            const tighter = Math.max(1.0, CONFIG.FLEXIBLE_TASK_MULTIPLIER - 0.1 * this._flexAbuseDays);
-            this._antiMisuseMult = tighter;
+            const tighter = Math.max(1.0, CONFIG.FLEXIBLE_TASK_MULTIPLIER - 0.1 * this.state.flexAbuseDays);
+            this.state.antiMisuseMult = tighter;
           } else {
-            this._antiMisuseMult = CONFIG.FLEXIBLE_TASK_MULTIPLIER;
+            this.state.antiMisuseMult = CONFIG.FLEXIBLE_TASK_MULTIPLIER;
           }
+          this.saveTrainerState();
 
           return plan;
         }
