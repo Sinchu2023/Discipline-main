@@ -83,16 +83,17 @@ class GraphManager {
 
   passesProductivityFilter(task, filter) {
     if (task.category === "Sleep") return false;
-    const tag = task.graph_tag || "neutral";
-    if (filter === "productivity") return tag === "productivity";
+    const isProductive = this.app.isProductiveCategory(task.category) || task.graph_tag === "productivity";
+    if (filter === "productivity") return isProductive;
+    
     if (filter === "logged_distraction")
       return (
-        tag === "distraction" ||
+        task.graph_tag === "distraction" ||
         task.category === "Time Waste / Distraction"
       );
     if (filter === "total_distraction")
       return (
-        tag === "distraction" ||
+        task.graph_tag === "distraction" ||
         task.category === "Time Waste / Distraction"
       );
     return true;
