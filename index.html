@@ -561,7 +561,7 @@
         color: #555;
       }
       /* active (within window) pulse dot */
-      .mission-active-now::before {
+      .shadow-goal-item.mission-active-now > span::before {
         content: "●";
         color: var(--success);
         margin-right: 4px;
@@ -5794,7 +5794,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const makeTask = (labelPrefix, topic, win, priority, dType, target) => {
               const progress = this.getTopicProgress(topic);
               const done = progress.minutes >= target;
-              const label = labelPrefix && topic ? `${labelPrefix}: ${topic}` : (labelPrefix || topic);
+              let label = labelPrefix || topic;
+              if (labelPrefix && topic && labelPrefix !== topic) {
+                  label = `${labelPrefix}: ${topic}`;
+              }
               return {
                  type: "custom", topic, label, progress, done, win, priority, discipline_type: dType,
                  target_minutes: target,
