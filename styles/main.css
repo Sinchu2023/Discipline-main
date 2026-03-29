@@ -826,7 +826,7 @@ header {
 .sd-bottom-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 24px;
 }
 .sd-bottom-grid > * {
   min-width: 0;

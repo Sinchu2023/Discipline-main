@@ -887,7 +887,8 @@
       .sd-bottom-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 16px;
+        gap: 24px;
+        margin-top: 24px;
       }
       .sd-bot-panel {
         background: linear-gradient(145deg, rgba(25, 25, 25, 0.95), rgba(30, 30, 30, 0.95));
@@ -899,13 +900,6 @@
       }
       .sd-bot-panel:hover {
         border-color: rgba(255, 255, 255, 0.1);
-      }
-      .sd-bottom-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        align-items: flex-start;
-        margin-top: 24px;
       }
       @media (max-width: 1200px) {
         .sd-bottom-grid {
@@ -1884,10 +1878,10 @@
         <!-- ZONE 4: BOTTOM GRID -->
         <div class="sd-bottom-grid">
           <!-- Left Column: Mission -->
-          <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0; width: 100%;">
-            <div class="sd-bot-panel">
+          <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0; width: 100%; height: 100%;">
+            <div class="sd-bot-panel" style="flex: 1; display: flex; flex-direction: column;">
               <div class="sd-panel-title" id="daily-mission-header">DAILY MISSION</div>
-              <div class="sd-mission-list shadow-goal-list">
+              <div class="sd-mission-list shadow-goal-list" style="flex: 1;">
                 <div class="sd-mission-item shadow-goal-item">
                   <div class="sd-mission-dot done"></div>
                   <span id="mission-task-1">Shunt Clipper Circuits Clamper Circuits</span>
