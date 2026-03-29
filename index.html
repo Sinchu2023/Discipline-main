@@ -2146,6 +2146,57 @@
         </div>
       </div>
     </div>
+    <!-- Task Editor Modal -->
+    <div class="modal-overlay" id="task-editor-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Edit Activity</h2>
+          <button class="btn" id="close-task-editor" style="position: absolute; right: 20px; top: 20px">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-content">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="trainer-row" style="flex-direction: column; align-items: flex-start;">
+              <div class="trainer-key" style="margin-bottom: 8px;">Activity Name</div>
+              <input type="text" id="edit-task-description" class="task-input" style="width: 100%; border-color: var(--border);">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="trainer-row" style="flex-direction: column; align-items: flex-start;">
+                <div class="trainer-key" style="margin-bottom: 8px;">Category</div>
+                <select id="edit-task-category" class="range-select" style="width: 100%; height: 42px; padding: 0 12px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary);">
+                  <option value="Productive Work">Productive Work</option>
+                  <option value="Study / Skill Development">Study / Skill Development</option>
+                  <option value="Physical Training">Physical Training</option>
+                  <option value="Sleep">Sleep</option>
+                  <option value="Time Waste / Distraction">Time Waste / Distraction</option>
+                  <option value="Miscellaneous">Miscellaneous</option>
+                </select>
+              </div>
+              <div class="trainer-row" style="flex-direction: column; align-items: flex-start;">
+                <div class="trainer-key" style="margin-bottom: 8px;">Subcategory</div>
+                <input type="text" id="edit-task-subcategory" class="task-input" style="width: 100%; border-color: var(--border);">
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="trainer-row" style="flex-direction: column; align-items: flex-start;">
+                <div class="trainer-key" style="margin-bottom: 8px;">Start Time</div>
+                <input type="datetime-local" id="edit-task-start" class="task-input" style="width: 100%; border-color: var(--border); font-size: 0.9rem;">
+              </div>
+              <div class="trainer-row" style="flex-direction: column; align-items: flex-start;">
+                <div class="trainer-key" style="margin-bottom: 8px;">End Time</div>
+                <input type="datetime-local" id="edit-task-end" class="task-input" style="width: 100%; border-color: var(--border); font-size: 0.9rem;">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="save-task-edit" style="width: 100%; justify-content: center;">
+            <i class="fas fa-save"></i> SAVE CHANGES
+          </button>
+        </div>
+      </div>
+    </div>
     <!-- Report Modal -->
     <div class="modal-overlay" id="report-modal">
       <div class="modal">

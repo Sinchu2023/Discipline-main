@@ -134,6 +134,9 @@ class DisciplineTracker {
             "profile-menu-container",
             "profile-menu-toggle",
             "profile-menu",
+            "task-editor-modal",
+            "close-task-editor",
+            "save-task-edit",
           ].forEach((id) => (elements[id] = document.getElementById(id)));
           return elements;
         }

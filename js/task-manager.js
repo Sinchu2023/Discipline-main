@@ -143,7 +143,7 @@ class TaskManager {
             const el = document.createElement("div");
             const isSleep = task.category === "Sleep";
             el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
-            el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${task.category} • ${task.subcategory}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTimestamp(task.startTime)} - ${this.app.formatTimestamp(task.endTime)}</div><div class="task-time">${task.description || ""}</div><div class="task-actions">${isSleep ? `<button class="btn edit-sleep-btn" data-id="${task.id}"><i class="fas fa-pen"></i> Edit Sleep</button>` : ""}<button class="btn delete-task-btn" data-id="${task.id}"><i class="fas fa-trash"></i> Delete</button></div>`;
+            el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${task.category} • ${task.subcategory}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTimestamp(task.startTime)} - ${this.app.formatTimestamp(task.endTime)}</div><div class="task-description">${task.description || ""}</div><div class="task-actions"><button class="btn edit-task-btn" data-id="${task.id}"><i class="fas fa-pen"></i> Edit</button><button class="btn delete-task-btn" data-id="${task.id}"><i class="fas fa-trash"></i> Delete</button></div>`;
             c.appendChild(el);
           });
           document
@@ -154,74 +154,75 @@ class TaskManager {
               ),
             );
           document
-            .querySelectorAll(".edit-sleep-btn")
+            .querySelectorAll(".edit-task-btn")
             .forEach((btn) =>
               btn.addEventListener("click", (e) =>
-                this.editSleepTask(e.currentTarget.getAttribute("data-id")),
+                this.editTask(e.currentTarget.getAttribute("data-id")),
               ),
             );
         }
 
-        editSleepTask(taskId) {
-          const task = this.app.state.tasks.find(
-            (t) => t.id === taskId && t.category === "Sleep",
-          );
+        editTask(taskId) {
+          const task = this.app.state.tasks.find((t) => t.id === taskId);
           if (!task) return;
 
-          const toEditable = (ts) => {
+          this.editingTaskId = taskId;
+          
+          const toLocalISO = (ts) => {
             const d = new Date(ts);
-            const Y = d.getFullYear();
-            const M = String(d.getMonth() + 1).padStart(2, "0");
-            const D = String(d.getDate()).padStart(2, "0");
-            const h = String(d.getHours()).padStart(2, "0");
-            const m = String(d.getMinutes()).padStart(2, "0");
-            return `${Y}-${M}-${D} ${h}:${m}`;
+            const offset = d.getTimezoneOffset() * 60000;
+            return new Date(d.getTime() - offset).toISOString().slice(0, 16);
           };
 
-          const parseEditable = (value) => {
-            if (!value) return null;
-            const parsed = new Date(value.replace(" ", "T"));
-            return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
-          };
+          const modal = document.getElementById("task-editor-modal");
+          document.getElementById("edit-task-description").value = task.description || "";
+          document.getElementById("edit-task-category").value = task.category || "Miscellaneous";
+          document.getElementById("edit-task-subcategory").value = task.subcategory || "";
+          document.getElementById("edit-task-start").value = toLocalISO(task.startTime);
+          document.getElementById("edit-task-end").value = toLocalISO(task.endTime);
 
-          const startInput = prompt(
-            "Sleep start (YYYY-MM-DD HH:mm)",
-            toEditable(task.startTime),
-          );
-          if (startInput === null) return;
-          const endInput = prompt(
-            "Sleep end (YYYY-MM-DD HH:mm)",
-            toEditable(task.endTime),
-          );
-          if (endInput === null) return;
+          modal.style.display = "flex";
+        }
 
-          const newStart = parseEditable(startInput.trim());
-          const newEnd = parseEditable(endInput.trim());
-          if (!newStart || !newEnd || newEnd <= newStart) {
-            alert("Invalid sleep time range.");
-            return;
+        saveTaskEdit() {
+          if (!this.editingTaskId) return;
+          const task = this.app.state.tasks.find((t) => t.id === this.editingTaskId);
+          if (!task) return;
+
+          const desc = document.getElementById("edit-task-description").value.trim();
+          const cat = document.getElementById("edit-task-category").value;
+          const sub = document.getElementById("edit-task-subcategory").value.trim();
+          const startVal = document.getElementById("edit-task-start").value;
+          const endVal = document.getElementById("edit-task-end").value;
+
+          if (!startVal || !endVal) return alert("Please provide both start and end times.");
+          
+          const newStart = new Date(startVal).getTime();
+          const newEnd = new Date(endVal).getTime();
+
+          if (isNaN(newStart) || isNaN(newEnd) || newEnd <= newStart) {
+            return alert("Invalid time range provided.");
           }
 
+          // Update task properties
+          task.description = desc;
+          task.category = cat;
+          task.subcategory = sub || "General";
           task.startTime = newStart;
           task.endTime = newEnd;
-          task.duration = Math.min(
-            24 * 60,
-            Math.max(1, Math.round((newEnd - newStart) / 60000)),
-          );
-          task.date = this.app.getDateString(new Date(newStart));
           task.updatedAt = Date.now();
+          
+          // Re-normalize to ensure duration, category consistency, and classifier fields are updated
+          const normalized = this.app.normalizeTask(task);
+          Object.assign(task, normalized);
 
-          this.app.saveToStorage(
-            CONFIG.STORAGE_KEYS.TASKS,
-            this.app.state.tasks,
-          );
+          this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASKS, this.app.state.tasks);
           this.app.cloudManager?.syncTaskUpsert?.(task);
-          this.app.syncManager.queue({
-            type: "upsert",
-            entry: task,
-            ts: Date.now(),
-          });
+          this.app.syncManager.queue({ type: "upsert", entry: task, ts: Date.now() });
           this.app.syncManager.flushQueue();
+
+          document.getElementById("task-editor-modal").style.display = "none";
+          this.editingTaskId = null;
           this.refreshViews();
         }
         renderFavorites() {

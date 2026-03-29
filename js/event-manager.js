@@ -149,5 +149,20 @@ class EventManager {
             if (e.target === this.app.elements["trainer-modal"])
               this.app.trainerEngine.hideWindow();
           });
+
+          // Task Editor Modal
+          this.app.elements["save-task-edit"].addEventListener("click", () =>
+            this.app.taskManager.saveTaskEdit()
+          );
+          this.app.elements["close-task-editor"].addEventListener("click", () => {
+            this.app.elements["task-editor-modal"].style.display = "none";
+            this.app.taskManager.editingTaskId = null;
+          });
+          this.app.elements["task-editor-modal"].addEventListener("click", (e) => {
+            if (e.target === this.app.elements["task-editor-modal"]) {
+              this.app.elements["task-editor-modal"].style.display = "none";
+              this.app.taskManager.editingTaskId = null;
+            }
+          });
         }
       }
