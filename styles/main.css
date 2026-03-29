@@ -828,11 +828,19 @@ header {
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.sd-bottom-grid > * {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
 .sd-bot-panel {
   background: linear-gradient(145deg, rgba(25, 25, 25, 0.95), rgba(30, 30, 30, 0.95));
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
+  min-width: 0;
+  box-sizing: border-box;
+  width: 100%;
 }
 .sd-bot-panel.penalty {
   border: 1px solid rgba(220, 53, 69, 0.3);
