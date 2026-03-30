@@ -5860,10 +5860,14 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         }
 
         formatTimeWindow([startH, endH]) {
-          const fmt = h => {
-            let hour = Math.floor(h) % 24;
-            let mins = Math.round((h - Math.floor(h)) * 60);
-             return `${hour < 10 ? "0" : ""}${hour}:${mins < 10 ? "0" : ""}${mins}`;
+          const fmt = (h) => {
+            const normalized = ((h % 24) + 24) % 24; // handle times >24 (overnight REST block)
+            const totalMinutes = Math.round(normalized * 60);
+            const hour = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            const period = hour >= 12 ? "PM" : "AM";
+            const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+            return `${hour12}:${mins.toString().padStart(2, "0")} ${period}`;
           };
           return `${fmt(startH)}–${fmt(endH)}`;
         }
