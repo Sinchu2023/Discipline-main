@@ -5927,6 +5927,18 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           return cache;
         }
 
+        updateMissionChecklistScore(cache = this._missionStateCache) {
+          const scoreEl = this.app?.elements?.["shadow-mission-score"];
+          if (!scoreEl || !cache || cache.size === 0) return;
+          const total = cache.size;
+          let done = 0;
+          cache.forEach((entry) => {
+            if (entry?.done) done += 1;
+          });
+          const score = Math.round((done / Math.max(1, total)) * 100);
+          scoreEl.textContent = `${score}/100`;
+        }
+
         // ── Phase 0.3: targeted single-row DOM update (no innerHTML rebuild) ─
         _applyRowState(row, done, expired, activeNow) {
           row.classList.toggle("shadow-goal-done",    done);
@@ -5984,6 +5996,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const checks = this.getTodayManualMissionChecks();
             checks[checkId] = !!e.target.checked;
             this.saveTrainerState();
+            this.updateMissionChecklistScore();
           }, { passive: true });
         }
 
@@ -6002,6 +6015,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
           // Phase 0.2: rebuild local state cache
           this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
+          this.updateMissionChecklistScore(this._missionStateCache);
 
           const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
           const timeIds = ["mission-time-1","mission-time-2","mission-time-3","mission-time-4","mission-time-5","mission-time-6","mission-time-7"];
