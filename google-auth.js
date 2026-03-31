@@ -85,3 +85,7 @@ window.GoogleAuthModule = {
   shouldFallbackToRedirect,
   startGoogleLogin,
 };
+
+// Dispatch event to notify that the module is ready
+window.dispatchEvent(new Event("google-auth-ready"));
+console.log("GoogleAuthModule initialized and ready.");

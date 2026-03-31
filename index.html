@@ -1407,7 +1407,7 @@
       <div class="login-gate-title">Discipline Tracker Pro</div>
       <div class="login-gate-sub">Your private, personal discipline journey.<br>Sign in to access your data.</div>
       <div class="login-gate-card">
-        <button class="login-gate-btn" id="login-gate-google-btn">
+        <button class="login-gate-btn" id="login-gate-google-btn" disabled title="Initializing authentication...">
           <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.3 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.8 6C12.2 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.8-2.1 5.1-4.5 6.7l7 5.4C43.3 37 46.1 31.2 46.1 24.5z"/><path fill="#FBBC05" d="M10.4 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7-5.4c-2 1.3-4.6 2.1-8.2 2.1-6.3 0-11.7-3.7-13.6-9.1l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
           Sign in with Google
         </button>
@@ -1447,7 +1447,7 @@
           <button class="btn btn-primary" id="view-report">
             <i class="fas fa-chart-bar"></i> Report
           </button>
-          <button class="btn" id="google-login-btn">Google Login</button>
+          <button class="btn" id="google-login-btn" disabled title="Initializing authentication...">Google Login</button>
           <div class="profile-menu-container" id="profile-menu-container">
             <button class="btn profile-trigger" id="profile-menu-toggle" aria-label="Open profile menu">
               <i class="fas fa-user"></i>
@@ -2440,6 +2440,24 @@
           return !!(this.auth && this.db && this.user);
         }
 
+        updateAuthButtonState() {
+          const loginBtn = this.app.elements["google-login-btn"];
+          const gateBtn = document.getElementById("login-gate-google-btn");
+          const isModuleReady = !!window.GoogleAuthModule?.startGoogleLogin;
+          const isFirebaseReady = !!this.auth;
+          const ready = isModuleReady && isFirebaseReady;
+
+          if (loginBtn) {
+            loginBtn.disabled = !ready;
+            loginBtn.title = ready ? "Sign in with Google" : "Initializing authentication...";
+          }
+          if (gateBtn) {
+            gateBtn.disabled = !ready;
+            gateBtn.title = ready ? "Sign in with Google" : "Initializing authentication...";
+          }
+          console.log(`Auth readiness check: Module=${isModuleReady}, Firebase=${isFirebaseReady}`);
+        }
+
         stopLeaderLoop() {
           if (!this.leaderLoopIntervalId) return;
           clearInterval(this.leaderLoopIntervalId);
@@ -2471,7 +2489,12 @@
           if (this.firebaseReadyListenerBound) return;
           this.firebaseReadyListenerBound = true;
           window.addEventListener("firebase-services-ready", async () => {
+            console.log("Firebase services ready event received");
             await this.completeFirebaseInitialization();
+          });
+          window.addEventListener("google-auth-ready", () => {
+            console.log("Google auth module ready event received");
+            this.updateAuthButtonState();
           });
         }
 
@@ -2494,6 +2517,7 @@
 
           this.initializeAuthObservers();
           this.firebaseInitCompleted = true;
+          this.updateAuthButtonState();
           return true;
         }
 
@@ -2703,9 +2727,9 @@
             "auth/popup-closed-by-user": "Login popup closed before authentication finished. Please try again.",
             "auth/cancelled-popup-request": "Another sign-in is already in progress. Please wait and try again.",
             "auth/network-request-failed": "Network error during login. Check your internet connection and retry.",
-            "auth/unauthorized-domain": "This domain is not authorized in Firebase Authentication settings.",
+            "auth/unauthorized-domain": "This domain is not authorized in Firebase Authentication settings. If running locally, ensure you use a server (not file://) and add your domain to Firebase console.",
             "auth/operation-not-allowed": "Google sign-in is not enabled for this Firebase project.",
-            "auth/operation-not-supported-in-this-environment": "Your browser environment blocked popup login. Redirect login will be used instead.",
+            "auth/operation-not-supported-in-this-environment": "Google Sign-In is NOT supported on file:// origins. Please use a local server (e.g. Live Server for VS Code or 'python -m http.server').",
             "auth/dependencies-missing": "Login services are not fully initialized. Refresh the page and try again.",
           };
           const message =
@@ -6104,10 +6128,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             this.applyMissionTimeStates(container);
             return;
           }
-
-          // Phase 0.2: rebuild local state cache
-          this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
-          this.updateMissionChecklistScore(this._missionStateCache);
 
           const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
           const timeIds = ["mission-time-1","mission-time-2","mission-time-3","mission-time-4","mission-time-5","mission-time-6","mission-time-7"];
