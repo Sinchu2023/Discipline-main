@@ -2777,11 +2777,28 @@
 
           const data = snap.exists() ? snap.data() || {} : {};
           if (data.flowProtocol) this.app.flowEngine.state = data.flowProtocol;
-          if (data.trainerState)
+          if (data.trainerState) {
+            const localTrainerState = this.app.trainerEngine.state || {};
+            const cloudTrainerState = data.trainerState || {};
             this.app.trainerEngine.state = {
-              ...this.app.trainerEngine.state,
-              ...data.trainerState,
+              ...localTrainerState,
+              ...cloudTrainerState,
+              // Keep freshest local day-check and day-slot snapshots to prevent
+              // stale cloud reads from clearing just-ticked mission checkboxes.
+              manualMissionChecks: {
+                ...(cloudTrainerState.manualMissionChecks || {}),
+                ...(localTrainerState.manualMissionChecks || {}),
+              },
+              roadmapSlotsDate:
+                localTrainerState.roadmapSlotsDate ||
+                cloudTrainerState.roadmapSlotsDate ||
+                null,
+              roadmapSlots:
+                localTrainerState.roadmapSlots ||
+                cloudTrainerState.roadmapSlots ||
+                null,
             };
+          }
           if (Number.isFinite(data.shadowAvg))
             this.app.shadowEngine.shadowSevenDayAverage = data.shadowAvg;
 
