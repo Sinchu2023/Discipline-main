@@ -5999,17 +5999,21 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
 
           const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
+          const timeIds = ["mission-time-1","mission-time-2","mission-time-3","mission-time-4","mission-time-5","mission-time-6","mission-time-7"];
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
           container.innerHTML = tasks.map((item, idx) => {
             const checkId = this.getMissionCheckId(item.topic);
             const state   = this._missionStateCache.get(checkId);
             const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
+            const timeId = idx < 4 ? ` id="${timeIds[idx]}"` : "";
             let cls = "shadow-goal-item";
             if (state.done)      cls += " shadow-goal-done";
             if (state.expired)   cls += " mission-expired";
             if (state.activeNow) cls += " mission-active-now";
-            const badge = `<span class="mission-time-badge">${this.formatTimeWindow(state.win)}</span>`;
+            const badge = `<span class="mission-time-badge"${timeId}>${this.formatTimeWindow(state.win)}</span>`;
+            const labelledBy = idx < 4 ? `${taskIds[idx]} ${timeIds[idx]}` : "";
+            const ariaLabel = labelledBy ? ` aria-labelledby="${labelledBy}"` : ` aria-label="${this.escapeHtml(item.label || item.topic)} ${this.formatTimeWindow(state.win)}"`;
             return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}">` +
                      `<div class="mission-copy"><span class="mission-title"${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}</span>${badge}</div>` +
                      `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
