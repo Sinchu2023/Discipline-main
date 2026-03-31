@@ -511,29 +511,37 @@
         font-size: 0.86rem;
       }
       .shadow-goal-list {
-        margin-top: 0.6rem;
+        margin-top: 0.7rem;
         display: grid;
-        gap: 0.4rem;
+        gap: 0.55rem;
       }
       .shadow-goal-item {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 0.6rem;
-        font-size: 0.84rem;
+        align-items: flex-start;
+        gap: 0.85rem;
+        font-size: 0.85rem;
         color: var(--text-secondary);
         cursor: pointer;
+        padding: 0.6rem 0.7rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.02);
       }
-      .shadow-goal-item > span {
+      .shadow-goal-item > .mission-copy {
         min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        display: grid;
+        gap: 0.2rem;
+      }
+      .mission-title {
+        color: var(--text-main, #f5f5f5);
+        line-height: 1.35;
       }
       .shadow-goal-item .mission-check {
         width: 18px;
         height: 18px;
         accent-color: var(--success);
+        margin-top: 0.2rem;
       }
       .shadow-goal-done {
         color: var(--success) !important;
@@ -550,16 +558,20 @@
       /* time badge shown next to each mission */
       .mission-time-badge {
         font-size: 0.72rem;
-        color: var(--text-muted, #888);
-        margin-left: 4px;
-        flex-shrink: 0;
-        white-space: nowrap;
+        color: var(--text-muted, #999);
+        display: inline-flex;
+        width: fit-content;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        letter-spacing: 0.2px;
       }
       .mission-expired .mission-time-badge {
         color: #555;
       }
       /* active (within window) pulse dot */
-      .shadow-goal-item.mission-active-now > span::before {
+      .shadow-goal-item.mission-active-now .mission-title::before {
         content: "●";
         color: var(--success);
         margin-right: 4px;
@@ -1527,20 +1539,32 @@
               <div class="shadow-mission-title">Daily Mission</div>
               <div class="shadow-goal-list">
                 <div class="shadow-goal-item">
-                  <span id="mission-task-1">1. Basic Semiconductor Physics</span
-                  ><input class="mission-check" type="checkbox" />
+                  <div class="mission-copy">
+                    <span id="mission-task-1" class="mission-title">1. Basic Semiconductor Physics</span>
+                    <span id="mission-time-1" class="mission-time-badge">5:00 AM–6:15 AM</span>
+                  </div>
+                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-1 mission-time-1" />
                 </div>
                 <div class="shadow-goal-item">
-                  <span id="mission-task-2">2. Different Models of Diodes</span
-                  ><input class="mission-check" type="checkbox" />
+                  <div class="mission-copy">
+                    <span id="mission-task-2" class="mission-title">2. Different Models of Diodes</span>
+                    <span id="mission-time-2" class="mission-time-badge">6:15 AM–7:30 AM</span>
+                  </div>
+                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-2 mission-time-2" />
                 </div>
                 <div class="shadow-goal-item">
-                  <span id="mission-task-3">3. Project Work</span
-                  ><input class="mission-check" type="checkbox" />
+                  <div class="mission-copy">
+                    <span id="mission-task-3" class="mission-title">3. Project Work</span>
+                    <span id="mission-time-3" class="mission-time-badge">7:30 AM–11:00 AM</span>
+                  </div>
+                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-3 mission-time-3" />
                 </div>
                 <div class="shadow-goal-item">
-                  <span id="mission-task-4">4. Revision</span
-                  ><input class="mission-check" type="checkbox" />
+                  <div class="mission-copy">
+                    <span id="mission-task-4" class="mission-title">4. Revision</span>
+                    <span id="mission-time-4" class="mission-time-badge">11:00 AM–4:00 PM</span>
+                  </div>
+                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-4 mission-time-4" />
                 </div>
               </div>
               <div class="shadow-line">
@@ -5967,20 +5991,24 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
 
           const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
+          const timeIds = ["mission-time-1","mission-time-2","mission-time-3","mission-time-4","mission-time-5","mission-time-6","mission-time-7"];
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
           container.innerHTML = tasks.map((item, idx) => {
             const checkId = this.getMissionCheckId(item.topic);
             const state   = this._missionStateCache.get(checkId);
             const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
+            const timeId = idx < 4 ? ` id="${timeIds[idx]}"` : "";
             let cls = "shadow-goal-item";
             if (state.done)      cls += " shadow-goal-done";
             if (state.expired)   cls += " mission-expired";
             if (state.activeNow) cls += " mission-active-now";
-            const badge = `<span class="mission-time-badge">${this.formatTimeWindow(state.win)}</span>`;
+            const badge = `<span class="mission-time-badge"${timeId}>${this.formatTimeWindow(state.win)}</span>`;
+            const labelledBy = idx < 4 ? `${taskIds[idx]} ${timeIds[idx]}` : "";
+            const ariaLabel = labelledBy ? ` aria-labelledby="${labelledBy}"` : ` aria-label="${this.escapeHtml(item.label || item.topic)} ${this.formatTimeWindow(state.win)}"`;
             return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}">` +
-                     `<span${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}${badge}</span>` +
-                     `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
+                     `<div class="mission-copy"><span class="mission-title"${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}</span>${badge}</div>` +
+                     `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}"${ariaLabel} ${state.done ? "checked" : ""} />` +
                    `</div>`;
           }).join("");
 
