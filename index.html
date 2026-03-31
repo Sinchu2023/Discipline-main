@@ -518,7 +518,7 @@
       .shadow-goal-item {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
+        align-items: flex-start;
         gap: 0.85rem;
         font-size: 0.85rem;
         color: var(--text-secondary);
@@ -530,22 +530,18 @@
       }
       .shadow-goal-item > .mission-copy {
         min-width: 0;
-        display: flex;
-        align-items: center;
-        gap: 0.45rem;
+        display: grid;
+        gap: 0.2rem;
       }
       .mission-title {
         color: var(--text-main, #f5f5f5);
-        line-height: 1.25;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        line-height: 1.35;
       }
       .shadow-goal-item .mission-check {
         width: 18px;
         height: 18px;
         accent-color: var(--success);
+        margin-top: 0.2rem;
       }
       .shadow-goal-done {
         color: var(--success) !important;
@@ -565,8 +561,6 @@
         color: var(--text-muted, #999);
         display: inline-flex;
         width: fit-content;
-        flex-shrink: 0;
-        white-space: nowrap;
         padding: 0.12rem 0.45rem;
         border-radius: 999px;
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1546,31 +1540,39 @@
               <div class="shadow-goal-list">
                 <div class="shadow-goal-item">
                   <div class="mission-copy">
-                    <span id="mission-task-1" class="mission-title">1. Basic Semiconductor Physics</span>
-                    <span id="mission-time-1" class="mission-time-badge">5:00 AM–6:15 AM</span>
-                  </div>
-                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-1 mission-time-1" />
+                    <span id="mission-task-1" class="mission-title"
+                      >1. Basic Semiconductor Physics</span
+                    >
+                    <span class="mission-time-badge">5:00 AM–6:15 AM</span>
+                  </div
+                  ><input class="mission-check" type="checkbox" />
                 </div>
                 <div class="shadow-goal-item">
                   <div class="mission-copy">
-                    <span id="mission-task-2" class="mission-title">2. Different Models of Diodes</span>
-                    <span id="mission-time-2" class="mission-time-badge">6:15 AM–7:30 AM</span>
-                  </div>
-                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-2 mission-time-2" />
+                    <span id="mission-task-2" class="mission-title"
+                      >2. Different Models of Diodes</span
+                    >
+                    <span class="mission-time-badge">6:15 AM–7:30 AM</span>
+                  </div
+                  ><input class="mission-check" type="checkbox" />
                 </div>
                 <div class="shadow-goal-item">
                   <div class="mission-copy">
-                    <span id="mission-task-3" class="mission-title">3. Project Work</span>
-                    <span id="mission-time-3" class="mission-time-badge">7:30 AM–11:00 AM</span>
-                  </div>
-                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-3 mission-time-3" />
+                    <span id="mission-task-3" class="mission-title"
+                      >3. Project Work</span
+                    >
+                    <span class="mission-time-badge">7:30 AM–11:00 AM</span>
+                  </div
+                  ><input class="mission-check" type="checkbox" />
                 </div>
                 <div class="shadow-goal-item">
                   <div class="mission-copy">
-                    <span id="mission-task-4" class="mission-title">4. Revision</span>
-                    <span id="mission-time-4" class="mission-time-badge">11:00 AM–4:00 PM</span>
-                  </div>
-                  <input class="mission-check" type="checkbox" aria-labelledby="mission-task-4 mission-time-4" />
+                    <span id="mission-task-4" class="mission-title"
+                      >4. Revision</span
+                    >
+                    <span class="mission-time-badge">11:00 AM–4:00 PM</span>
+                  </div
+                  ><input class="mission-check" type="checkbox" />
                 </div>
               </div>
               <div class="shadow-line">
@@ -6014,7 +6016,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const ariaLabel = labelledBy ? ` aria-labelledby="${labelledBy}"` : ` aria-label="${this.escapeHtml(item.label || item.topic)} ${this.formatTimeWindow(state.win)}"`;
             return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}">` +
                      `<div class="mission-copy"><span class="mission-title"${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}</span>${badge}</div>` +
-                     `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}"${ariaLabel} ${state.done ? "checked" : ""} />` +
+                     `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
                    `</div>`;
           }).join("");
 
