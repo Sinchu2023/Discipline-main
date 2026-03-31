@@ -5771,8 +5771,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           return this.state.manualMissionChecks[today];
         }
 
-        getMissionCheckId(topic = "") {
-          return this.normalizeTopic(topic).replace(/\s+/g, "-") || "mission";
+        getMissionCheckId(topic = "", idx = null) {
+          const base = this.normalizeTopic(topic).replace(/\s+/g, "-") || "mission";
+          return Number.isInteger(idx) ? `${base}-${idx + 1}` : base;
         }
 
         getThresholdForTopic(topic = "") {
@@ -5914,9 +5915,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         _buildMissionCache(tasks, checks, nowH) {
           const cache = new Map();
           tasks.forEach((item, idx) => {
-            const checkId    = this.getMissionCheckId(item.topic);
+            const checkId    = this.getMissionCheckId(item.topic, idx);
+            const legacyId   = this.getMissionCheckId(item.topic);
             const autoDone   = !!item.done;
-            const manualDone = !!checks[checkId];
+            const manualDone = !!checks[checkId] || !!checks[legacyId];
             const done       = autoDone || manualDone;
             const win        = this.getMissionTimeWindow(item);
             const [startH, endH] = win;
@@ -6022,7 +6024,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
           container.innerHTML = tasks.map((item, idx) => {
-            const checkId = this.getMissionCheckId(item.topic);
+            const checkId = this.getMissionCheckId(item.topic, idx);
             const state   = this._missionStateCache.get(checkId);
             const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
             const timeId = idx < 4 ? ` id="${timeIds[idx]}"` : "";
