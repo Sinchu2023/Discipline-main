@@ -2431,6 +2431,7 @@
           this.timerUnsubscribe = null;
           this.tasksUnsubscribe = null;
           this.roadmapUnsubscribe = null;
+          this.firebaseInitCompleted = false;
         }
 
         get isReady() {
@@ -2467,11 +2468,31 @@
         bindFirebaseReadyListener() {
           if (this.firebaseReadyListenerBound) return;
           this.firebaseReadyListenerBound = true;
-          window.addEventListener("firebase-services-ready", () => {
-            if (this.auth) return;
-            if (!this.attachFirebaseServicesIfAvailable()) return;
-            this.initializeAuthObservers();
+          window.addEventListener("firebase-services-ready", async () => {
+            await this.completeFirebaseInitialization();
           });
+        }
+
+        async completeFirebaseInitialization() {
+          if (this.firebaseInitCompleted) return true;
+          if (!this.attachFirebaseServicesIfAvailable()) return false;
+
+          this.installFirestoreInstrumentation();
+          this.ensureClientVersion();
+
+          try {
+            const redirectResult =
+              await window.FirebaseServices.getRedirectResult(this.auth);
+            if (redirectResult?.user) {
+              sessionStorage.removeItem(this.redirectLoginKey);
+            }
+          } catch (error) {
+            this.handleAuthError(error);
+          }
+
+          this.initializeAuthObservers();
+          this.firebaseInitCompleted = true;
+          return true;
         }
 
         initializeAuthObservers() {
@@ -2521,28 +2542,12 @@
         async initialize() {
           this.bindAuthButtons();
           this.bindFirebaseReadyListener();
-
-          if (!this.attachFirebaseServicesIfAvailable()) {
+          const initialized = await this.completeFirebaseInitialization();
+          if (!initialized) {
             console.warn(
               "Firebase services not configured yet. Waiting for module initialization.",
             );
-            return;
           }
-
-          this.installFirestoreInstrumentation();
-          this.ensureClientVersion();
-
-          try {
-            const redirectResult =
-              await window.FirebaseServices.getRedirectResult(this.auth);
-            if (redirectResult?.user) {
-              sessionStorage.removeItem(this.redirectLoginKey);
-            }
-          } catch (error) {
-            this.handleAuthError(error);
-          }
-
-          this.initializeAuthObservers();
         }
 
         isAuthInitialized() {
@@ -2775,11 +2780,28 @@
 
           const data = snap.exists() ? snap.data() || {} : {};
           if (data.flowProtocol) this.app.flowEngine.state = data.flowProtocol;
-          if (data.trainerState)
+          if (data.trainerState) {
+            const localTrainerState = this.app.trainerEngine.state || {};
+            const cloudTrainerState = data.trainerState || {};
             this.app.trainerEngine.state = {
-              ...this.app.trainerEngine.state,
-              ...data.trainerState,
+              ...localTrainerState,
+              ...cloudTrainerState,
+              // Keep freshest local day-check and day-slot snapshots to prevent
+              // stale cloud reads from clearing just-ticked mission checkboxes.
+              manualMissionChecks: {
+                ...(cloudTrainerState.manualMissionChecks || {}),
+                ...(localTrainerState.manualMissionChecks || {}),
+              },
+              roadmapSlotsDate:
+                localTrainerState.roadmapSlotsDate ||
+                cloudTrainerState.roadmapSlotsDate ||
+                null,
+              roadmapSlots:
+                localTrainerState.roadmapSlots ||
+                cloudTrainerState.roadmapSlots ||
+                null,
             };
+          }
           if (Number.isFinite(data.shadowAvg))
             this.app.shadowEngine.shadowSevenDayAverage = data.shadowAvg;
 
@@ -3512,6 +3534,9 @@
               }).catch(e => console.warn("Timer start cloud sync delayed", e));
             }, 0);
           }
+          if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+            this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+          }
           this.startTicking();
         }
         startSleep() {
@@ -3552,6 +3577,9 @@
                 }).catch(e => console.warn("Timer stop cloud sync delayed", e));
             }, 0);
           }
+          if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+            this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+          }
           this.reset();
         }
         reset() {
@@ -3568,6 +3596,9 @@
           this.app.elements["task-input"].disabled = false;
           this.app.elements["active-task-indicator"].style.display = "none";
           this.app.elements["task-input"].value = "";
+          if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+            this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+          }
         }
         resumeActiveTask(activeTask) {
           if (!activeTask?.startTime || this.isRunning) return;
@@ -5766,8 +5797,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           return this.state.manualMissionChecks[today];
         }
 
-        getMissionCheckId(topic = "") {
-          return this.normalizeTopic(topic).replace(/\s+/g, "-") || "mission";
+        getMissionCheckId(topic = "", idx = null) {
+          const base = this.normalizeTopic(topic).replace(/\s+/g, "-") || "mission";
+          return Number.isInteger(idx) ? `${base}-${idx + 1}` : base;
         }
 
         getThresholdForTopic(topic = "") {
@@ -5909,9 +5941,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         _buildMissionCache(tasks, checks, nowH) {
           const cache = new Map();
           tasks.forEach((item, idx) => {
-            const checkId    = this.getMissionCheckId(item.topic);
+            const checkId    = this.getMissionCheckId(item.topic, idx);
+            const legacyId   = this.getMissionCheckId(item.topic);
             const autoDone   = !!item.done;
-            const manualDone = !!checks[checkId];
+            const manualDone = !!checks[checkId] || !!checks[legacyId];
             const done       = autoDone || manualDone;
             const win        = this.getMissionTimeWindow(item);
             const [startH, endH] = win;
@@ -5920,6 +5953,18 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             cache.set(checkId, { idx, item, checkId, done, win, startH, endH, expired, activeNow });
           });
           return cache;
+        }
+
+        updateMissionChecklistScore(cache = this._missionStateCache) {
+          const scoreEl = this.app?.elements?.["shadow-mission-score"];
+          if (!scoreEl || !cache || cache.size === 0) return;
+          const total = cache.size;
+          let done = 0;
+          cache.forEach((entry) => {
+            if (entry?.done) done += 1;
+          });
+          const score = Math.round((done / Math.max(1, total)) * 100);
+          scoreEl.textContent = `${score}/100`;
         }
 
         // ── Phase 0.3: targeted single-row DOM update (no innerHTML rebuild) ─
@@ -5932,7 +5977,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         // ── Phase 0.4: live expiry ticker — only CSS toggles, never innerHTML ─
         applyMissionTimeStates(container) {
           if (!container) return;
-          let nowH = new Date().getHours() + new Date().getMinutes() / 60;
+          const now = new Date();
+          let nowH = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
           if (nowH < 5) nowH += 24; // map cross-midnight REST tasks
           container.querySelectorAll(".shadow-goal-item[data-win-start]").forEach(el => {
             const startH = parseFloat(el.dataset.winStart);
@@ -5942,12 +5988,58 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           });
         }
 
-        // ── Phase 0.5: live loop — 30s, never triggers a full re-render ──────
+        getCurrentMissionDateKey(now = new Date()) {
+          return this.app.getDateString(now);
+        }
+
+        getNextBoundaryDelayMs(cache = this._missionStateCache) {
+          if (!cache || cache.size === 0) return null;
+          const now = new Date();
+          const nowMs = now.getTime();
+          const base = new Date(now);
+          base.setHours(0, 0, 0, 0);
+          let minDelay = null;
+
+          cache.forEach((entry) => {
+            if (!entry) return;
+            [entry.startH, entry.endH].forEach((h) => {
+              if (!Number.isFinite(h)) return;
+              const candidate = new Date(base);
+              candidate.setTime(base.getTime() + h * 3600000);
+              let delta = candidate.getTime() - nowMs;
+              if (delta <= 0) delta += 24 * 3600000;
+              if (minDelay === null || delta < minDelay) minDelay = delta;
+            });
+          });
+
+          if (minDelay === null) return null;
+          return Math.max(200, Math.floor(minDelay) + 20);
+        }
+
+        scheduleMissionBoundaryPulse() {
+          if (this._missionBoundaryTimeoutId) clearTimeout(this._missionBoundaryTimeoutId);
+          const delay = this.getNextBoundaryDelayMs();
+          if (!Number.isFinite(delay)) return;
+          this._missionBoundaryTimeoutId = setTimeout(() => {
+            this.syncMissionFromRoadmap({ skipRender: true, rebuild: false });
+            this.scheduleMissionBoundaryPulse();
+          }, delay);
+        }
+
+        // ── Phase 0.5: live loop — 1s precision, no structural re-render ──────
         startMissionLiveLoop() {
           if (this._missionLiveLoopId) return; // only one loop ever — never restart on re-render
+          this._missionLastDateKey = this.getCurrentMissionDateKey();
           this._missionLiveLoopId = setInterval(() => {
-            this.applyMissionTimeStates(document.querySelector(".shadow-goal-list"));
-          }, 30000);
+            const currentDateKey = this.getCurrentMissionDateKey();
+            if (currentDateKey !== this._missionLastDateKey) {
+              this._missionLastDateKey = currentDateKey;
+              this.syncMissionFromRoadmap();
+              return;
+            }
+            this.syncMissionFromRoadmap({ skipRender: true, rebuild: false });
+          }, 1000);
+          this.scheduleMissionBoundaryPulse();
         }
 
         // ── Phase 0.1: single delegated listener — attached ONCE, never re-added
@@ -5979,31 +6071,43 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const checks = this.getTodayManualMissionChecks();
             checks[checkId] = !!e.target.checked;
             this.saveTrainerState();
+            this.syncMissionFromRoadmap({ skipRender: true, rebuild: false });
           }, { passive: true });
         }
 
         // ── Main sync: rebuilds innerHTML ONLY when task topology changes ─────
-        syncMissionFromRoadmap() {
+        syncMissionFromRoadmap({ skipRender = false, rebuild = true } = {}) {
           const container = document.querySelector(".shadow-goal-list");
           if (!container) return;
 
           // Phase 0.1: guarantee ONE delegated listener — never per-element
           this._initMissionDelegation();
 
-          const tasks  = this.getDailyMissionTasks();
-          const checks = this.getTodayManualMissionChecks();
-          let nowH     = new Date().getHours() + new Date().getMinutes() / 60;
-          if (nowH < 5) nowH += 24;
+          let tasks = null;
+          if (rebuild || !this._missionStateCache) {
+            tasks = this.getDailyMissionTasks();
+            const checks = this.getTodayManualMissionChecks();
+            let nowH = new Date().getHours() + new Date().getMinutes() / 60;
+            if (nowH < 5) nowH += 24;
+            // Phase 0.2: rebuild local state cache
+            this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
+          }
+          this.updateMissionChecklistScore(this._missionStateCache);
+          this.scheduleMissionBoundaryPulse();
 
-          // Phase 0.2: rebuild local state cache
-          this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
+          if (skipRender) {
+            this.applyMissionTimeStates(container);
+            return;
+          }
+
+          if (!tasks) tasks = this.getDailyMissionTasks();
 
           const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
           const timeIds = ["mission-time-1","mission-time-2","mission-time-3","mission-time-4","mission-time-5","mission-time-6","mission-time-7"];
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
           container.innerHTML = tasks.map((item, idx) => {
-            const checkId = this.getMissionCheckId(item.topic);
+            const checkId = this.getMissionCheckId(item.topic, idx);
             const state   = this._missionStateCache.get(checkId);
             const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
             const timeId = idx < 4 ? ` id="${timeIds[idx]}"` : "";
