@@ -518,7 +518,7 @@
       .shadow-goal-item {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        align-items: flex-start;
+        align-items: center;
         gap: 0.85rem;
         font-size: 0.85rem;
         color: var(--text-secondary);
@@ -530,8 +530,11 @@
       }
       .shadow-goal-item > .mission-copy {
         min-width: 0;
-        display: grid;
-        gap: 0.2rem;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
       }
       .mission-title {
         color: var(--text-main, #f5f5f5);
@@ -541,7 +544,6 @@
         width: 18px;
         height: 18px;
         accent-color: var(--success);
-        margin-top: 0.2rem;
       }
       .shadow-goal-done {
         color: var(--success) !important;
@@ -5760,6 +5762,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
         getTodayManualMissionChecks() {
           const today = this.app.getDateString(new Date());
+          if (!this.state.manualMissionChecks) {
+            this.state.manualMissionChecks = {};
+          }
           if (!this.state.manualMissionChecks[today]) {
             this.state.manualMissionChecks[today] = {};
           }
