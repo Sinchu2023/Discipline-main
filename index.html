@@ -3514,6 +3514,9 @@
               }).catch(e => console.warn("Timer start cloud sync delayed", e));
             }, 0);
           }
+          if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+            this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+          }
           this.startTicking();
         }
         startSleep() {
@@ -3554,6 +3557,9 @@
                 }).catch(e => console.warn("Timer stop cloud sync delayed", e));
             }, 0);
           }
+          if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+            this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+          }
           this.reset();
         }
         reset() {
@@ -3570,6 +3576,9 @@
           this.app.elements["task-input"].disabled = false;
           this.app.elements["active-task-indicator"].style.display = "none";
           this.app.elements["task-input"].value = "";
+          if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+            this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+          }
         }
         resumeActiveTask(activeTask) {
           if (!activeTask?.startTime || this.isRunning) return;
@@ -5951,7 +5960,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         // ── Phase 0.4: live expiry ticker — only CSS toggles, never innerHTML ─
         applyMissionTimeStates(container) {
           if (!container) return;
-          let nowH = new Date().getHours() + new Date().getMinutes() / 60;
+          const now = new Date();
+          let nowH = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
           if (nowH < 5) nowH += 24; // map cross-midnight REST tasks
           container.querySelectorAll(".shadow-goal-item[data-win-start]").forEach(el => {
             const startH = parseFloat(el.dataset.winStart);
@@ -5961,12 +5971,58 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           });
         }
 
-        // ── Phase 0.5: live loop — 30s, never triggers a full re-render ──────
+        getCurrentMissionDateKey(now = new Date()) {
+          return this.app.getDateString(now);
+        }
+
+        getNextBoundaryDelayMs(cache = this._missionStateCache) {
+          if (!cache || cache.size === 0) return null;
+          const now = new Date();
+          const nowMs = now.getTime();
+          const base = new Date(now);
+          base.setHours(0, 0, 0, 0);
+          let minDelay = null;
+
+          cache.forEach((entry) => {
+            if (!entry) return;
+            [entry.startH, entry.endH].forEach((h) => {
+              if (!Number.isFinite(h)) return;
+              const candidate = new Date(base);
+              candidate.setTime(base.getTime() + h * 3600000);
+              let delta = candidate.getTime() - nowMs;
+              if (delta <= 0) delta += 24 * 3600000;
+              if (minDelay === null || delta < minDelay) minDelay = delta;
+            });
+          });
+
+          if (minDelay === null) return null;
+          return Math.max(200, Math.floor(minDelay) + 20);
+        }
+
+        scheduleMissionBoundaryPulse() {
+          if (this._missionBoundaryTimeoutId) clearTimeout(this._missionBoundaryTimeoutId);
+          const delay = this.getNextBoundaryDelayMs();
+          if (!Number.isFinite(delay)) return;
+          this._missionBoundaryTimeoutId = setTimeout(() => {
+            this.syncMissionFromRoadmap({ skipRender: true, rebuild: false });
+            this.scheduleMissionBoundaryPulse();
+          }, delay);
+        }
+
+        // ── Phase 0.5: live loop — 1s precision, no structural re-render ──────
         startMissionLiveLoop() {
           if (this._missionLiveLoopId) return; // only one loop ever — never restart on re-render
+          this._missionLastDateKey = this.getCurrentMissionDateKey();
           this._missionLiveLoopId = setInterval(() => {
-            this.applyMissionTimeStates(document.querySelector(".shadow-goal-list"));
-          }, 30000);
+            const currentDateKey = this.getCurrentMissionDateKey();
+            if (currentDateKey !== this._missionLastDateKey) {
+              this._missionLastDateKey = currentDateKey;
+              this.syncMissionFromRoadmap();
+              return;
+            }
+            this.syncMissionFromRoadmap({ skipRender: true, rebuild: false });
+          }, 1000);
+          this.scheduleMissionBoundaryPulse();
         }
 
         // ── Phase 0.1: single delegated listener — attached ONCE, never re-added
@@ -6003,17 +6059,29 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         }
 
         // ── Main sync: rebuilds innerHTML ONLY when task topology changes ─────
-        syncMissionFromRoadmap() {
+        syncMissionFromRoadmap({ skipRender = false, rebuild = true } = {}) {
           const container = document.querySelector(".shadow-goal-list");
           if (!container) return;
 
           // Phase 0.1: guarantee ONE delegated listener — never per-element
           this._initMissionDelegation();
 
-          const tasks  = this.getDailyMissionTasks();
-          const checks = this.getTodayManualMissionChecks();
-          let nowH     = new Date().getHours() + new Date().getMinutes() / 60;
-          if (nowH < 5) nowH += 24;
+          let tasks = null;
+          if (rebuild || !this._missionStateCache) {
+            tasks = this.getDailyMissionTasks();
+            const checks = this.getTodayManualMissionChecks();
+            let nowH = new Date().getHours() + new Date().getMinutes() / 60;
+            if (nowH < 5) nowH += 24;
+            // Phase 0.2: rebuild local state cache
+            this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
+          }
+          this.updateMissionChecklistScore(this._missionStateCache);
+          this.scheduleMissionBoundaryPulse();
+
+          if (skipRender) {
+            this.applyMissionTimeStates(container);
+            return;
+          }
 
           // Phase 0.2: rebuild local state cache
           this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
