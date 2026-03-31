@@ -2433,6 +2433,7 @@
           this.timerUnsubscribe = null;
           this.tasksUnsubscribe = null;
           this.roadmapUnsubscribe = null;
+          this.firebaseInitCompleted = false;
         }
 
         get isReady() {
@@ -2469,11 +2470,31 @@
         bindFirebaseReadyListener() {
           if (this.firebaseReadyListenerBound) return;
           this.firebaseReadyListenerBound = true;
-          window.addEventListener("firebase-services-ready", () => {
-            if (this.auth) return;
-            if (!this.attachFirebaseServicesIfAvailable()) return;
-            this.initializeAuthObservers();
+          window.addEventListener("firebase-services-ready", async () => {
+            await this.completeFirebaseInitialization();
           });
+        }
+
+        async completeFirebaseInitialization() {
+          if (this.firebaseInitCompleted) return true;
+          if (!this.attachFirebaseServicesIfAvailable()) return false;
+
+          this.installFirestoreInstrumentation();
+          this.ensureClientVersion();
+
+          try {
+            const redirectResult =
+              await window.FirebaseServices.getRedirectResult(this.auth);
+            if (redirectResult?.user) {
+              sessionStorage.removeItem(this.redirectLoginKey);
+            }
+          } catch (error) {
+            this.handleAuthError(error);
+          }
+
+          this.initializeAuthObservers();
+          this.firebaseInitCompleted = true;
+          return true;
         }
 
         initializeAuthObservers() {
@@ -2523,28 +2544,12 @@
         async initialize() {
           this.bindAuthButtons();
           this.bindFirebaseReadyListener();
-
-          if (!this.attachFirebaseServicesIfAvailable()) {
+          const initialized = await this.completeFirebaseInitialization();
+          if (!initialized) {
             console.warn(
               "Firebase services not configured yet. Waiting for module initialization.",
             );
-            return;
           }
-
-          this.installFirestoreInstrumentation();
-          this.ensureClientVersion();
-
-          try {
-            const redirectResult =
-              await window.FirebaseServices.getRedirectResult(this.auth);
-            if (redirectResult?.user) {
-              sessionStorage.removeItem(this.redirectLoginKey);
-            }
-          } catch (error) {
-            this.handleAuthError(error);
-          }
-
-          this.initializeAuthObservers();
         }
 
         isAuthInitialized() {
