@@ -1487,6 +1487,38 @@
       .shadow-hidden-metrics {
         display: none;
       }
+      .shadow-battle-card {
+        align-items: center;
+        text-align: center;
+        justify-content: center;
+      }
+      .shadow-battle-line {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 0.38rem;
+        margin-top: 0.2rem;
+        width: 100%;
+      }
+      .shadow-battle-side {
+        font-size: 0.62rem;
+        letter-spacing: 0.45px;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .shadow-battle-number {
+        font-size: 1.12rem;
+        font-weight: 700;
+        color: var(--text-accent);
+      }
+      .shadow-battle-number.shadow {
+        color: rgba(255, 255, 255, 0.92);
+      }
+      .shadow-battle-vs {
+        font-size: 0.68rem;
+        text-transform: lowercase;
+        color: var(--text-secondary);
+      }
       .shadow-micro-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1724,6 +1756,16 @@
                 <div class="shadow-mini-label">Status</div>
                 <div class="shadow-mini-value" id="shadow-status">OUT OF RANGE</div>
                 <div class="shadow-mini-sub" id="shadow-pressure">Pressure: High</div>
+              </div>
+              <div class="shadow-mini-card shadow-battle-card">
+                <div class="shadow-mini-label">MONTHLY BATTLE</div>
+                <div class="shadow-battle-line">
+                  <span class="shadow-battle-side">YOU</span>
+                  <span class="shadow-battle-number" id="shadow-battle-you">3</span>
+                  <span class="shadow-battle-vs">vs</span>
+                  <span class="shadow-battle-number shadow" id="shadow-battle-shadow">27</span>
+                  <span class="shadow-battle-side">SHADOW</span>
+                </div>
               </div>
             </div>
             <div class="shadow-progress">
@@ -3310,6 +3352,8 @@
             "shadow-rank",
             "shadow-badge",
             "shadow-duel",
+            "shadow-battle-you",
+            "shadow-battle-shadow",
             "shadow-note",
             "shadow-weekly-average",
             "shadow-momentum",
@@ -5434,6 +5478,10 @@
           this.app.elements["shadow-badge"].textContent = rank.badge;
           this.app.elements["shadow-score"].textContent =
             `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
+          if (this.app.elements["shadow-battle-you"])
+            this.app.elements["shadow-battle-you"].textContent = `${competition.myWins}`;
+          if (this.app.elements["shadow-battle-shadow"])
+            this.app.elements["shadow-battle-shadow"].textContent = `${competition.shadowWins}`;
           this.app.elements["shadow-duel"].textContent =
             scoreDiff === 0 ? "Leader 0" : `Leader +${Math.abs(scoreDiff)}`;
 
@@ -7651,6 +7699,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     <script type="module" src="app.js?v=2026-03-15-phase4"></script>
   </body>
 </html>
+
 
 
 
