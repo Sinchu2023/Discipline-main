@@ -700,7 +700,7 @@
       /* GitHub 365-day Heatmap */
       .github-heatmap-container {
         display: flex;
-        gap: 4px;
+        gap: 2px;
         overflow-x: auto;
         padding-bottom: 0.8rem;
         scrollbar-width: thin;
@@ -708,11 +708,11 @@
       .github-weeks-col {
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 2px;
       }
       .github-cell {
-        width: 12px;
-        height: 12px;
+        width: 8px;
+        height: 8px;
         border-radius: 2px;
         background-color: #161b22;
         transition: transform 0.1s;
@@ -4085,6 +4085,7 @@
             monthTasks,
             "Productive Work",
           );
+          const missionBreakdown = AnalyticsService.missionBreakdown(monthTasks);
           const trainingBreakdown = AnalyticsService.breakdown(
             monthTasks,
             "Physical Training",
@@ -4105,6 +4106,7 @@
             productivityRatio,
             daily,
             productiveBreakdown,
+            missionBreakdown,
             trainingBreakdown,
             bestProductiveDay,
             worstWasteDay,
@@ -4130,6 +4132,22 @@
                 (out[t.subcategory] = (out[t.subcategory] || 0) + t.duration),
             );
           return out;
+        }
+        static missionBreakdown(tasks) {
+          const out = {};
+          tasks
+            .filter(
+              (t) =>
+                PRODUCTIVE_CATEGORIES.has(t.category) &&
+                String(t.missionTopic || "").trim(),
+            )
+            .forEach((t) => {
+              const key = String(t.missionTopic || "").trim();
+              out[key] = (out[key] || 0) + t.duration;
+            });
+          return Object.fromEntries(
+            Object.entries(out).sort((a, b) => b[1] - a[1]),
+          );
         }
         static longestSleepConsistencyStreak(daily, targetMin) {
           const days = Object.keys(daily).sort();
@@ -4266,6 +4284,14 @@
               )
               .join("") ||
             '<tr><td style="padding:0.75rem;" colspan="2">No entries</td></tr>';
+          const missionBreak =
+            Object.entries(r.missionBreakdown || {})
+              .map(
+                ([k, v]) =>
+                  `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.escapeHtml(k)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td></tr>`,
+              )
+              .join("") ||
+            '<tr><td style="padding:0.75rem;" colspan="2">No mission-linked entries</td></tr>';
           const trainBreak =
             Object.entries(r.trainingBreakdown)
               .map(
@@ -4332,10 +4358,12 @@
           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><tbody>${summaryRows}</tbody></table></div>
           <h4 style="margin-top:1rem;">Category Totals</h4>
           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Category</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Share</th></tr></thead><tbody>${catRows}</tbody></table></div>
-          <h4 style="margin-top:1rem;">Productive Work Breakdown</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div>
-          <h4 style="margin-top:1rem;">Physical Training Breakdown</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div>
+           <h4 style="margin-top:1rem;">Productive Work Breakdown</h4>
+           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div>
+           <h4 style="margin-top:1rem;">Mission Progress</h4>
+           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Mission Topic</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Tracked Time</th></tr></thead><tbody>${missionBreak}</tbody></table></div>
+           <h4 style="margin-top:1rem;">Physical Training Breakdown</h4>
+           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div>
           <h4>Daily Breakdown</h4>
           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div>`;
           this.app.elements["report-modal"].style.display = "flex";
@@ -5903,43 +5931,62 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
           if (!learningSlots && active) {
             const uncompleted = active.module.days.filter(d => !d.completed);
-            learningSlots = uncompleted.slice(0, 3).map(d => (d.text || "").split("\n")[0].trim());
+            learningSlots = uncompleted
+              .slice(0, 4)
+              .map(d => (d.text || "").split("\n")[0].trim());
             this.state.roadmapSlotsDate = today;
             this.state.roadmapSlots = learningSlots;
             this.saveTrainerState();
           }
 
           const getTopic = (idx, fallback) => {
-             if (learningSlots && learningSlots[idx]) return learningSlots[idx];
-             return fallback;
+            if (learningSlots && learningSlots[idx]) return learningSlots[idx];
+            return fallback;
           };
 
-          const d1_topic = getTopic(0, "Deep Work Phase 1");
-          const d2_topic = getTopic(1, "Deep Work Phase 2");
-          const learn_topic = getTopic(2, "Learning Session");
+          const analog1Topic = getTopic(0, "MOS Concepts");
+          const analog2Topic = getTopic(1, "Numericals");
+          const analog3Topic = getTopic(2, "Reinforcement");
+          const analogRevisionTopic = "Revision";
 
           const makeTask = (labelPrefix, topic, win, priority, dType, target) => {
-              const progress = this.getTopicProgress(topic);
-              const done = progress.minutes >= target;
-              let label = labelPrefix || topic;
-              if (labelPrefix && topic && labelPrefix !== topic) {
-                  label = `${labelPrefix}: ${topic}`;
-              }
-              return {
-                 type: "custom", topic, label, progress, done, win, priority, discipline_type: dType,
-                 target_minutes: target,
-                 estimated_minutes: dType === "FLEXIBLE" ? Math.round(target * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER)) : target
-              };
+            const progress = this.getTopicProgress(topic);
+            const done = progress.minutes >= target;
+            let label = labelPrefix || topic;
+            if (labelPrefix && topic && labelPrefix !== topic) {
+              label = `${labelPrefix}: ${topic}`;
+            }
+            return {
+              type: "custom",
+              topic,
+              label,
+              progress,
+              done,
+              win,
+              priority,
+              discipline_type: dType,
+              target_minutes: target,
+              estimated_minutes: dType === "FLEXIBLE" ? Math.round(target * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER)) : target
+            };
           };
 
           return [
-              makeTask("DEEP WORK", d1_topic, [5, 6.25], "HIGH", "STRICT", 75),
-              makeTask("TRAIN", "TRAIN", [6.25, 7.5], "HIGH", "STRICT", 75),
-              makeTask("DEEP WORK", d2_topic, [7.5, 11], "HIGH", "STRICT", 210),
-              makeTask("BUILD", "BUILD", [11, 16], "MEDIUM", "FLEXIBLE", 300),
-              makeTask("LEARN", learn_topic, [16, 19.5], "MEDIUM", "FLEXIBLE", 210),
-              makeTask("ATOMIC HABITS", "ATOMIC HABITS", [19.5, 22.75], "LOW", "FLEXIBLE", 195),
-              makeTask("REST", "REST", [22.75, 29], "HIGH", "STRICT", 375),
+            makeTask("IB CORE", "CA + Reasoning + Quant", [5, 6.25], "HIGH", "STRICT", 75),
+            makeTask("TRAIN", "Workout / Jog", [6.25, 7.5], "HIGH", "STRICT", 75),
+            makeTask("BATH + BREAKFAST", "Bath + Breakfast", [7.5, 8.25], "LOW", "FLEXIBLE", 45),
+            makeTask("ANALOG SET 1", analog1Topic, [8.25, 10.25], "HIGH", "STRICT", 120),
+            makeTask("BREAK", "Break + Hydration", [10.25, 10.5], "LOW", "FLEXIBLE", 15),
+            makeTask("ANALOG SET 2", analog2Topic, [10.5, 12.5], "HIGH", "STRICT", 120),
+            makeTask("LUNCH", "Lunch", [12.5, 13.25], "LOW", "FLEXIBLE", 45),
+            makeTask("BUILD", "Project / Circuits", [13.25, 15.25], "MEDIUM", "FLEXIBLE", 120),
+            makeTask("ANALOG SET 3", analog3Topic, [15.25, 17.25], "HIGH", "STRICT", 120),
+            makeTask("SNACK", "Snack + Break", [17.25, 17.75], "LOW", "FLEXIBLE", 30),
+            makeTask("IB REVISION", "IB Revision", [17.75, 18.75], "MEDIUM", "FLEXIBLE", 60),
+            makeTask("ANALOG REVISION", analogRevisionTopic, [18.75, 19.5], "MEDIUM", "FLEXIBLE", 45),
+            makeTask("DINNER", "Dinner", [19.5, 20.25], "LOW", "FLEXIBLE", 45),
+            makeTask("LIGHT TASKS", "Planning / Light Tasks", [20.25, 21.5], "LOW", "FLEXIBLE", 75),
+            makeTask("SHUTDOWN", "No screens", [21.5, 22], "HIGH", "STRICT", 30),
+            makeTask("REST", "Sleep", [22, 29], "HIGH", "STRICT", 420),
           ];
         }
 
