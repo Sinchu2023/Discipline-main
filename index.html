@@ -6432,7 +6432,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
                 const primary = entries.filter(({ item }) => !item.secondary);
                 const secondary = entries.filter(({ item }) => !!item.secondary);
                 return `<section class="mission-phase">` +
-                         `<div class="mission-phase-header"><div class="mission-phase-title">${this.escapeHtml(this.getMissionPhaseLabel(phase))}</div></div>` +
                          (primary.length ? `<div class="mission-phase-items">${primary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
                          (secondary.length ? `<div class="mission-phase-items secondary">${secondary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
                        `</section>`;
