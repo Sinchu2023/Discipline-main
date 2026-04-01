@@ -6420,8 +6420,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           };
 
           const orderedEntries = tasks.map((item, idx) => ({ item, idx }));
-          const primaryEntries = orderedEntries.filter(({ item }) => !item.secondary);
-          const secondaryEntries = orderedEntries.filter(({ item }) => !!item.secondary);
+          const primaryEntries = orderedEntries.filter((_, visualIdx) => visualIdx % 2 === 0);
+          const secondaryEntries = orderedEntries.filter((_, visualIdx) => visualIdx % 2 === 1);
 
           const renderEntrySet = (entries, secondary = false) => {
             if (!entries.length) return "";
