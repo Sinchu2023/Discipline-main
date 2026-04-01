@@ -1418,9 +1418,17 @@
       .shadow-summary-grid,
       .shadow-top-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.5rem;
         margin: 0.68rem 0 0;
+      }
+      .shadow-top-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.42rem;
+        align-items: start;
+        justify-items: stretch;
+      }
+      .shadow-summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       .shadow-summary-card,
       .shadow-mini-card {
@@ -7671,5 +7679,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     <script type="module" src="app.js?v=2026-03-15-phase4"></script>
   </body>
 </html>
+
 
 
