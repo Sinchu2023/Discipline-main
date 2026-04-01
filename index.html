@@ -1402,6 +1402,11 @@
         font-size: 0.8rem;
         color: var(--text-secondary);
       }
+      .shadow-mission-secondary {
+        margin-top: 1rem;
+        padding-top: 0.95rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      }
       .shadow-badge-row {
         display: flex;
         flex-wrap: wrap;
@@ -1749,7 +1754,7 @@
               <div class="shadow-mission-summary">
                 Scan by phase, execute the active block, and keep the compact checklist clean.
               </div>
-              <div class="shadow-goal-list">
+              <div class="shadow-goal-list" id="shadow-goal-list-primary">
                 <div class="shadow-goal-item">
                   <div class="mission-copy">
                     <span id="mission-task-1" class="mission-title"
@@ -1787,7 +1792,7 @@
                   ><input class="mission-check" type="checkbox" />
                 </div>
               </div>
-              <div class="shadow-mission-footer">Primary tasks stay at the top. Support blocks stay grouped below.</div>
+              <div class="shadow-mission-footer">Primary study blocks stay on this side for faster scanning.</div>
             </div>
           </div>
           <div class="shadow-card" id="shadow-standard-card">
@@ -1850,6 +1855,15 @@
             </div>
             <div class="shadow-line" id="shadow-note">
               Calculated from real historical data only
+            </div>
+            <div class="shadow-mission-details shadow-mission-secondary">
+              <div class="shadow-mission-title-row">
+                <div class="shadow-mission-title">Support Blocks</div>
+              </div>
+              <div class="shadow-mission-summary">
+                Breaks and evening blocks live here to keep both panels balanced.
+              </div>
+              <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
             </div>
 
             <details class="advanced-shadow-panel">
@@ -6336,8 +6350,13 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
         // ── Main sync: rebuilds innerHTML ONLY when task topology changes ─────
         syncMissionFromRoadmap({ skipRender = false, rebuild = true } = {}) {
-          const container = document.querySelector(".shadow-goal-list");
-          if (!container) return;
+          const primaryContainer =
+            document.getElementById("shadow-goal-list-primary") ||
+            document.querySelector(".shadow-goal-list");
+          const secondaryContainer = document.getElementById(
+            "shadow-goal-list-secondary",
+          );
+          if (!primaryContainer) return;
 
           // Phase 0.1: guarantee ONE delegated listener — never per-element
           this._initMissionDelegation();
@@ -6355,7 +6374,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.scheduleMissionBoundaryPulse();
 
           if (skipRender) {
-            this.applyMissionTimeStates(container);
+            this.applyMissionTimeStates(primaryContainer);
+            this.applyMissionTimeStates(secondaryContainer);
             return;
           }
 
@@ -6381,20 +6401,34 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
                    `</div>`;
           };
 
-          const phaseMarkup = phaseOrder.map((phase) => {
-            const entries = tasks.map((item, idx) => ({ item, idx })).filter(({ item }) => (item.phase || "Core Study") === phase);
-            if (!entries.length) return "";
-            const primary = entries.filter(({ item }) => !item.secondary);
-            const secondary = entries.filter(({ item }) => !!item.secondary);
-            return `<section class="mission-phase">` +
-                     `<div class="mission-phase-header"><div class="mission-phase-title">${this.escapeHtml(phase)}</div><div class="mission-phase-count">${entries.length} block${entries.length === 1 ? "" : "s"}</div></div>` +
-                     (primary.length ? `<div class="mission-phase-items">${primary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
-                     (secondary.length ? `<div class="mission-phase-items secondary">${secondary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
-                   `</section>`;
-          }).join("");
+          const renderPhaseSet = (targetPhases) =>
+            phaseOrder
+              .filter((phase) => targetPhases.includes(phase))
+              .map((phase) => {
+                const entries = tasks
+                  .map((item, idx) => ({ item, idx }))
+                  .filter(
+                    ({ item }) => (item.phase || "Core Study") === phase,
+                  );
+                if (!entries.length) return "";
+                const primary = entries.filter(({ item }) => !item.secondary);
+                const secondary = entries.filter(({ item }) => !!item.secondary);
+                return `<section class="mission-phase">` +
+                         `<div class="mission-phase-header"><div class="mission-phase-title">${this.escapeHtml(phase)}</div><div class="mission-phase-count">${entries.length} block${entries.length === 1 ? "" : "s"}</div></div>` +
+                         (primary.length ? `<div class="mission-phase-items">${primary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
+                         (secondary.length ? `<div class="mission-phase-items secondary">${secondary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
+                       `</section>`;
+              })
+              .join("");
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
-          container.innerHTML = phaseMarkup;
+          primaryContainer.innerHTML = renderPhaseSet(["Morning", "Core Study"]);
+          if (secondaryContainer) {
+            secondaryContainer.innerHTML = renderPhaseSet([
+              "Breaks",
+              "Evening",
+            ]);
+          }
 
           // Phase 0.5: start live loop (guard inside prevents duplicate)
           this.startMissionLiveLoop();
