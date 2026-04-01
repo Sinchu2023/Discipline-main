@@ -2761,45 +2761,45 @@
           return location.protocol === "file:";
         }
 
+        async handleGoogleLogin(loginButton = this.app.elements["google-login-btn"]) {
+          if (!this.auth || !window.FirebaseServices) {
+            alert("Login service is still initializing. Please try again in a moment.");
+            return;
+          }
+
+          if (!window.GoogleAuthModule?.startGoogleLogin) {
+            alert("Authentication module not loaded yet. Please wait a second and try again.");
+            return;
+          }
+
+          try {
+            await window.GoogleAuthModule.startGoogleLogin({
+              auth: this.auth,
+              loginButton,
+              redirectLoginKey: this.redirectLoginKey,
+              googleAuthProvider: window.FirebaseServices.GoogleAuthProvider,
+              signInWithPopup: window.FirebaseServices.signInWithPopup,
+              signInWithRedirect: window.FirebaseServices.signInWithRedirect,
+            });
+          } catch (moduleError) {
+            this.handleAuthError(moduleError);
+          }
+        }
+
         bindAuthButtons() {
           if (this.authButtonsBound) return;
           this.authButtonsBound = true;
 
-          // Wire the login gate button to the same handler as the header button
           const gateBtn = document.getElementById("login-gate-google-btn");
           if (gateBtn) {
-            gateBtn.addEventListener("click", () => {
-              this.app.elements["google-login-btn"]?.click();
-            });
+            gateBtn.addEventListener("click", () =>
+              this.handleGoogleLogin(gateBtn),
+            );
           }
 
           this.app.elements["google-login-btn"]?.addEventListener(
             "click",
-            async () => {
-              const loginBtn = this.app.elements["google-login-btn"];
-
-              if (!this.auth || !window.FirebaseServices) {
-                alert("Login service is still initializing. Please try again in a moment.");
-                return;
-              }
-
-              if (window.GoogleAuthModule?.startGoogleLogin) {
-                try {
-                  await window.GoogleAuthModule.startGoogleLogin({
-                    auth: this.auth,
-                    loginButton: loginBtn,
-                    redirectLoginKey: this.redirectLoginKey,
-                    googleAuthProvider: window.FirebaseServices.GoogleAuthProvider,
-                    signInWithPopup: window.FirebaseServices.signInWithPopup,
-                    signInWithRedirect: window.FirebaseServices.signInWithRedirect,
-                  });
-                } catch (moduleError) {
-                  this.handleAuthError(moduleError);
-                }
-              } else {
-                alert("Authentication module not loaded yet. Please wait a second and try again.");
-              }
-            },
+            () => this.handleGoogleLogin(this.app.elements["google-login-btn"]),
           );
           this.app.elements["google-logout-btn"]?.addEventListener(
             "click",
