@@ -1487,20 +1487,6 @@
         padding: 0.85rem 0.9rem;
         background: rgba(0, 0, 0, 0.2);
       }
-      .advanced-shadow-panel > summary {
-        list-style: none;
-        cursor: pointer;
-        font-weight: 700;
-        color: var(--text-accent);
-      }
-      .advanced-shadow-panel > summary::-webkit-details-marker {
-        display: none;
-      }
-      .advanced-shadow-summary-note {
-        margin-top: 0.2rem;
-        font-size: 0.76rem;
-        color: var(--text-secondary);
-      }
       .shadow-micro-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1866,9 +1852,7 @@
               <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
             </div>
 
-            <details class="advanced-shadow-panel">
-              <summary>Advanced Shadow Analysis</summary>
-              <div class="advanced-shadow-summary-note">Urgent values stay prominent. Detailed reasoning stays compressed under each card.</div>
+            <div class="advanced-shadow-panel">
               <div class="shadow-analysis-grid">
                 <div class="shadow-analysis-card">
                   <div class="shadow-analysis-label">Penalty</div>
@@ -1893,7 +1877,7 @@
                   <div class="shadow-analysis-sub">Cycle: <strong id="flow-cycle-status">-</strong></div>
                 </div>
               </div>
-            </details>
+            </div>
           </div>
         </div>
       </section>
@@ -7419,66 +7403,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const tick = (now) => {
             const progress = Math.min(1, (now - start) / duration);
             const eased = 1 - Math.pow(1 - progress, 3);
-            const current = fromMinutes + (toMinutes - fromMinutes) * eased;
-            el.textContent = this.app.formatDuration(current);
-            if (progress < 1)
-              this.totalCounterAnimation = requestAnimationFrame(tick);
-          };
-          if (this.totalCounterAnimation)
-            cancelAnimationFrame(this.totalCounterAnimation);
-          this.totalCounterAnimation = requestAnimationFrame(tick);
-        }
-
-        updateCharts() {
-          if (!this.charts.productivity || !this.charts.sleep) return;
-          const prodRange = this.app.elements["prod-range"].value;
-          const sleepRange = this.app.elements["sleep-range"].value;
-          const filter = this.getCurrentFilter();
-
-          const prodContainer = this.app.elements["productivity-chart"].closest(
-            ".graph-canvas-container",
-          );
-          if (prodContainer) prodContainer.classList.add("filter-updating");
-
-          const fromMinutes = this.lastFilteredTotalMinutes;
-          this.charts.productivity.data = this.getProductivityData(
-            prodRange,
-            filter,
-          );
-          this.charts.sleep.data = this.getSleepData(sleepRange);
-          this.charts.productivity.update();
-          this.charts.sleep.update();
-
-          const toMinutes = this.getCurrentFilteredTotalMinutes();
-          this.lastFilteredTotalMinutes = toMinutes;
-          this.animateFilteredTotal(fromMinutes, toMinutes);
-          this.updateGraphKpis();
-          this.renderGithubHeatmap();
-          setTimeout(() => {
-            if (prodContainer)
-              prodContainer.classList.remove("filter-updating");
-          }, 360);
-        }
-
-        setupChartControls() {
-          this.app.elements["prod-range"].addEventListener("change", () =>
-            this.updateCharts(),
-          );
-          this.app.elements["sleep-range"].addEventListener("change", () =>
-            this.updateCharts(),
-          );
-        }
-
-        renderGithubHeatmap() {
-          const container = document.getElementById("github-heatmap-container");
-          if (!container) return;
-          container.innerHTML = "";
-          
-          const dailyMap = new Map();
-          this.app.state.tasks.forEach((task) => {
-            if (!this.app.isProductiveCategory(task.category)) return;
-            dailyMap.set(task.date, (dailyMap.get(task.date) || 0) + task.duration);
-          });
 
           const target = 150; // default heat map scaling target
           const days = 365;
