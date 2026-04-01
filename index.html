@@ -1780,7 +1780,6 @@
                   ><input class="mission-check" type="checkbox" />
                 </div>
               </div>
-              <div class="shadow-mission-footer">Primary study blocks stay on this side for faster scanning.</div>
             </div>
           </div>
           <div class="shadow-card" id="shadow-standard-card">
@@ -1873,9 +1872,6 @@
             <div class="shadow-mission-details shadow-mission-secondary">
               <div class="shadow-mission-title-row">
                 <div class="shadow-mission-title">Support Blocks</div>
-              </div>
-              <div class="shadow-mission-summary">
-                Breaks and evening blocks live here to keep both panels balanced.
               </div>
               <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
             </div>
@@ -6417,12 +6413,13 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               .join("");
 
           // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
-          primaryContainer.innerHTML = renderPhaseSet(["Morning", "Core Study"]);
+          primaryContainer.innerHTML = renderPhaseSet([
+            "Morning",
+            "Core Study",
+            "Breaks",
+          ]);
           if (secondaryContainer) {
-            secondaryContainer.innerHTML = renderPhaseSet([
-              "Breaks",
-              "Evening",
-            ]);
+            secondaryContainer.innerHTML = renderPhaseSet(["Evening"]);
           }
 
           // Phase 0.5: start live loop (guard inside prevents duplicate)
