@@ -6162,7 +6162,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const analog3Topic = getTopic(2, "Reinforcement");
           const analogRevisionTopic = "Revision";
 
-          const makeTask = (labelPrefix, topic, win, priority, dType, target, phase, secondary = false) => {
+          const makeTask = (labelPrefix, topic, win, priority, dType, target, phase, secondary = false, scoreWeight = 0) => {
             const progress = this.getTopicProgress(topic);
             const done = progress.minutes >= target;
             let label = labelPrefix || topic;
@@ -6180,28 +6180,28 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               discipline_type: dType,
               phase,
               secondary,
+              score_weight: scoreWeight,
               target_minutes: target,
               estimated_minutes: dType === "FLEXIBLE" ? Math.round(target * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER)) : target
             };
           };
-
           return [
-            makeTask("IB CORE", "CA + Reasoning + Quant", [5, 6.25], "HIGH", "STRICT", 75, "Morning"),
-            makeTask("TRAIN", "Workout / Jog", [6.25, 7.5], "HIGH", "STRICT", 75, "Morning", true),
-            makeTask("BATH + BREAKFAST", "Bath + Breakfast", [7.5, 8.25], "LOW", "FLEXIBLE", 45, "Morning", true),
-            makeTask("ANALOG SET 1", analog1Topic, [8.25, 10.25], "HIGH", "STRICT", 120, "Core Study"),
-            makeTask("BREAK", "Break + Hydration", [10.25, 10.5], "LOW", "FLEXIBLE", 15, "Breaks", true),
-            makeTask("ANALOG SET 2", analog2Topic, [10.5, 12.5], "HIGH", "STRICT", 120, "Core Study"),
-            makeTask("LUNCH", "Lunch", [12.5, 13.25], "LOW", "FLEXIBLE", 45, "Breaks", true),
-            makeTask("BUILD", "Project / Circuits", [13.25, 15.25], "MEDIUM", "FLEXIBLE", 120, "Core Study"),
-            makeTask("ANALOG SET 3", analog3Topic, [15.25, 17.25], "HIGH", "STRICT", 120, "Core Study"),
-            makeTask("SNACK", "Snack + Break", [17.25, 17.75], "LOW", "FLEXIBLE", 30, "Breaks", true),
-            makeTask("IB REVISION", "IB Revision", [17.75, 18.75], "MEDIUM", "FLEXIBLE", 60, "Evening"),
-            makeTask("ANALOG REVISION", analogRevisionTopic, [18.75, 19.5], "MEDIUM", "FLEXIBLE", 45, "Evening"),
-            makeTask("DINNER", "Dinner", [19.5, 20.25], "LOW", "FLEXIBLE", 45, "Breaks", true),
-            makeTask("LIGHT TASKS", "Planning / Light Tasks", [20.25, 21.5], "LOW", "FLEXIBLE", 75, "Evening", true),
-            makeTask("SHUTDOWN", "No screens", [21.5, 22], "HIGH", "STRICT", 30, "Evening", true),
-            makeTask("REST", "Sleep", [22, 29], "HIGH", "STRICT", 420, "Evening", true),
+            makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
+            makeTask("ANALOG SET 1", analog1Topic, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
+            makeTask("BREAK", "Break + Hydration", [8.25, 8.5], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
+            makeTask("ANALOG SET 2", analog2Topic, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+            makeTask("IB PRACTICE", "IB Practice", [10.5, 12], "MEDIUM", "FLEXIBLE", 90, "Morning", false, 14),
+            makeTask("LUNCH", "Lunch", [12, 12.5], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+            makeTask("BUILD", "Project / Circuits", [12.5, 14.5], "MEDIUM", "FLEXIBLE", 120, "Core Study", false, 10),
+            makeTask("ANALOG SET 3", analog3Topic, [14.5, 16.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+            makeTask("IB REVISION", "IB Revision", [16.5, 17.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+            makeTask("ANALOG REVISION", analogRevisionTopic, [17.5, 18.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+            makeTask("DINNER", "Dinner", [18.5, 19], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+            makeTask("WEAK AREA REVIEW", "Weak-area review", [19, 20], "LOW", "FLEXIBLE", 60, "Evening", true, 4),
+            makeTask("TRAINING", "Training", [20, 21], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3),
+            makeTask("FINAL REVISION", "Final revision / recap", [21, 22], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 3),
+            makeTask("WIND DOWN", "Wind down", [22, 23], "LOW", "FLEXIBLE", 60, "Evening", true, 1),
+            makeTask("REST", "Sleep", [23, 28], "HIGH", "STRICT", 300, "Evening", true, 2),
           ];
         }
 
@@ -6249,16 +6249,16 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         updateMissionChecklistScore(cache = this._missionStateCache) {
           const scoreEl = this.app?.elements?.["shadow-mission-score"];
           if (!scoreEl || !cache || cache.size === 0) return;
-          const total = cache.size;
-          let done = 0;
+          let totalWeight = 0;
+          let doneWeight = 0;
           cache.forEach((entry) => {
-            if (entry?.done) done += 1;
+            const weight = Math.max(0, Number(entry?.item?.score_weight ?? 0));
+            totalWeight += weight;
+            if (entry?.done) doneWeight += weight;
           });
-          const score = Math.round((done / Math.max(1, total)) * 100);
+          const score = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0;
           scoreEl.textContent = `${score}/100`;
         }
-
-        // ── Phase 0.3: targeted single-row DOM update (no innerHTML rebuild) ─
         _applyRowState(row, done, expired, activeNow) {
           row.classList.toggle("shadow-goal-done",    done);
           row.classList.toggle("mission-expired",     expired && !done);
