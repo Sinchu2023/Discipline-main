@@ -1419,13 +1419,13 @@
       .shadow-top-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.55rem;
-        margin: 0.75rem 0 0;
+        gap: 0.5rem;
+        margin: 0.68rem 0 0;
       }
       .shadow-summary-card,
       .shadow-mini-card {
         min-width: 0;
-        padding: 0.66rem 0.72rem;
+        padding: 0.6rem 0.68rem;
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.08);
         background: rgba(255, 255, 255, 0.03);
@@ -1443,14 +1443,14 @@
         color: var(--text-accent);
       }
       .shadow-summary-sub {
-        margin-top: 0.12rem;
+        margin-top: 0.1rem;
         font-size: 0.72rem;
         color: var(--text-secondary);
         line-height: 1.35;
       }
       .shadow-summary-stack {
         display: grid;
-        gap: 0.12rem;
+        gap: 0.1rem;
       }
       .shadow-mini-label {
         font-size: 0.68rem;
@@ -1465,12 +1465,18 @@
         color: var(--text-accent);
       }
       .shadow-mini-sub {
-        margin-top: 0.12rem;
+        margin-top: 0.1rem;
         font-size: 0.72rem;
         color: var(--text-secondary);
         line-height: 1.35;
       }
-      .shadow-analysis-grid {
+      .shadow-note-inline {
+        margin-top: 0.16rem;
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+        line-height: 1.3;
+      }
+      .shadow-hidden-metrics {
         display: none;
       }
       .shadow-micro-grid {
@@ -1772,19 +1778,19 @@
             <div class="shadow-main-value" id="shadow-average">0h 00m</div>
             <div class="shadow-top-grid">
               <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Weekly 7-Day Avg</div>
-                <div class="shadow-mini-value" id="shadow-weekly-average">0h 00m</div>
-                <div class="shadow-mini-sub">Shadow standard <strong id="shadow-standard-metric">0h 00m</strong></div>
+                <div class="shadow-mini-label">Shadow Standard</div>
+                <div class="shadow-mini-value" id="shadow-standard-metric">0h 00m</div>
+                <div class="shadow-mini-sub">Weekly avg <strong id="shadow-weekly-average">0h 00m</strong></div>
+                <div class="shadow-note-inline" id="shadow-note">Calculated from real historical data only</div>
               </div>
               <div class="shadow-mini-card">
                 <div class="shadow-mini-label">Momentum</div>
                 <div class="shadow-mini-value" id="shadow-momentum-score">0.00x</div>
-                <div class="shadow-mini-sub"><strong id="shadow-momentum" class="shadow-momentum-flat">Stable</strong></div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Consistency</div>
-                <div class="shadow-mini-value" id="shadow-consistency-index">0/7</div>
-                <div class="shadow-mini-sub">Trend <strong id="shadow-growth-trend">STABLE</strong></div>
+                <div class="shadow-summary-stack">
+                  <div class="shadow-mini-sub"><strong id="shadow-momentum" class="shadow-momentum-flat">Stable</strong></div>
+                  <div class="shadow-mini-sub">Consistency <strong id="shadow-consistency-index">0/7</strong></div>
+                  <div class="shadow-mini-sub">Trend <strong id="shadow-growth-trend">STABLE</strong></div>
+                </div>
               </div>
               <div class="shadow-mini-card">
                 <div class="shadow-mini-label">Today’s Target</div>
@@ -1800,52 +1806,57 @@
                   <div class="shadow-summary-sub" id="shadow-badge">Baseline</div>
                   <div class="shadow-summary-sub" id="shadow-duel">Leader: Even</div>
                 </div>
-              </div>
-              <div class="shadow-summary-card">
-                <div class="shadow-summary-label">Monthly Race</div>
-                <div class="shadow-summary-value" id="shadow-score">Monthly Score: You 0 - Shadow 0</div>
-                <div class="shadow-summary-stack">
-                  <div class="shadow-summary-sub" id="shadow-lead-margin">Lead Margin: 0</div>
-                  <div class="shadow-summary-sub" id="shadow-trend">Monthly trend: 0%</div>
+                <div class="shadow-hidden-metrics">
+                  <div id="shadow-score">Monthly Score: You 0 - Shadow 0</div>
+                  <div id="shadow-lead-margin">Lead Margin: 0</div>
+                  <div id="shadow-trend">Monthly trend: 0%</div>
+                  <div class="shadow-duel-bar">
+                    <div class="shadow-duel-you">
+                      <div class="shadow-duel-you-fill" id="shadow-duel-you-fill"></div>
+                    </div>
+                    <div class="shadow-duel-shadow">
+                      <div class="shadow-duel-shadow-fill" id="shadow-duel-shadow-fill"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="shadow-duel-bar">
-              <div class="shadow-duel-you">
-                <div
-                  class="shadow-duel-you-fill"
-                  id="shadow-duel-you-fill"
-                ></div>
+              <div class="shadow-summary-card">
+                <div class="shadow-summary-label">Penalty</div>
+                <div class="shadow-summary-value shadow-gap-positive" id="shadow-penalty">-0h 00m</div>
+                <div class="shadow-summary-sub" id="shadow-penalty-reason">No active penalty triggers</div>
               </div>
-              <div class="shadow-duel-shadow">
-                <div
-                  class="shadow-duel-shadow-fill"
-                  id="shadow-duel-shadow-fill"
-                ></div>
-              </div>
-            </div>
-            <div class="shadow-note-block">
-              <div class="shadow-note-title">Shadow Standard</div>
-              <div class="shadow-line" id="shadow-note">
-                Calculated from real historical data only
+              <div class="shadow-summary-card">
+                <div class="shadow-summary-label">Deadline / Ladder</div>
+                <div class="shadow-summary-value" id="shadow-penalty-expiry">No active penalty</div>
+                <div class="shadow-summary-stack">
+                  <div class="shadow-summary-sub">Roadmap timer: <strong id="roadmap-penalty-timer">No active penalty</strong></div>
+                  <div class="shadow-summary-sub" id="shadow-win-ladder">3/5: 0/3 � 5/7: 0/5</div>
+                  <div class="shadow-summary-sub">Distraction budget: <strong id="shadow-distraction-budget">0h 00m / 1h 30m</strong></div>
+                </div>
+                <div class="shadow-hidden-metrics">
+                  <div id="flow-blockers-status-compact">-</div>
+                  <div id="flow-proneness-status-compact">-</div>
+                  <div id="flow-triggers-status-compact">-</div>
+                  <div id="flow-cycle-status-compact">-</div>
+                </div>
               </div>
             </div>
             <div class="advanced-shadow-panel">
               <div class="shadow-analysis-grid">
                 <div class="shadow-analysis-card">
                   <div class="shadow-analysis-label">Penalty</div>
-                  <div class="shadow-analysis-value shadow-gap-positive" id="shadow-penalty">-0h 00m</div>
-                  <div class="shadow-analysis-sub" id="shadow-penalty-reason">No active penalty triggers</div>
+                  <div class="shadow-analysis-value shadow-gap-positive" id="shadow-penalty-legacy">-0h 00m</div>
+                  <div class="shadow-analysis-sub" id="shadow-penalty-reason-legacy">No active penalty triggers</div>
                 </div>
                 <div class="shadow-analysis-card">
                   <div class="shadow-analysis-label">Deadline</div>
-                  <div class="shadow-analysis-value" id="shadow-penalty-expiry">No active penalty</div>
-                  <div class="shadow-analysis-sub">Roadmap timer: <strong id="roadmap-penalty-timer">No active penalty</strong></div>
+                  <div class="shadow-analysis-value" id="shadow-penalty-expiry-legacy">No active penalty</div>
+                  <div class="shadow-analysis-sub">Roadmap timer: <strong id="roadmap-penalty-timer-legacy">No active penalty</strong></div>
                 </div>
                 <div class="shadow-analysis-card">
                   <div class="shadow-analysis-label">Win Ladder</div>
-                  <div class="shadow-analysis-value" id="shadow-win-ladder">3/5: 0/3 • 5/7: 0/5</div>
-                  <div class="shadow-analysis-sub">Distraction budget: <strong id="shadow-distraction-budget">0h 00m / 1h 30m</strong></div>
+                  <div class="shadow-analysis-value" id="shadow-win-ladder-legacy">3/5: 0/3 • 5/7: 0/5</div>
+                  <div class="shadow-analysis-sub">Distraction budget: <strong id="shadow-distraction-budget-legacy">0h 00m / 1h 30m</strong></div>
                 </div>
                 <div class="shadow-analysis-card">
                   <div class="shadow-analysis-label">Flow State</div>
@@ -7660,3 +7671,5 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     <script type="module" src="app.js?v=2026-03-15-phase4"></script>
   </body>
 </html>
+
+
