@@ -6395,10 +6395,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           primaryContainer.innerHTML = renderPhaseSet([
             "Morning",
             "Core Study",
-            "Breaks",
           ]);
           if (secondaryContainer) {
-            secondaryContainer.innerHTML = renderPhaseSet(["Evening"]);
+            secondaryContainer.innerHTML = renderPhaseSet(["Breaks", "Evening"]);
           }
 
           // Phase 0.5: start live loop (guard inside prevents duplicate)
@@ -7652,6 +7651,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     <script type="module" src="app.js?v=2026-03-15-phase4"></script>
   </body>
 </html>
+
 
 
 
