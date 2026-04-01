@@ -452,8 +452,8 @@
         color: var(--text-accent);
       }
       .shadow-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        display: flex;
+        align-items: stretch;
         gap: 1rem;
       }
       .shadow-card {
@@ -470,6 +470,10 @@
           transform 320ms ease,
           box-shadow 320ms ease,
           border-color 320ms ease;
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
       }
       .shadow-card:hover {
         transform: translateY(-2px);
@@ -513,20 +517,50 @@
       .shadow-goal-list {
         margin-top: 0.7rem;
         display: grid;
-        gap: 0.55rem;
+        gap: 0.8rem;
+      }
+      .mission-phase {
+        display: grid;
+        gap: 0.45rem;
+      }
+      .mission-phase-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+      .mission-phase-title {
+        font-size: 0.74rem;
+        letter-spacing: 0.55px;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .mission-phase-count {
+        font-size: 0.72rem;
+        color: var(--text-muted, #999);
+      }
+      .mission-phase-items {
+        display: grid;
+        gap: 0.45rem;
+      }
+      .mission-phase-items.secondary {
+        opacity: 0.9;
       }
       .shadow-goal-item {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         gap: 0.85rem;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         color: var(--text-secondary);
         cursor: pointer;
-        padding: 0.6rem 0.7rem;
+        padding: 0.55rem 0.7rem;
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.08);
         background: rgba(255, 255, 255, 0.02);
+      }
+      .shadow-goal-item.mission-secondary {
+        background: rgba(255, 255, 255, 0.015);
       }
       .shadow-goal-item > .mission-copy {
         min-width: 0;
@@ -539,6 +573,7 @@
       .mission-title {
         color: var(--text-main, #f5f5f5);
         line-height: 1.35;
+        flex: 1 1 220px;
       }
       .shadow-goal-item .mission-check {
         width: 18px;
@@ -699,11 +734,34 @@
       }
       /* GitHub 365-day Heatmap */
       .github-heatmap-container {
-        display: flex;
-        gap: 2px;
+        width: 100%;
+        overflow: hidden;
+      }
+      .github-heatmap-wrapper {
         overflow-x: auto;
         padding-bottom: 0.8rem;
         scrollbar-width: thin;
+      }
+      .github-heatmap-inner {
+        display: flex;
+        flex-direction: column;
+        width: max-content;
+      }
+      .github-months-row {
+        display: flex;
+        position: relative;
+        height: 16px;
+        font-size: 10px;
+        color: var(--text-secondary);
+        margin-bottom: 2px;
+      }
+      .github-month-label {
+        position: absolute;
+        top: 0;
+      }
+      .github-heatmap-grid {
+        display: flex;
+        gap: 2px;
       }
       .github-weeks-col {
         display: flex;
@@ -1261,7 +1319,7 @@
           grid-template-columns: 1fr;
         }
         .shadow-grid {
-          grid-template-columns: 1fr;
+          flex-direction: column;
         }
         .trainer-overview {
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1305,24 +1363,169 @@
       }
 
       .shadow-mission-details {
-        margin-top: 0.9rem;
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
-      .shadow-mission-details > summary {
-        cursor: pointer;
-        font-weight: 700;
+      .shadow-mission-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.1rem;
+      }
+      .shadow-mission-title {
+        font-size: 0.88rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--text-accent);
+      }
+      .shadow-mission-score-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.28rem 0.55rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .shadow-mission-summary {
         margin-bottom: 0.65rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+      }
+      .shadow-mission-footer {
+        margin-top: 0.75rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+      }
+      .shadow-badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.3rem;
+      }
+      .shadow-top-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+        margin: 0.85rem 0 0.7rem;
+      }
+      .shadow-mini-card {
+        min-width: 0;
+        padding: 0.75rem 0.8rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .shadow-mini-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-secondary);
+        margin-bottom: 0.2rem;
+      }
+      .shadow-mini-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-accent);
+      }
+      .shadow-mini-sub {
+        margin-top: 0.18rem;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+      .shadow-analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+        margin-top: 0.8rem;
+      }
+      .shadow-analysis-card {
+        min-width: 0;
+        padding: 0.8rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .shadow-analysis-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-secondary);
+        margin-bottom: 0.22rem;
+      }
+      .shadow-analysis-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text-accent);
+      }
+      .shadow-analysis-sub {
+        margin-top: 0.2rem;
+        font-size: 0.78rem;
+        line-height: 1.35;
+        color: var(--text-secondary);
+      }
+      .shadow-analysis-sub strong {
+        color: var(--text-accent);
+      }
+      .shadow-analysis-span {
+        grid-column: 1 / -1;
       }
       .advanced-shadow-panel {
-        margin-top: 0.9rem;
+        margin-top: auto;
         border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 0.65rem 0.75rem;
+        border-radius: 12px;
+        padding: 0.85rem 0.9rem;
         background: rgba(0, 0, 0, 0.2);
       }
       .advanced-shadow-panel > summary {
+        list-style: none;
         cursor: pointer;
         font-weight: 700;
-        margin-bottom: 0.55rem;
+        color: var(--text-accent);
+      }
+      .advanced-shadow-panel > summary::-webkit-details-marker {
+        display: none;
+      }
+      .advanced-shadow-summary-note {
+        margin-top: 0.2rem;
+        font-size: 0.76rem;
+        color: var(--text-secondary);
+      }
+      .shadow-micro-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem 0.8rem;
+        margin-top: 0.75rem;
+      }
+      .shadow-micro-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.14rem;
+      }
+      .shadow-micro-item span {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.45px;
+        color: var(--text-secondary);
+      }
+      .shadow-micro-item strong {
+        font-size: 0.82rem;
+        color: var(--text-accent);
+      }
+      @media (max-width: 900px) {
+        .shadow-grid {
+          flex-direction: column;
+        }
+        .shadow-top-grid,
+        .shadow-analysis-grid,
+        .shadow-micro-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       /* Login Gate */
@@ -1509,36 +1712,43 @@
             <div class="shadow-main-value" id="shadow-current-minutes">
               0h 00m
             </div>
-            <div class="shadow-line">
-              Gap vs Shadow:
-              <strong id="shadow-gap" class="shadow-gap-equal">0h 00m</strong>
-            </div>
-            <div class="shadow-line">
-              Need to tie today: <strong id="shadow-needed-tie">0h 00m</strong>
-            </div>
-            <div class="shadow-line">
-              Need to lead today:
-              <strong id="shadow-needed-lead">0h 00m</strong>
-            </div>
-            <div class="shadow-line">
-              Reached: <strong id="shadow-percent">0%</strong>
-            </div>
-            <div class="shadow-line">
-              Shadow Defense Target (tomorrow):
-              <strong id="shadow-defense-target">0h 00m</strong>
-            </div>
-            <div>
-              <span class="shadow-badge" id="shadow-status">OUT OF RANGE</span>
-              <span class="shadow-badge" id="shadow-pressure"
-                >Pressure: High</span
-              >
+            <div class="shadow-top-grid">
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Gap vs Shadow</div>
+                <div class="shadow-mini-value" id="shadow-gap">0h 00m</div>
+                <div class="shadow-mini-sub">Reached <strong id="shadow-percent">0%</strong></div>
+              </div>
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Today’s Line</div>
+                <div class="shadow-mini-value" id="shadow-needed-tie">0h 00m</div>
+                <div class="shadow-mini-sub">Lead by <strong id="shadow-needed-lead">0h 00m</strong></div>
+              </div>
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Tomorrow Defense</div>
+                <div class="shadow-mini-value" id="shadow-defense-target">0h 00m</div>
+                <div class="shadow-mini-sub">Protect the new floor</div>
+              </div>
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Status</div>
+                <div class="shadow-mini-value" id="shadow-status">OUT OF RANGE</div>
+                <div class="shadow-mini-sub" id="shadow-pressure">Pressure: High</div>
+              </div>
             </div>
             <div class="shadow-progress">
               <div class="shadow-progress-fill" id="shadow-progress-fill"></div>
             </div>
 
             <div class="shadow-mission-details">
-              <div class="shadow-mission-title">Daily Mission</div>
+              <div class="shadow-mission-title-row">
+                <div class="shadow-mission-title">Daily Mission</div>
+                <div class="shadow-mission-score-badge">
+                  Mission Score
+                  <strong id="shadow-mission-score">0/100</strong>
+                </div>
+              </div>
+              <div class="shadow-mission-summary">
+                Scan by phase, execute the active block, and keep the compact checklist clean.
+              </div>
               <div class="shadow-goal-list">
                 <div class="shadow-goal-item">
                   <div class="mission-copy">
@@ -1577,52 +1787,39 @@
                   ><input class="mission-check" type="checkbox" />
                 </div>
               </div>
-              <div class="shadow-line">
-                Mission Score: <strong id="shadow-mission-score">0/100</strong>
-              </div>
+              <div class="shadow-mission-footer">Primary tasks stay at the top. Support blocks stay grouped below.</div>
             </div>
           </div>
           <div class="shadow-card" id="shadow-standard-card">
             <div class="shadow-card-title">🌑 The Shadow</div>
             <div class="shadow-main-value" id="shadow-average">0h 00m</div>
-            <div class="shadow-line">
-              Weekly 7-Day Avg:
-              <strong id="shadow-weekly-average">0h 00m</strong>
+            <div class="shadow-top-grid">
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Weekly 7-Day Avg</div>
+                <div class="shadow-mini-value" id="shadow-weekly-average">0h 00m</div>
+                <div class="shadow-mini-sub">Shadow standard <strong id="shadow-standard-metric">0h 00m</strong></div>
+              </div>
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Momentum</div>
+                <div class="shadow-mini-value" id="shadow-momentum-score">0.00x</div>
+                <div class="shadow-mini-sub"><strong id="shadow-momentum" class="shadow-momentum-flat">Stable</strong></div>
+              </div>
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Consistency</div>
+                <div class="shadow-mini-value" id="shadow-consistency-index">0/7</div>
+                <div class="shadow-mini-sub">Trend <strong id="shadow-growth-trend">STABLE</strong></div>
+              </div>
+              <div class="shadow-mini-card">
+                <div class="shadow-mini-label">Today’s Target</div>
+                <div class="shadow-mini-value" id="shadow-target">0h 00m</div>
+                <div class="shadow-mini-sub">Weekly delta <strong id="shadow-weekly-gap" class="shadow-gap-equal">0h 00m</strong></div>
+              </div>
             </div>
-            <div class="shadow-line">
-              Shadow Standard:
-              <strong id="shadow-standard-metric">0h 00m</strong>
-            </div>
-            <div class="shadow-line">
-              Momentum Score: <strong id="shadow-momentum-score">0.00x</strong>
-            </div>
-            <div class="shadow-line">
-              Consistency Index:
-              <strong id="shadow-consistency-index">0/7</strong>
-            </div>
-            <div class="shadow-line">
-              Growth Trend: <strong id="shadow-growth-trend">STABLE</strong>
-            </div>
-            <div class="shadow-line">
-              Momentum:
-              <strong id="shadow-momentum" class="shadow-momentum-flat"
-                >Stable</strong
-              >
-            </div>
-            <div class="shadow-line">
-              Weekly Delta vs Shadow:
-              <strong id="shadow-weekly-gap" class="shadow-gap-equal"
-                >0h 00m</strong
-              >
-            </div>
-            <div class="shadow-line">
-              Today's Target: <strong id="shadow-target">0h 00m</strong>
-            </div>
-            <div>
+            <div class="shadow-badge-row">
               <span class="shadow-badge" id="shadow-rank">Rank: Initiate</span>
               <span class="shadow-badge" id="shadow-badge">Baseline</span>
             </div>
-            <div>
+            <div class="shadow-badge-row">
               <span class="shadow-badge" id="shadow-score"
                 >Monthly Score: You 0 - Shadow 0</span
               >
@@ -1657,48 +1854,30 @@
 
             <details class="advanced-shadow-panel">
               <summary>Advanced Shadow Analysis</summary>
-              <div class="shadow-line">
-                Penalty:
-                <strong id="shadow-penalty" class="shadow-gap-positive"
-                  >-0h 00m</strong
-                >
-              </div>
-              <div class="shadow-line">
-                Penalty Reason:
-                <strong id="shadow-penalty-reason"
-                  >No active penalty triggers</strong
-                >
-              </div>
-              <div class="shadow-line">
-                Penalty Expiry:
-                <strong id="shadow-penalty-expiry">No active penalty</strong>
-              </div>
-              <div class="shadow-line">
-                Distraction Budget:
-                <strong id="shadow-distraction-budget">0h 00m / 1h 30m</strong>
-              </div>
-              <div class="shadow-line">
-                Win Ladder:
-                <strong id="shadow-win-ladder">3/5: 0/3 • 5/7: 0/5</strong>
-              </div>
-              <div class="shadow-line">
-                Roadmap Penalty Timer:
-                <strong id="roadmap-penalty-timer">No active penalty</strong>
-              </div>
-              <div class="flow-row">
-                <span>Flow Blockers</span
-                ><strong id="flow-blockers-status">-</strong>
-              </div>
-              <div class="flow-row">
-                <span>Flow Proneness</span
-                ><strong id="flow-proneness-status">-</strong>
-              </div>
-              <div class="flow-row">
-                <span>Flow Triggers</span
-                ><strong id="flow-triggers-status">-</strong>
-              </div>
-              <div class="flow-row">
-                <span>Flow Cycle</span><strong id="flow-cycle-status">-</strong>
+              <div class="advanced-shadow-summary-note">Urgent values stay prominent. Detailed reasoning stays compressed under each card.</div>
+              <div class="shadow-analysis-grid">
+                <div class="shadow-analysis-card">
+                  <div class="shadow-analysis-label">Penalty</div>
+                  <div class="shadow-analysis-value shadow-gap-positive" id="shadow-penalty">-0h 00m</div>
+                  <div class="shadow-analysis-sub" id="shadow-penalty-reason">No active penalty triggers</div>
+                </div>
+                <div class="shadow-analysis-card">
+                  <div class="shadow-analysis-label">Deadline</div>
+                  <div class="shadow-analysis-value" id="shadow-penalty-expiry">No active penalty</div>
+                  <div class="shadow-analysis-sub">Roadmap timer: <strong id="roadmap-penalty-timer">No active penalty</strong></div>
+                </div>
+                <div class="shadow-analysis-card">
+                  <div class="shadow-analysis-label">Win Ladder</div>
+                  <div class="shadow-analysis-value" id="shadow-win-ladder">3/5: 0/3 • 5/7: 0/5</div>
+                  <div class="shadow-analysis-sub">Distraction budget: <strong id="shadow-distraction-budget">0h 00m / 1h 30m</strong></div>
+                </div>
+                <div class="shadow-analysis-card">
+                  <div class="shadow-analysis-label">Flow State</div>
+                  <div class="shadow-analysis-sub">Blockers: <strong id="flow-blockers-status">-</strong></div>
+                  <div class="shadow-analysis-sub">Proneness: <strong id="flow-proneness-status">-</strong></div>
+                  <div class="shadow-analysis-sub">Triggers: <strong id="flow-triggers-status">-</strong></div>
+                  <div class="shadow-analysis-sub">Cycle: <strong id="flow-cycle-status">-</strong></div>
+                </div>
               </div>
             </details>
           </div>
@@ -5256,11 +5435,13 @@
           const gapEl = this.app.elements["shadow-gap"];
           gapEl.textContent = `${gap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(gap))}`;
           gapEl.className =
-            gap > 0
-              ? "shadow-gap-positive"
-              : gap < 0
-                ? "shadow-gap-negative"
-                : "shadow-gap-equal";
+            `shadow-mini-value ${
+              gap > 0
+                ? "shadow-gap-positive"
+                : gap < 0
+                  ? "shadow-gap-negative"
+                  : "shadow-gap-equal"
+            }`;
 
           this.app.elements["shadow-status"].textContent =
             this.getCurrentStatus(percentage);
@@ -5272,7 +5453,7 @@
           );
           const pressureEl = this.app.elements["shadow-pressure"];
           pressureEl.textContent = pressure.label;
-          pressureEl.className = `shadow-badge ${pressure.cls}`;
+          pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
           const rank = this.getShadowRank(shadowAvg);
           this.app.elements["shadow-rank"].textContent = `Rank: ${rank.title}`;
@@ -5949,7 +6130,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const analog3Topic = getTopic(2, "Reinforcement");
           const analogRevisionTopic = "Revision";
 
-          const makeTask = (labelPrefix, topic, win, priority, dType, target) => {
+          const makeTask = (labelPrefix, topic, win, priority, dType, target, phase, secondary = false) => {
             const progress = this.getTopicProgress(topic);
             const done = progress.minutes >= target;
             let label = labelPrefix || topic;
@@ -5965,28 +6146,30 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               win,
               priority,
               discipline_type: dType,
+              phase,
+              secondary,
               target_minutes: target,
               estimated_minutes: dType === "FLEXIBLE" ? Math.round(target * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER)) : target
             };
           };
 
           return [
-            makeTask("IB CORE", "CA + Reasoning + Quant", [5, 6.25], "HIGH", "STRICT", 75),
-            makeTask("TRAIN", "Workout / Jog", [6.25, 7.5], "HIGH", "STRICT", 75),
-            makeTask("BATH + BREAKFAST", "Bath + Breakfast", [7.5, 8.25], "LOW", "FLEXIBLE", 45),
-            makeTask("ANALOG SET 1", analog1Topic, [8.25, 10.25], "HIGH", "STRICT", 120),
-            makeTask("BREAK", "Break + Hydration", [10.25, 10.5], "LOW", "FLEXIBLE", 15),
-            makeTask("ANALOG SET 2", analog2Topic, [10.5, 12.5], "HIGH", "STRICT", 120),
-            makeTask("LUNCH", "Lunch", [12.5, 13.25], "LOW", "FLEXIBLE", 45),
-            makeTask("BUILD", "Project / Circuits", [13.25, 15.25], "MEDIUM", "FLEXIBLE", 120),
-            makeTask("ANALOG SET 3", analog3Topic, [15.25, 17.25], "HIGH", "STRICT", 120),
-            makeTask("SNACK", "Snack + Break", [17.25, 17.75], "LOW", "FLEXIBLE", 30),
-            makeTask("IB REVISION", "IB Revision", [17.75, 18.75], "MEDIUM", "FLEXIBLE", 60),
-            makeTask("ANALOG REVISION", analogRevisionTopic, [18.75, 19.5], "MEDIUM", "FLEXIBLE", 45),
-            makeTask("DINNER", "Dinner", [19.5, 20.25], "LOW", "FLEXIBLE", 45),
-            makeTask("LIGHT TASKS", "Planning / Light Tasks", [20.25, 21.5], "LOW", "FLEXIBLE", 75),
-            makeTask("SHUTDOWN", "No screens", [21.5, 22], "HIGH", "STRICT", 30),
-            makeTask("REST", "Sleep", [22, 29], "HIGH", "STRICT", 420),
+            makeTask("IB CORE", "CA + Reasoning + Quant", [5, 6.25], "HIGH", "STRICT", 75, "Morning"),
+            makeTask("TRAIN", "Workout / Jog", [6.25, 7.5], "HIGH", "STRICT", 75, "Morning", true),
+            makeTask("BATH + BREAKFAST", "Bath + Breakfast", [7.5, 8.25], "LOW", "FLEXIBLE", 45, "Morning", true),
+            makeTask("ANALOG SET 1", analog1Topic, [8.25, 10.25], "HIGH", "STRICT", 120, "Core Study"),
+            makeTask("BREAK", "Break + Hydration", [10.25, 10.5], "LOW", "FLEXIBLE", 15, "Breaks", true),
+            makeTask("ANALOG SET 2", analog2Topic, [10.5, 12.5], "HIGH", "STRICT", 120, "Core Study"),
+            makeTask("LUNCH", "Lunch", [12.5, 13.25], "LOW", "FLEXIBLE", 45, "Breaks", true),
+            makeTask("BUILD", "Project / Circuits", [13.25, 15.25], "MEDIUM", "FLEXIBLE", 120, "Core Study"),
+            makeTask("ANALOG SET 3", analog3Topic, [15.25, 17.25], "HIGH", "STRICT", 120, "Core Study"),
+            makeTask("SNACK", "Snack + Break", [17.25, 17.75], "LOW", "FLEXIBLE", 30, "Breaks", true),
+            makeTask("IB REVISION", "IB Revision", [17.75, 18.75], "MEDIUM", "FLEXIBLE", 60, "Evening"),
+            makeTask("ANALOG REVISION", analogRevisionTopic, [18.75, 19.5], "MEDIUM", "FLEXIBLE", 45, "Evening"),
+            makeTask("DINNER", "Dinner", [19.5, 20.25], "LOW", "FLEXIBLE", 45, "Breaks", true),
+            makeTask("LIGHT TASKS", "Planning / Light Tasks", [20.25, 21.5], "LOW", "FLEXIBLE", 75, "Evening", true),
+            makeTask("SHUTDOWN", "No screens", [21.5, 22], "HIGH", "STRICT", 30, "Evening", true),
+            makeTask("REST", "Sleep", [22, 29], "HIGH", "STRICT", 420, "Evening", true),
           ];
         }
 
@@ -6178,25 +6361,40 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
           const taskIds = ["mission-task-1","mission-task-2","mission-task-3","mission-task-4","mission-task-5","mission-task-6","mission-task-7"];
           const timeIds = ["mission-time-1","mission-time-2","mission-time-3","mission-time-4","mission-time-5","mission-time-6","mission-time-7"];
-
-          // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
-          container.innerHTML = tasks.map((item, idx) => {
+          const phaseOrder = ["Morning", "Core Study", "Breaks", "Evening"];
+          const renderTask = (item, idx) => {
             const checkId = this.getMissionCheckId(item.topic, idx);
-            const state   = this._missionStateCache.get(checkId);
-            const labelId = idx < 4 ? ` id="${taskIds[idx]}"` : "";
-            const timeId = idx < 4 ? ` id="${timeIds[idx]}"` : "";
+            const state = this._missionStateCache.get(checkId);
+            const labelId = idx < 7 ? ` id="${taskIds[idx]}"` : "";
+            const timeId = idx < 7 ? ` id="${timeIds[idx]}"` : "";
             let cls = "shadow-goal-item";
-            if (state.done)      cls += " shadow-goal-done";
-            if (state.expired)   cls += " mission-expired";
+            if (item.secondary) cls += " mission-secondary";
+            if (state.done) cls += " shadow-goal-done";
+            if (state.expired) cls += " mission-expired";
             if (state.activeNow) cls += " mission-active-now";
             const badge = `<span class="mission-time-badge"${timeId}>${this.formatTimeWindow(state.win)}</span>`;
-            const labelledBy = idx < 4 ? `${taskIds[idx]} ${timeIds[idx]}` : "";
+            const labelledBy = idx < 7 ? `${taskIds[idx]} ${timeIds[idx]}` : "";
             const ariaLabel = labelledBy ? ` aria-labelledby="${labelledBy}"` : ` aria-label="${this.escapeHtml(item.label || item.topic)} ${this.formatTimeWindow(state.win)}"`;
-            return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}">` +
+            return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}"${ariaLabel}>` +
                      `<div class="mission-copy"><span class="mission-title"${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}</span>${badge}</div>` +
                      `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
                    `</div>`;
+          };
+
+          const phaseMarkup = phaseOrder.map((phase) => {
+            const entries = tasks.map((item, idx) => ({ item, idx })).filter(({ item }) => (item.phase || "Core Study") === phase);
+            if (!entries.length) return "";
+            const primary = entries.filter(({ item }) => !item.secondary);
+            const secondary = entries.filter(({ item }) => !!item.secondary);
+            return `<section class="mission-phase">` +
+                     `<div class="mission-phase-header"><div class="mission-phase-title">${this.escapeHtml(phase)}</div><div class="mission-phase-count">${entries.length} block${entries.length === 1 ? "" : "s"}</div></div>` +
+                     (primary.length ? `<div class="mission-phase-items">${primary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
+                     (secondary.length ? `<div class="mission-phase-items secondary">${secondary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
+                   `</section>`;
           }).join("");
+
+          // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
+          container.innerHTML = phaseMarkup;
 
           // Phase 0.5: start live loop (guard inside prevents duplicate)
           this.startMissionLiveLoop();
