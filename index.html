@@ -765,7 +765,7 @@
         display: grid;
         grid-auto-flow: column;
         grid-auto-columns: 8px;
-        grid-template-rows: 8px;
+        grid-template-rows: repeat(7, 8px);
         gap: 2px;
         align-items: start;
       }
@@ -7500,15 +7500,15 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           });
 
           const target = 150; // default heat map scaling target
-          const days = 365;
-          const today = new Date();
+          const year = 2026;
           const dates = [];
-          
-          for (let i = days - 1; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            dates.push(this.app.getDateString(d));
+          const start = new Date(year, 0, 1);
+          const end = new Date(year, 11, 31);
+
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dates.push(this.app.getDateString(new Date(d)));
           }
+
           
           const wrapper = document.createElement("div");
           wrapper.className = "github-heatmap-wrapper";
@@ -7690,6 +7690,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     <script type="module" src="app.js?v=2026-03-15-phase4"></script>
   </body>
 </html>
+
 
 
 
