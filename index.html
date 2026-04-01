@@ -526,18 +526,20 @@
       .mission-phase-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
+        justify-content: flex-start;
+        gap: 0.5rem;
       }
       .mission-phase-title {
-        font-size: 0.74rem;
-        letter-spacing: 0.55px;
-        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0.1rem 0.45rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        font-size: 0.68rem;
+        letter-spacing: 0.35px;
         color: var(--text-secondary);
-      }
-      .mission-phase-count {
-        font-size: 0.72rem;
-        color: var(--text-muted, #999);
+        background: rgba(255, 255, 255, 0.03);
       }
       .mission-phase-items {
         display: grid;
@@ -1393,8 +1395,8 @@
         background: rgba(255, 255, 255, 0.04);
       }
       .shadow-mission-summary {
-        margin-bottom: 0.65rem;
-        font-size: 0.8rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.78rem;
         color: var(--text-secondary);
       }
       .shadow-mission-footer {
@@ -1842,16 +1844,6 @@
             <div class="shadow-line" id="shadow-note">
               Calculated from real historical data only
             </div>
-            <div class="shadow-mission-details shadow-mission-secondary">
-              <div class="shadow-mission-title-row">
-                <div class="shadow-mission-title">Support Blocks</div>
-              </div>
-              <div class="shadow-mission-summary">
-                Breaks and evening blocks live here to keep both panels balanced.
-              </div>
-              <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
-            </div>
-
             <div class="advanced-shadow-panel">
               <div class="shadow-analysis-grid">
                 <div class="shadow-analysis-card">
@@ -1877,6 +1869,15 @@
                   <div class="shadow-analysis-sub">Cycle: <strong id="flow-cycle-status">-</strong></div>
                 </div>
               </div>
+            </div>
+            <div class="shadow-mission-details shadow-mission-secondary">
+              <div class="shadow-mission-title-row">
+                <div class="shadow-mission-title">Support Blocks</div>
+              </div>
+              <div class="shadow-mission-summary">
+                Breaks and evening blocks live here to keep both panels balanced.
+              </div>
+              <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
             </div>
           </div>
         </div>
@@ -6103,6 +6104,16 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           };
         }
 
+        getMissionPhaseLabel(phase = "") {
+          const labels = {
+            Morning: "AM",
+            "Core Study": "Focus",
+            Breaks: "Reset",
+            Evening: "PM",
+          };
+          return labels[phase] || phase;
+        }
+
         getDailyMissionTasks() {
           const active = this.getActiveRoadmapDay();
           const today = this.app.getDateString(new Date());
@@ -6398,7 +6409,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
                 const primary = entries.filter(({ item }) => !item.secondary);
                 const secondary = entries.filter(({ item }) => !!item.secondary);
                 return `<section class="mission-phase">` +
-                         `<div class="mission-phase-header"><div class="mission-phase-title">${this.escapeHtml(phase)}</div><div class="mission-phase-count">${entries.length} block${entries.length === 1 ? "" : "s"}</div></div>` +
+                         `<div class="mission-phase-header"><div class="mission-phase-title">${this.escapeHtml(this.getMissionPhaseLabel(phase))}</div></div>` +
                          (primary.length ? `<div class="mission-phase-items">${primary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
                          (secondary.length ? `<div class="mission-phase-items secondary">${secondary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
                        `</section>`;
