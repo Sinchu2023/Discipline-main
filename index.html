@@ -1415,6 +1415,51 @@
         gap: 0.45rem;
         margin-top: 0.3rem;
       }
+      .shadow-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+        margin: 0.8rem 0 0.75rem;
+      }
+      .shadow-summary-card {
+        min-width: 0;
+        padding: 0.78rem 0.82rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .shadow-summary-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.45px;
+        color: var(--text-secondary);
+        margin-bottom: 0.2rem;
+      }
+      .shadow-summary-value {
+        font-size: 0.94rem;
+        font-weight: 700;
+        color: var(--text-accent);
+      }
+      .shadow-summary-sub {
+        margin-top: 0.18rem;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        line-height: 1.35;
+      }
+      .shadow-note-block {
+        margin-top: 0.75rem;
+        padding: 0.72rem 0.8rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .shadow-note-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.45px;
+        color: var(--text-secondary);
+        margin-bottom: 0.18rem;
+      }
       .shadow-top-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1807,21 +1852,27 @@
                 <div class="shadow-mini-sub">Weekly delta <strong id="shadow-weekly-gap" class="shadow-gap-equal">0h 00m</strong></div>
               </div>
             </div>
-            <div class="shadow-badge-row">
-              <span class="shadow-badge" id="shadow-rank">Rank: Initiate</span>
-              <span class="shadow-badge" id="shadow-badge">Baseline</span>
-            </div>
-            <div class="shadow-badge-row">
-              <span class="shadow-badge" id="shadow-score"
-                >Monthly Score: You 0 - Shadow 0</span
-              >
-              <span class="shadow-badge" id="shadow-duel">Leader: Even</span>
-              <span class="shadow-badge" id="shadow-lead-margin"
-                >Lead Margin: 0</span
-              >
-              <span class="shadow-badge" id="shadow-trend"
-                >Monthly trend: 0%</span
-              >
+            <div class="shadow-summary-grid">
+              <div class="shadow-summary-card">
+                <div class="shadow-summary-label">Rank</div>
+                <div class="shadow-summary-value" id="shadow-rank">Rank: Initiate</div>
+                <div class="shadow-summary-sub" id="shadow-badge">Baseline</div>
+              </div>
+              <div class="shadow-summary-card">
+                <div class="shadow-summary-label">Monthly Score</div>
+                <div class="shadow-summary-value" id="shadow-score">Monthly Score: You 0 - Shadow 0</div>
+                <div class="shadow-summary-sub" id="shadow-duel">Leader: Even</div>
+              </div>
+              <div class="shadow-summary-card">
+                <div class="shadow-summary-label">Lead Margin</div>
+                <div class="shadow-summary-value" id="shadow-lead-margin">Lead Margin: 0</div>
+                <div class="shadow-summary-sub" id="shadow-trend">Monthly trend: 0%</div>
+              </div>
+              <div class="shadow-summary-card">
+                <div class="shadow-summary-label">Standard</div>
+                <div class="shadow-summary-value">Historical Peak</div>
+                <div class="shadow-summary-sub">Measured from your strongest rolling performance.</div>
+              </div>
             </div>
             <div class="shadow-duel-bar">
               <div class="shadow-duel-you">
@@ -1837,11 +1888,11 @@
                 ></div>
               </div>
             </div>
-            <div class="shadow-line">
-              Your Strongest Historical 7-Day Standard
-            </div>
-            <div class="shadow-line" id="shadow-note">
-              Calculated from real historical data only
+            <div class="shadow-note-block">
+              <div class="shadow-note-title">Shadow Standard</div>
+              <div class="shadow-line" id="shadow-note">
+                Calculated from real historical data only
+              </div>
             </div>
             <div class="advanced-shadow-panel">
               <div class="shadow-analysis-grid">
@@ -7484,30 +7535,45 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           }
           
           const weeks = [];
-          for(let i=0; i<dates.length; i+=7) {
-            weeks.push(dates.slice(i, i+7));
+          for (let i = 0; i < dates.length; i += 7) {
+            weeks.push(dates.slice(i, i + 7));
           }
-          
-          weeks.forEach(week => {
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "github-heatmap-wrapper";
+
+          const inner = document.createElement("div");
+          inner.className = "github-heatmap-inner";
+
+          const grid = document.createElement("div");
+          grid.className = "github-heatmap-grid";
+
+          weeks.forEach((week) => {
             const weekCol = document.createElement("div");
             weekCol.className = "github-weeks-col";
-            week.forEach(dateStr => {
+            week.forEach((dateStr) => {
               const minutes = dailyMap.get(dateStr) || 0;
               let level = 0;
               if (minutes > 0) level = 1;
               if (minutes >= target * 0.5) level = 2;
               if (minutes >= target) level = 3;
               if (minutes >= target * 1.5) level = 4;
-              
+
               const cell = document.createElement("div");
               cell.className = "github-cell";
               cell.dataset.level = level;
               cell.title = `${dateStr}: ${this.app.formatDuration(minutes)}`;
               weekCol.appendChild(cell);
             });
-            container.appendChild(weekCol);
+            grid.appendChild(weekCol);
           });
-          setTimeout(() => container.scrollLeft = container.scrollWidth, 50);
+
+          inner.appendChild(grid);
+          wrapper.appendChild(inner);
+          container.appendChild(wrapper);
+          setTimeout(() => {
+            wrapper.scrollLeft = wrapper.scrollWidth;
+          }, 50);
         }
       }
       class EventManager {
