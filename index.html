@@ -762,13 +762,15 @@
         top: 0;
       }
       .github-heatmap-grid {
-        display: flex;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 8px;
+        grid-template-rows: 8px;
         gap: 2px;
+        align-items: start;
       }
       .github-weeks-col {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+        display: contents;
       }
       .github-cell {
         width: 8px;
@@ -7508,11 +7510,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             dates.push(this.app.getDateString(d));
           }
           
-          const weeks = [];
-          for (let i = 0; i < dates.length; i += 7) {
-            weeks.push(dates.slice(i, i + 7));
-          }
-
           const wrapper = document.createElement("div");
           wrapper.className = "github-heatmap-wrapper";
 
@@ -7522,24 +7519,19 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const grid = document.createElement("div");
           grid.className = "github-heatmap-grid";
 
-          weeks.forEach((week) => {
-            const weekCol = document.createElement("div");
-            weekCol.className = "github-weeks-col";
-            week.forEach((dateStr) => {
-              const minutes = dailyMap.get(dateStr) || 0;
-              let level = 0;
-              if (minutes > 0) level = 1;
-              if (minutes >= target * 0.5) level = 2;
-              if (minutes >= target) level = 3;
-              if (minutes >= target * 1.5) level = 4;
+          dates.forEach((dateStr) => {
+            const minutes = dailyMap.get(dateStr) || 0;
+            let level = 0;
+            if (minutes > 0) level = 1;
+            if (minutes >= target * 0.5) level = 2;
+            if (minutes >= target) level = 3;
+            if (minutes >= target * 1.5) level = 4;
 
-              const cell = document.createElement("div");
-              cell.className = "github-cell";
-              cell.dataset.level = level;
-              cell.title = `${dateStr}: ${this.app.formatDuration(minutes)}`;
-              weekCol.appendChild(cell);
-            });
-            grid.appendChild(weekCol);
+            const cell = document.createElement("div");
+            cell.className = "github-cell";
+            cell.dataset.level = level;
+            cell.title = `${dateStr}: ${this.app.formatDuration(minutes)}`;
+            grid.appendChild(cell);
           });
 
           inner.appendChild(grid);
@@ -7698,6 +7690,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     <script type="module" src="app.js?v=2026-03-15-phase4"></script>
   </body>
 </html>
+
 
 
 
