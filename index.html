@@ -1891,9 +1891,9 @@
               </div>
             </div>
             <div class="shadow-mission-details shadow-mission-secondary">
-              <div class="shadow-mission-title-row">
-                <div class="shadow-mission-title">Support Blocks</div>
-              </div>
+
+
+
               <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
             </div>
           </div>
@@ -6419,33 +6419,33 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
                    `</div>`;
           };
 
-          const renderPhaseSet = (targetPhases) =>
-            phaseOrder
-              .filter((phase) => targetPhases.includes(phase))
-              .map((phase) => {
-                const entries = tasks
-                  .map((item, idx) => ({ item, idx }))
-                  .filter(
-                    ({ item }) => (item.phase || "Core Study") === phase,
-                  );
-                if (!entries.length) return "";
-                const primary = entries.filter(({ item }) => !item.secondary);
-                const secondary = entries.filter(({ item }) => !!item.secondary);
-                return `<section class="mission-phase">` +
-                         (primary.length ? `<div class="mission-phase-items">${primary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
-                         (secondary.length ? `<div class="mission-phase-items secondary">${secondary.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>` : "") +
-                       `</section>`;
-              })
-              .join("");
+          const orderedEntries = tasks.map((item, idx) => ({ item, idx }));
+          const primaryEntries = orderedEntries.filter(({ item }) => !item.secondary);
+          const secondaryEntries = orderedEntries.filter(({ item }) => !!item.secondary);
 
-          // Phase 0.3: structural innerHTML render â€” ONLY called here, never on interaction
-          primaryContainer.innerHTML = renderPhaseSet([
-            "Morning",
-            "Core Study",
-          ]);
+          const renderEntrySet = (entries, secondary = false) => {
+            if (!entries.length) return "";
+            return `<div class="mission-phase-items${secondary ? " secondary" : ""}">${entries.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>`;
+          };
+
+          // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
+          primaryContainer.innerHTML = renderEntrySet(primaryEntries);
           if (secondaryContainer) {
-            secondaryContainer.innerHTML = renderPhaseSet(["Breaks", "Evening"]);
+            secondaryContainer.innerHTML = renderEntrySet(secondaryEntries, true);
           }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
           // Phase 0.5: start live loop (guard inside prevents duplicate)
           this.startMissionLiveLoop();
