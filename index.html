@@ -3600,18 +3600,38 @@
           });
         }
         updateStreak(showPopup = false) {
-          const dates = [
-            ...new Set(this.state.tasks.map((t) => t.date)),
+          const productiveDates = [
+            ...new Set(
+              this.state.tasks
+                .filter(
+                  (t) =>
+                    this.isProductiveCategory(t.category) &&
+                    Number.isFinite(t.duration) &&
+                    t.duration > 0,
+                )
+                .map((t) => t.date),
+            ),
           ].sort();
-          if (!dates.length) {
+          const today = this.getDateString();
+          const hasAnyTaskToday = this.state.tasks.some(
+            (t) =>
+              t.date === today &&
+              Number.isFinite(t.duration) &&
+              t.duration > 0,
+          );
+          const hasProductiveTaskToday = productiveDates.includes(today);
+          if (
+            !productiveDates.length ||
+            (hasAnyTaskToday && !hasProductiveTaskToday)
+          ) {
             this.state.streak = 0;
+            this.saveToStorage(CONFIG.STORAGE_KEYS.STREAK, 0);
             this.elements["streak-display"].textContent = 0;
             return;
           }
-          const set = new Set(dates);
-          const today = this.getDateString();
+          const set = new Set(productiveDates);
           let streak = 0;
-          let cursor = set.has(today)
+          let cursor = hasProductiveTaskToday
             ? today
             : this.getDateString(new Date(Date.now() - 86400000));
           while (set.has(cursor)) {
@@ -6430,7 +6450,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             return `<div class="mission-phase-items${secondary ? " secondary" : ""}">${entries.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>`;
           };
 
-          // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
+          // Phase 0.3: structural innerHTML render â€” ONLY called here, never on interaction
           primaryContainer.innerHTML = renderEntrySet(primaryEntries);
           if (secondaryContainer) {
             secondaryContainer.innerHTML = renderEntrySet(secondaryEntries, true);

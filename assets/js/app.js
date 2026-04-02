@@ -304,10 +304,13 @@
       }
       loadChartJS() { return new Promise((resolve, reject) => { const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/chart.js'; s.onload=resolve; s.onerror=reject; document.head.appendChild(s); }); }
       updateStreak(showPopup = false) {
-        const dates = [...new Set(this.state.tasks.map(t => t.date))].sort();
-        if (!dates.length) { this.state.streak=0; this.elements['streak-display'].textContent=0; return; }
-        const set = new Set(dates); const today = this.getDateString();
-        let streak=0; let cursor=set.has(today)?today:this.getDateString(new Date(Date.now()-86400000));
+        const productiveDates = [...new Set(this.state.tasks.filter(t => this.isProductiveCategory(t.category) && Number.isFinite(t.duration) && t.duration > 0).map(t => t.date))].sort();
+        const today = this.getDateString();
+        const hasAnyTaskToday = this.state.tasks.some(t => t.date === today && Number.isFinite(t.duration) && t.duration > 0);
+        const hasProductiveTaskToday = productiveDates.includes(today);
+        if (!productiveDates.length || (hasAnyTaskToday && !hasProductiveTaskToday)) { this.state.streak=0; this.saveToStorage(CONFIG.STORAGE_KEYS.STREAK, 0); this.elements['streak-display'].textContent=0; return; }
+        const set = new Set(productiveDates);
+        let streak=0; let cursor=hasProductiveTaskToday?today:this.getDateString(new Date(Date.now()-86400000));
         while (set.has(cursor)) { streak++; const d=new Date(cursor); d.setDate(d.getDate()-1); cursor=this.getDateString(d); }
         const old=this.state.streak; this.state.streak=streak;
         this.saveToStorage(CONFIG.STORAGE_KEYS.STREAK, streak); this.elements['streak-display'].textContent=streak;
