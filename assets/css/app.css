@@ -1840,3 +1840,14 @@
 .github-heatmap-container {
   padding-bottom: 0 !important;
 }
+/* Restore hidden-but-scrollable 365 grid */
+.github-heatmap-container {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding-bottom: 0 !important;
+  -webkit-overflow-scrolling: touch;
+}
+.github-heatmap-wrapper {
+  overflow: visible !important;
+  padding-bottom: 0 !important;
+}
