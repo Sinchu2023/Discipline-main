@@ -3785,6 +3785,9 @@
           this.startTicking();
         }
         startSleep() {
+          if (this.app.trainerEngine?.armRoadmapSlotRollover) {
+            this.app.trainerEngine.armRoadmapSlotRollover();
+          }
           this.start("Sleep", {
             category: "Sleep",
             subcategory: "Night Sleep",
@@ -6074,6 +6077,11 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.saveTrainerState();
         }
 
+        armRoadmapSlotRollover() {
+          this.state.roadmapAdvanceAfterDate = this.app.getDateString(new Date());
+          this.saveTrainerState();
+        }
+
         getTodayManualMissionChecks() {
           const today = this.app.getDateString(new Date());
           if (!this.state.manualMissionChecks) {
@@ -6140,7 +6148,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const match = this.findRoadmapDayByTopic(topic);
           if (!match || !!match.day.completed === !!completed) return false;
           match.day.completed = !!completed;
-          this.invalidateRoadmapSlots();
           this.app.saveToStorage(
             CONFIG.STORAGE_KEYS.ROADMAP_STATE,
             this.state.roadmap,
@@ -6197,7 +6204,15 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         getDailyMissionTasks() {
           const active = this.getActiveRoadmapDay();
           const today = this.app.getDateString(new Date());
-          let learningSlots = this.state.roadmapSlotsDate === today ? this.state.roadmapSlots : null;
+          const rolloverArmedDate = this.state.roadmapAdvanceAfterDate || null;
+          const canAdvanceToday = !!rolloverArmedDate && rolloverArmedDate !== today;
+          let learningSlots = null;
+
+          if (this.state.roadmapSlotsDate === today) {
+            learningSlots = this.state.roadmapSlots;
+          } else if (this.state.roadmapSlots && !canAdvanceToday) {
+            learningSlots = this.state.roadmapSlots;
+          }
 
           if (!learningSlots && active) {
             const uncompleted = active.module.days.filter(d => !d.completed);
@@ -6206,6 +6221,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               .map(d => (d.text || "").split("\n")[0].trim());
             this.state.roadmapSlotsDate = today;
             this.state.roadmapSlots = learningSlots;
+            if (canAdvanceToday) this.state.roadmapAdvanceAfterDate = null;
             this.saveTrainerState();
           }
 
@@ -6520,7 +6536,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const progress = this.getTopicProgress(topic);
             if (!active.day.completed && progress.minutes >= this.getThresholdForTopic(topic)) {
               active.day.completed = true;
-              this.invalidateRoadmapSlots();
               this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
               this.normalizeRoadmapDays();
               this.renderRoadmap();
@@ -6699,7 +6714,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               const day = this.state.roadmap.modules[m]?.days[d];
               if (!day) return;
               day.completed = !!e.target.checked;
-              this.invalidateRoadmapSlots();
               this.app.saveToStorage(
                 CONFIG.STORAGE_KEYS.ROADMAP_STATE,
                 this.state.roadmap,
