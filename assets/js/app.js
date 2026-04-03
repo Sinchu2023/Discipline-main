@@ -1241,6 +1241,8 @@ class DisciplineTracker {
       "shadow-duel",
       "shadow-battle-you",
       "shadow-battle-shadow",
+      "shadow-next-rank",
+      "shadow-next-rank-sub",
       "shadow-note",
       "shadow-weekly-average",
       "shadow-momentum",
@@ -2708,13 +2710,16 @@ class ShadowEngine {
     this.app = app;
     this.shadowSevenDayAverage = 0;
     this.rankTiers = [
-      { min: 0, title: "Initiate", badge: "Baseline" },
-      { min: 120, title: "Builder", badge: "Builder" },
-      { min: 180, title: "Operator", badge: "Operator" },
-      { min: 240, title: "Executor", badge: "Executor" },
-      { min: 300, title: "Elite", badge: "Elite" },
-      { min: 360, title: "Apex", badge: "Apex" },
-      { min: 420, title: "Overdrive", badge: "Legend" },
+      { min: 0, title: "Stinger" },
+      { min: 100, title: "Javelin" },
+      { min: 180, title: "Exocet" },
+      { min: 260, title: "Astra" },
+      { min: 350, title: "Tomahawk" },
+      { min: 450, title: "Prithvi" },
+      { min: 560, title: "Agni" },
+      { min: 680, title: "Trident" },
+      { min: 800, title: "Minuteman" },
+      { min: 900, title: "BrahMos" },
     ];
   }
 
@@ -3053,11 +3058,110 @@ class ShadowEngine {
     };
   }
 
-  getShadowRank(minutes) {
+  getShadowRank(score) {
     let selected = this.rankTiers[0];
     for (const tier of this.rankTiers)
-      if (minutes >= tier.min) selected = tier;
+      if (score >= tier.min) selected = tier;
     return selected;
+  }
+
+  getNextShadowRank(score) {
+    return this.rankTiers.find((tier) => score < tier.min) || null;
+  }
+
+  clampScore(value) {
+    return Math.max(0, Math.min(100, value));
+  }
+
+  getRankGate({
+    nextRank,
+    consistency,
+    mission,
+    battle,
+    recovery,
+    currentRank,
+  }) {
+    if (!nextRank) return { met: true, reason: "Top rank secured" };
+
+    const eliteRanks = new Set(["Agni", "Trident"]);
+    const apexRanks = new Set(["Minuteman", "BrahMos"]);
+
+    if (eliteRanks.has(nextRank.title)) {
+      if (consistency < 60)
+        return { met: false, reason: "Raise consistency above 60" };
+      if (mission < 55)
+        return { met: false, reason: "Raise mission discipline above 55" };
+    }
+
+    if (apexRanks.has(nextRank.title)) {
+      if (consistency < 75)
+        return { met: false, reason: "Need elite consistency above 75" };
+      if (battle < 60)
+        return { met: false, reason: "Win rate must clear 60%" };
+      if (recovery < 65)
+        return { met: false, reason: "Recovery control is too weak" };
+    }
+
+    if (currentRank?.title === "BrahMos")
+      return { met: true, reason: "Top rank secured" };
+
+    return { met: true, reason: "Gate clear" };
+  }
+
+  getShadowRating({
+    currentAvg,
+    missionScore,
+    competition,
+    penalty,
+    sleepCompromises,
+    productiveDays7,
+    currentRank,
+  }) {
+    const output = this.clampScore((currentAvg / 360) * 100);
+    const consistency = this.clampScore((productiveDays7 / 7) * 100);
+    const mission = this.clampScore(missionScore);
+    const monthlyWinRate = competition.activeDays
+      ? competition.myWins / competition.activeDays
+      : 0;
+    const battle = this.clampScore(
+      (competition.recentWinRate * 0.65 + monthlyWinRate * 0.35) * 100,
+    );
+    const distractionPenalty = penalty.budget
+      ? Math.min(60, (penalty.overBudget / penalty.budget) * 60)
+      : 0;
+    const recovery = this.clampScore(
+      100 - sleepCompromises * 18 - distractionPenalty,
+    );
+
+    const rating = Math.round(
+      (output * 0.35 +
+        consistency * 0.25 +
+        mission * 0.15 +
+        battle * 0.15 +
+        recovery * 0.10) * 10,
+    );
+    const nextRank = this.getNextShadowRank(rating);
+    const gate = this.getRankGate({
+      nextRank,
+      consistency,
+      mission,
+      battle,
+      recovery,
+      currentRank,
+    });
+
+    return {
+      rating,
+      nextRank,
+      gate,
+      factors: {
+        output,
+        consistency,
+        mission,
+        battle,
+        recovery,
+      },
+    };
   }
 
   getCurrentStatus(percentage) {
@@ -3116,16 +3220,33 @@ class ShadowEngine {
       level + weeklyPenalty + trendPenalty + missionPenalty,
     );
 
+    const reasons = [];
+    if (weeklyGap > 0) reasons.push("7d avg below shadow");
+    if (recentWinRate < 0.35) reasons.push("monthly win rate collapsing");
+    else if (recentWinRate < 0.55) reasons.push("monthly win rate weak");
+    if (missionScore < 50) reasons.push("mission score too low");
+    if (percentage < 70) reasons.push("today is far below target");
+    else if (percentage < 100) reasons.push("today is still below target");
+
     if (level <= 0)
       return {
         label: "Pressure: Controlled",
         cls: "shadow-pressure-low",
+        reasons,
       };
     if (level === 1)
-      return { label: "Pressure: Elevated", cls: "shadow-pressure-mid" };
+      return {
+        label: "Pressure: Elevated",
+        cls: "shadow-pressure-mid",
+        reasons,
+      };
     if (level === 2)
-      return { label: "Pressure: High", cls: "shadow-pressure-mid" };
-    return { label: "Pressure: Critical", cls: "shadow-pressure-high" };
+      return { label: "Pressure: High", cls: "shadow-pressure-mid", reasons };
+    return {
+      label: "Pressure: Critical",
+      cls: "shadow-pressure-high",
+      reasons,
+    };
   }
 
   countShadowWinsThisMonth(dailyMap, shadowAvg) {
@@ -3301,6 +3422,30 @@ class ShadowEngine {
     });
     const slope = den ? num / den : 0;
     const growthTrend = slope > 2 ? "UP" : slope < -2 ? "DOWN" : "STABLE";
+    const productiveDays7 = last7.filter((v) => v > 0).length;
+    const sleepCompromises = this.countSleepCompromisesLast7();
+    const shadowRating = this.getShadowRating({
+      currentAvg,
+      missionScore,
+      competition,
+      penalty,
+      sleepCompromises,
+      productiveDays7,
+      currentRank: null,
+    });
+    const rank = this.getShadowRank(shadowRating.rating);
+    shadowRating.gate = this.getRankGate({
+      nextRank: shadowRating.nextRank,
+      consistency: shadowRating.factors.consistency,
+      mission: shadowRating.factors.mission,
+      battle: shadowRating.factors.battle,
+      recovery: shadowRating.factors.recovery,
+      currentRank: rank,
+    });
+    const nextRank = shadowRating.nextRank;
+    const srGap = nextRank
+      ? Math.max(0, nextRank.min - shadowRating.rating)
+      : 0;
 
     this.app.elements["shadow-current-minutes"].textContent =
       this.app.formatDuration(todayMinutes);
@@ -3322,20 +3467,16 @@ class ShadowEngine {
     this.app.elements["shadow-target"].textContent =
       this.app.formatDuration(targetToday);
     this.app.elements["shadow-needed-tie"].textContent =
-      this.app.formatDuration(neededTie);
+      neededTie > 0 ? this.app.formatDuration(neededTie) : "Already cleared";
     this.app.elements["shadow-needed-lead"].textContent =
-      this.app.formatDuration(neededLead);
+      neededLead > 0 ? this.app.formatDuration(neededLead) : "Already ahead";
     this.app.elements["shadow-defense-target"].textContent =
       this.app.formatDuration(defenseTarget);
     this.app.elements["shadow-penalty"].textContent =
       `-${this.app.formatDuration(penalty.minutes)}`;
-    const penaltyTags = [];
-    if (todayMinutes < shadowAvg) penaltyTags.push("Behind");
-    if (competition.recentWinRate < 0.5) penaltyTags.push("Low WR");
-    if (missionScore < 60) penaltyTags.push("Missed target");
-    this.app.elements["shadow-penalty-reason"].textContent = penaltyTags.length
-      ? penaltyTags.join("  ")
-      : "Clear";
+    this.app.elements["shadow-penalty-reason"].textContent = penalty.reasons.length
+      ? penalty.reasons.slice(0, 2).join(" | ")
+      : "Pressure clear";
     const expiryEl = this.app.elements["shadow-penalty-expiry"];
     const updateCountdown = () => {
       const now = new Date();
@@ -3409,12 +3550,13 @@ class ShadowEngine {
       missionScore,
     );
     const pressureEl = this.app.elements["shadow-pressure"];
-    pressureEl.textContent = pressure.label;
+    pressureEl.textContent = pressure.reasons.length
+      ? `${pressure.label} • ${pressure.reasons.slice(0, 2).join(", ")}`
+      : pressure.label;
     pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
-    const rank = this.getShadowRank(shadowAvg);
     this.app.elements["shadow-rank"].textContent = rank.title;
-    this.app.elements["shadow-badge"].textContent = rank.badge;
+    this.app.elements["shadow-badge"].textContent = `SR ${shadowRating.rating}`;
     this.app.elements["shadow-score"].textContent =
       `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
     if (this.app.elements["shadow-battle-you"])
@@ -3422,7 +3564,22 @@ class ShadowEngine {
     if (this.app.elements["shadow-battle-shadow"])
       this.app.elements["shadow-battle-shadow"].textContent = `${competition.shadowWins}`;
     this.app.elements["shadow-duel"].textContent =
-      scoreDiff === 0 ? "Leader 0" : `Leader +${Math.abs(scoreDiff)}`;
+      scoreDiff === 0
+        ? "Monthly battle tied"
+        : scoreDiff > 0
+          ? `You lead by ${Math.abs(scoreDiff)} day-win(s)`
+          : `Shadow leads by ${Math.abs(scoreDiff)} day-win(s)`;
+
+    if (this.app.elements["shadow-next-rank"])
+      this.app.elements["shadow-next-rank"].textContent = nextRank
+        ? nextRank.title
+        : "Top rank secured";
+    if (this.app.elements["shadow-next-rank-sub"])
+      this.app.elements["shadow-next-rank-sub"].textContent = nextRank
+        ? shadowRating.gate.met
+          ? `Need ${srGap} SR`
+          : `Need ${srGap} SR • ${shadowRating.gate.reason}`
+        : "BrahMos ceiling held";
 
 
 
