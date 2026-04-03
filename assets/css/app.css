@@ -760,7 +760,7 @@
       .github-cell {
         width: 8px;
         height: 8px;
-        border-radius: 0;
+        border-radius: 1px;
         background-color: #161b22;
         transition: transform 0.1s;
       }
@@ -1676,7 +1676,7 @@
 .github-cell {
   width: 10px;
   height: 10px;
-  border-radius: 0;
+  border-radius: 1px;
   background-color: #12161d;
   border: 1px solid rgba(255, 255, 255, 0.06);
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
@@ -1774,7 +1774,7 @@
 .github-cell {
   width: 10px;
   height: 10px;
-  border-radius: 0;
+  border-radius: 1px;
   background-color: var(--border);
   border: 1px solid rgba(255, 255, 255, 0.08);
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
@@ -1817,4 +1817,26 @@
 }
 .github-heatmap-container::-webkit-scrollbar {
   display: none;
+}
+/* Force-hide 365 grid scrollbar */
+.github-heatmap-container,
+.github-heatmap-wrapper {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.github-heatmap-container::-webkit-scrollbar,
+.github-heatmap-wrapper::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+/* Final 365 grid scrollbar cleanup */
+.github-heatmap-wrapper {
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  padding-bottom: 0 !important;
+}
+.github-heatmap-container {
+  padding-bottom: 0 !important;
 }
