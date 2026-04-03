@@ -5581,16 +5581,6 @@ class GraphManager {
           const inner = document.createElement("div");
           inner.className = "github-heatmap-inner";
 
-    const monthsRow = document.createElement("div");
-    monthsRow.className = "github-months-row";
-    for (let i = 0; i < 53; i += 1) {
-      const cellDate = dates[Math.min(i * 7, dates.length - 1)];
-      const monthLabel = document.createElement("div");
-      monthLabel.className = "github-month-label";
-      monthLabel.textContent = this.formatCompactBattleDate(cellDate).slice(1, 4);
-      monthsRow.appendChild(monthLabel);
-    }
-
     const grid = document.createElement("div");
     grid.className = "github-heatmap-grid";
 
@@ -5612,7 +5602,6 @@ class GraphManager {
       grid.appendChild(cell);
     });
 
-          inner.appendChild(monthsRow);
           inner.appendChild(grid);
           wrapper.appendChild(inner);
           container.appendChild(wrapper);
