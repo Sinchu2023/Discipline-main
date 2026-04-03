@@ -1774,7 +1774,7 @@
 .github-cell {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: 0;
   background-color: var(--border);
   border: 1px solid rgba(255, 255, 255, 0.08);
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
