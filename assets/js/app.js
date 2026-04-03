@@ -5570,43 +5570,16 @@ class GraphManager {
     });
     const bestStartIndex = bestStreak > 0 ? (bestEndIndex - bestStreak + 1) : -1;
 
-    let lastBreak = "None";
-    for (let i = days.length - 1; i >= 0; i -= 1) {
-      if (days[i].state === "loss") {
-        lastBreak = this.formatCompactBattleDate(days[i].dateStr);
-        break;
-      }
-    }
+          const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
+          const todayDate = this.app.getDateString(today);
+          const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
+          const todayWeek = todayIndex >= 0 ? Math.floor(todayIndex / 7) : 52;
 
-    const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
-    const todayDate = this.app.getDateString(today);
+          const wrapper = document.createElement("div");
+          wrapper.className = "github-heatmap-wrapper";
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "github-heatmap-wrapper";
-
-    const summary = document.createElement("div");
-    summary.className = "github-heatmap-summary";
-    [
-      ["Current Streak", String(currentStreak)],
-      ["Best Streak", String(bestStreak)],
-      ["Last Break", lastBreak],
-      ["Win Target", this.app.formatDuration(target)],
-    ].forEach(([label, value]) => {
-      const card = document.createElement("div");
-      card.className = "github-heatmap-stat";
-      const labelEl = document.createElement("div");
-      labelEl.className = "github-heatmap-stat-label";
-      labelEl.textContent = label;
-      const valueEl = document.createElement("div");
-      valueEl.className = "github-heatmap-stat-value";
-      valueEl.textContent = value;
-      card.appendChild(labelEl);
-      card.appendChild(valueEl);
-      summary.appendChild(card);
-    });
-
-    const inner = document.createElement("div");
-    inner.className = "github-heatmap-inner";
+          const inner = document.createElement("div");
+          inner.className = "github-heatmap-inner";
 
     const monthsRow = document.createElement("div");
     monthsRow.className = "github-months-row";
@@ -5639,33 +5612,17 @@ class GraphManager {
       grid.appendChild(cell);
     });
 
-    const legend = document.createElement("div");
-    legend.className = "github-heatmap-legend";
-    [
-      ["neutral", "No data"],
-      ["loss", "Loss"],
-      ["win", "Win"],
-      ["today", "Today"],
-      ["streak", "Streak"],
-    ].forEach(([cls, label]) => {
-      const item = document.createElement("div");
-      item.className = "github-legend-item";
-      const swatch = document.createElement("span");
-      swatch.className = `github-legend-swatch ${cls}`;
-      const text = document.createElement("span");
-      text.textContent = label;
-      item.appendChild(swatch);
-      item.appendChild(text);
-      legend.appendChild(item);
-    });
+          inner.appendChild(monthsRow);
+          inner.appendChild(grid);
+          wrapper.appendChild(inner);
+          container.appendChild(wrapper);
 
-    inner.appendChild(monthsRow);
-    inner.appendChild(grid);
-    wrapper.appendChild(summary);
-    wrapper.appendChild(inner);
-    wrapper.appendChild(legend);
-    container.appendChild(wrapper);
-  }
+          requestAnimationFrame(() => {
+            const cellWidth = 12;
+            const targetScroll = Math.max(0, (todayWeek * cellWidth) - container.clientWidth + 36);
+            container.scrollLeft = targetScroll;
+          });
+        }
 }
 class EventManager {
   constructor(app) {

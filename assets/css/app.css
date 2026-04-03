@@ -1734,3 +1734,79 @@
   background: #12161d;
   border-color: rgba(255, 255, 255, 0.95);
 }
+/* Minimal streak grid override */
+.github-heatmap-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.github-heatmap-wrapper {
+  display: block;
+}
+.github-heatmap-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: fit-content;
+}
+.github-months-row {
+  display: grid;
+  grid-template-columns: repeat(53, 10px);
+  gap: 2px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  width: fit-content;
+}
+.github-month-label {
+  grid-column: span 4;
+  text-align: left;
+  white-space: nowrap;
+}
+.github-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(53, 10px);
+  grid-template-rows: repeat(7, 10px);
+  gap: 2px;
+  align-items: start;
+  width: fit-content;
+}
+.github-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background-color: var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.github-cell[data-state="neutral"] {
+  background-color: var(--border);
+}
+.github-cell[data-state="loss"] {
+  background-color: var(--danger);
+  border-color: rgba(220, 53, 69, 0.55);
+}
+.github-cell[data-state="win"] {
+  background-color: var(--success);
+  border-color: rgba(40, 167, 69, 0.45);
+}
+.github-cell[data-state="today"] {
+  background-color: var(--primary);
+  border-color: rgba(0, 123, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.github-cell[data-streak="active"] {
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+.github-cell[data-best="true"] {
+  box-shadow: none;
+}
+.github-cell:hover {
+  transform: scale(1.08);
+  cursor: crosshair;
+}
+.github-heatmap-summary,
+.github-heatmap-legend {
+  display: none !important;
+}
