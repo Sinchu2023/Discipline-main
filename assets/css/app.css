@@ -1612,3 +1612,125 @@
         text-align: center;
         margin-top: -8px;
       }
+/* 365-day Streak Battle Grid override */
+.github-heatmap-container {
+  width: 100%;
+  overflow: hidden;
+}
+.github-heatmap-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.github-heatmap-summary {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.github-heatmap-stat {
+  min-width: 120px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.github-heatmap-stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.2rem;
+}
+.github-heatmap-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+.github-heatmap-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  align-items: flex-start;
+}
+.github-months-row {
+  display: grid;
+  grid-template-columns: repeat(53, 10px);
+  gap: 2px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  width: fit-content;
+}
+.github-month-label {
+  grid-column: span 4;
+  text-align: left;
+  white-space: nowrap;
+}
+.github-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(53, 10px);
+  grid-template-rows: repeat(7, 10px);
+  gap: 2px;
+  align-items: start;
+  width: fit-content;
+}
+.github-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background-color: #12161d;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.github-cell[data-state="neutral"] {
+  background-color: #12161d;
+}
+.github-cell[data-state="loss"] {
+  background-color: #8f1d2c;
+  border-color: rgba(255, 90, 90, 0.35);
+}
+.github-cell[data-state="win"] {
+  background-color: #1f8f4a;
+  border-color: rgba(72, 255, 149, 0.28);
+}
+.github-cell[data-state="today"] {
+  background-color: #2359c4;
+  border-color: rgba(116, 173, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(116, 173, 255, 0.35);
+}
+.github-cell[data-streak="active"] {
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.github-cell[data-best="true"] {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.github-cell:hover {
+  transform: scale(1.12);
+  cursor: crosshair;
+}
+.github-heatmap-legend {
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+.github-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.github-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.github-legend-swatch.neutral { background: #12161d; }
+.github-legend-swatch.loss { background: #8f1d2c; }
+.github-legend-swatch.win { background: #1f8f4a; }
+.github-legend-swatch.today { background: #2359c4; }
+.github-legend-swatch.streak {
+  background: #12161d;
+  border-color: rgba(255, 255, 255, 0.95);
+}
