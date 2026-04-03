@@ -3556,7 +3556,7 @@ class ShadowEngine {
     pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
     this.app.elements["shadow-rank"].textContent = rank.title;
-    this.app.elements["shadow-badge"].textContent = `SR ${shadowRating.rating}`;
+    this.app.elements["shadow-badge"].textContent = `SR: ${shadowRating.rating}`;
     this.app.elements["shadow-score"].textContent =
       `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
     if (this.app.elements["shadow-battle-you"])
