@@ -6,8 +6,9 @@
 
     getSnapshot() {
       const tasks = this.app?.state?.tasks || [];
+      const todayFlow = this.app?.flowEngine?.getTodayRecord?.() || null;
       return {
-        wakeTime: this.app?.state?.flow?.lastWakeAt || null,
+        wakeTime: todayFlow?.wakeAt || null,
         sleepTracking: tasks.filter(t => t.category === 'Sleep'),
         timerLogs: tasks,
         shadow: {

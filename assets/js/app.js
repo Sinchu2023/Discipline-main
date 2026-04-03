@@ -2403,14 +2403,14 @@ window.AppModule = {
           const catRows = Object.entries(r.totals)
             .map(
               ([k, v]) =>
-                `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${k}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${r.pctByCategory[k].toFixed(1)}%</td></tr>`,
+                `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.escapeHtml(k)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${r.pctByCategory[k].toFixed(1)}%</td></tr>`,
             )
             .join("");
           const prodBreak =
             Object.entries(r.productiveBreakdown)
               .map(
                 ([k, v]) =>
-                  `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${k}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td></tr>`,
+                  `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.escapeHtml(k)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td></tr>`,
               )
               .join("") ||
             '<tr><td style="padding:0.75rem;" colspan="2">No entries</td></tr>';
@@ -2426,7 +2426,7 @@ window.AppModule = {
             Object.entries(r.trainingBreakdown)
               .map(
                 ([k, v]) =>
-                  `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${k}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td></tr>`,
+                  `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.escapeHtml(k)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(v)}</td></tr>`,
               )
               .join("") ||
             '<tr><td style="padding:0.75rem;" colspan="2">No entries</td></tr>';
