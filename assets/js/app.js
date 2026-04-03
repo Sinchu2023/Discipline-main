@@ -1,12 +1,3 @@
-import "../../config/app.config.js";
-import "../../core/state-manager.js";
-import "../../execution/focus-builder.js";
-import "../../trainer/recommendation-engine.js";
-import "../../analytics/insights.js";
-import "../../shadow-engine/shadow-panel.js";
-import "../../services/state-sync.js";
-import "../../ui/shell-manager.js";
-
 window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
@@ -2479,11 +2470,11 @@ window.AppModule = {
           ]
             .map(
               ([label, value]) =>
-                `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);font-weight:600;">${label}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${value}</td></tr>`,
+                `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);font-weight:600;">${this.app.escapeHtml(label)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.escapeHtml(value)}</td></tr>`,
             )
             .join("");
           this.app.elements["report-content"].innerHTML = `
-          <h3 style="margin-bottom:1rem;">${monthName} ${r.year} Monthly Report</h3>
+          <h3 style="margin-bottom:1rem;">${this.app.escapeHtml(`${monthName} ${r.year} Monthly Report`)}</h3>
           <h4 style="margin-top:1rem;">Summary</h4>
           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><tbody>${summaryRows}</tbody></table></div>
           <h4 style="margin-top:1rem;">Category Totals</h4>

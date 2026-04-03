@@ -1,34 +1,22 @@
 # Architecture
 
 ## Runtime Entrypoints
-- `index.html`: app shell, DOM structure, and external asset/script references.
-- `assets/css/app.css`: primary stylesheet extracted from the HTML shell.
+- `index.html`: app shell and external asset references.
+- `assets/css/app.css`: runtime stylesheet.
+- `assets/js/app.js`: single runtime entrypoint and single source of truth for app behavior.
 - `firebase-service.js`: Firebase initialization and service exposure.
-- `google-auth.js`: Google sign-in flow and redirect fallback.
-- `assets/js/app.js`: single runtime entrypoint that loads the sidecar modules and the main app runtime.
-- `update-check.js`: optional deployment banner.
+- `google-auth.js`: Google sign-in flow.
+- `update-check.js`: deployment timestamp banner.
 
-## Active Module Ownership
-- `assets/js/app.js`: primary runtime controller, task lifecycle, stopwatch, analytics/report UI, SHADOW engine, trainer engine, flow protocol logic, and bootstrap imports for the sidecar modules.
-- `core/state-manager.js`: central runtime snapshot builder used by summary sync helpers.
-- `execution/focus-builder.js`: quick preset input wiring.
-- `analytics/insights.js`: analytics mirror fields derived from live UI state.
-- `shadow-engine/shadow-panel.js`: SHADOW summary mirroring into shell panels.
-- `trainer/recommendation-engine.js`: deterministic trainer advice text builder.
-- `services/state-sync.js`: periodic mission/trainer/shell synchronization.
-- `ui/shell-manager.js`: section navigation and mission CTA wiring.
-- `config/app.config.js`: reserved location for extracted shared config/constants.
+## Active Runtime Ownership
+- `assets/js/app.js`: stopwatch, task lifecycle, import/export, analytics/reporting, SHADOW logic, trainer logic, roadmap logic, flow protocol logic, graph rendering, and event wiring.
+- `firebase-service.js`: Firebase bootstrapping and helper methods.
+- `google-auth.js`: auth initiation and fallback behavior.
+- `assets/css/app.css`: all runtime styling.
 
-## Current Structure
-- `core/`: shared runtime state helpers.
-- `services/`: Firebase-adjacent and cross-panel sync services.
-- `execution/`: execution-mode helpers.
-- `analytics/`: analytics presentation helpers.
-- `shadow-engine/`: SHADOW-specific view sync logic.
-- `trainer/`: trainer-specific helper logic.
-- `ui/`: shell navigation and UI wiring outside the main runtime.
-- `assets/css/`: runtime styles.
-- `assets/js/`: main runtime script.
+## Design Decision
+- The duplicate sidecar runtime modules under `core/`, `services/`, `ui/`, `analytics/`, `shadow-engine/`, `trainer/`, and `execution/` were removed because they duplicated behavior from `assets/js/app.js` and were not the real source of truth.
+- The app now has one active runtime implementation instead of parallel partial implementations.
 
 ## Data Contracts Preserved
 - Existing `localStorage` keys remain unchanged.
@@ -36,12 +24,12 @@
 - Roadmap, mission, flow, streak, and trainer state semantics remain unchanged.
 
 ## Security Notes
-- User-controlled task/favorite text is escaped before HTML rendering in the main runtime.
+- User-controlled task and favorite text is escaped before HTML rendering.
 - Malformed `localStorage` payloads are rejected and cleared defensively.
-- File imports reject oversized files and ignore non-object JSON entries before normalization.
+- File imports reject oversized files and ignore malformed JSON entries before normalization.
+- Report labels and dynamic report values are escaped before interpolation.
 
 ## Extension Guidance
-- Add new business rules to `assets/js/app.js` only if they are tightly coupled to existing managers.
-- Add new shell/summary behavior to `ui/`, `analytics/`, `shadow-engine/`, or `services/` sidecar modules.
-- Add new shared state readers to `core/`.
-- Add new styling in `assets/css/app.css`, and split further only when a feature area becomes independently maintainable.
+- Add runtime logic to `assets/js/app.js` until a real domain split is performed.
+- Add styling to `assets/css/app.css`.
+- If a future modularization pass is done, move complete domain slices out of `assets/js/app.js`; do not reintroduce partial duplicate runtime modules.
