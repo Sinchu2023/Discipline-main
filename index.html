@@ -6068,6 +6068,12 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           this.app.saveToStorage(CONFIG.STORAGE_KEYS.TRAINER_STATE, this.state);
         }
 
+        invalidateRoadmapSlots() {
+          this.state.roadmapSlotsDate = null;
+          this.state.roadmapSlots = null;
+          this.saveTrainerState();
+        }
+
         getTodayManualMissionChecks() {
           const today = this.app.getDateString(new Date());
           if (!this.state.manualMissionChecks) {
@@ -6111,6 +6117,35 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           const dayIndex = module.days.findIndex((d) => !d.completed);
           if (dayIndex < 0) return null;
           return { moduleIndex, dayIndex, day: module.days[dayIndex], module };
+        }
+
+        findRoadmapDayByTopic(topic = "") {
+          this.ensureRoadmap();
+          const normalizedTopic = this.normalizeTopic((topic || "").split("\n")[0].trim());
+          if (!normalizedTopic) return null;
+          for (let mi = 0; mi < this.state.roadmap.modules.length; mi += 1) {
+            const module = this.state.roadmap.modules[mi];
+            for (let di = 0; di < module.days.length; di += 1) {
+              const day = module.days[di];
+              const dayTopic = this.normalizeTopic(((day.text || "").split("\n")[0] || "").trim());
+              if (dayTopic === normalizedTopic) {
+                return { moduleIndex: mi, dayIndex: di, day, module };
+              }
+            }
+          }
+          return null;
+        }
+
+        syncRoadmapDayFromMissionTopic(topic = "", completed = false) {
+          const match = this.findRoadmapDayByTopic(topic);
+          if (!match || !!match.day.completed === !!completed) return false;
+          match.day.completed = !!completed;
+          this.invalidateRoadmapSlots();
+          this.app.saveToStorage(
+            CONFIG.STORAGE_KEYS.ROADMAP_STATE,
+            this.state.roadmap,
+          );
+          return true;
         }
 
         getTopicProgress(topic, dateStr = this.app.getDateString(new Date())) {
@@ -6385,6 +6420,12 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             checks[checkId] = !!e.target.checked;
             this.saveTrainerState();
             this.updateMissionChecklistScore();
+
+            if (this.syncRoadmapDayFromMissionTopic(cached?.item?.topic, !!e.target.checked)) {
+              this.renderRoadmap();
+              this.syncMissionFromRoadmap();
+              this.app.shadowEngine?.refresh(false);
+            }
           }, { passive: true });
         }
 
@@ -6479,8 +6520,12 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
             const progress = this.getTopicProgress(topic);
             if (!active.day.completed && progress.minutes >= this.getThresholdForTopic(topic)) {
               active.day.completed = true;
+              this.invalidateRoadmapSlots();
               this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
               this.normalizeRoadmapDays();
+              this.renderRoadmap();
+              this.syncMissionFromRoadmap({ rebuild: true });
+              this.app.shadowEngine?.refresh(false);
             }
           }
         }
@@ -6654,11 +6699,14 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
               const day = this.state.roadmap.modules[m]?.days[d];
               if (!day) return;
               day.completed = !!e.target.checked;
+              this.invalidateRoadmapSlots();
               this.app.saveToStorage(
                 CONFIG.STORAGE_KEYS.ROADMAP_STATE,
                 this.state.roadmap,
               );
-              this.refresh();
+              this.renderRoadmap();
+              this.syncMissionFromRoadmap();
+              this.updatePenaltyTimer();
               this.app.shadowEngine?.refresh(false);
             }),
           );
