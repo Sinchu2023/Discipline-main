@@ -1,216 +1,45 @@
 # Discipline Tracker Pro
 
-A professional, feature-rich task and sleep tracking web application built with vanilla HTML, CSS, and JavaScript. Track your productivity, monitor sleep patterns, maintain daily discipline streaks, compete against your SHADOW, and seamlessly sync your data across devices using Firebase Cloud storage. 
+Vanilla HTML/CSS/JavaScript discipline tracker with task logging, sleep tracking, streaks, analytics, SHADOW competition logic, trainer roadmap logic, flow protocol features, and Firebase-backed auth/sync.
 
-## 🎯 Core Features
+## Runtime Structure
+- `index.html`: app shell only.
+- `assets/css/app.css`: extracted runtime stylesheet.
+- `assets/js/app.js`: single runtime entrypoint with the main managers, engines, and sidecar bootstrap imports.
+- `firebase-service.js`: Firebase setup.
+- `google-auth.js`: Google sign-in flow.
+- `update-check.js`: deployment timestamp banner.
 
-### ⏱️ Time Tracking
-- **Real-time Stopwatch**: Precise task duration tracking
-- **Start/Stop Controls**: Easy task logging with one click
-- **Sleep Tracking**: Dedicated sleep session logging
-- **Active Task Indicator**: Visual display of currently running tasks
-- **Auto-Save**: All data persists in browser localStorage and syncs to the cloud
+## Supporting Modules
+- `core/state-manager.js`: central snapshot builder.
+- `services/state-sync.js`: shell/mission/trainer synchronization.
+- `ui/shell-manager.js`: section navigation and mission CTA wiring.
+- `analytics/insights.js`: summary KPI mirroring.
+- `shadow-engine/shadow-panel.js`: SHADOW panel mirroring.
+- `trainer/recommendation-engine.js`: deterministic trainer advice.
+- `execution/focus-builder.js`: quick preset helpers.
 
-### 📋 Task Management
-- Log tasks with automatic timestamps
-- Categorize activities as productive or sleep
-- **Quick-Start Favorites**: Save and reuse frequent tasks
-- **Task History**: View all today's activities with duration
-- **Delete Functionality**: Remove tasks if needed
-- **Color-Coded Display**: Green for productive, Purple for sleep
+## Features
+- Real-time stopwatch and task logging
+- Sleep tracking
+- Favorites and task history
+- Daily streak tracking
+- Monthly reporting and charts
+- SHADOW performance engine
+- Trainer roadmap and mission system
+- Flow protocol and war-mode tracking
+- Firebase auth and cloud sync
+- Import/export support
 
-### ☁️ Cloud Sync & Authentication
-- **Google Sign-in**: Secure authentication via Firebase
-- **Cross-Device Syncing**: Your tasks, streaks, and settings are automatically backed up and synced
-- **Offline Mode**: Full local functionality when offline, syncing automatically when connection is restored
+## Quick Start
+1. Serve the repo over HTTP(S). Do not use `file://` if you need Firebase auth.
+2. Open [index.html](/D:/Programme/Html/Discipline-main/index.html).
+3. Sign in with Google if you want cloud sync.
 
-### 📊 Statistics Dashboard
-- **Productive Time**: Hours spent on productive tasks today
-- **Sleep Time**: Total sleep duration tracked
-- **Total Tracked**: Combined productive + sleep time
-- **Day Streak**: Consecutive days with logged activity
-- Real-time updates as you log activities
+## Storage and Sync
+The app keeps the existing browser storage keys and Firebase document structure stable so old user data continues to load.
 
-### 🔥 Streak System
-- Automatic consecutive day counter
-- Beautiful popup notifications
-- Customized messages for milestones:
-  - Day 1: "Day one. This is where it begins."
-  - Day 7: "One week! Discipline is becoming a habit."
-  - Day 30: "One month of discipline. Elite status."
-  - Day 365: "One year. You've mastered yourself."
-
-### 📈 Analytics & Reporting
-- **Productivity Trend Graph**: Line chart with smooth curves
-  - View 7 days, 30 days, 3 months, 6 months, or 1 year
-  - Shaded area fill for visual clarity
-- **Sleep Analysis Chart**: Bar chart showing sleep patterns
-  - Same time range options as productivity
-- **Performance Report**: Monthly detailed breakdown
-  - Summary statistics (tasks, hours, streak)
-  - Daily breakdown table
-  - Print-ready formatting
-- **Export Data**: Download all data as CSV or JSON file
-
-### 💡 Motivation & Flow Protocol
-- 20 rotating inspirational quotes
-- **Flow Engine**: Dedicated flow state tracking and protocol management
-- **War Mode**: High-focus tracking triggers
-
-## 🌑 SHADOW Engine (Competitive Tracking System)
-
-The SHADOW Engine is an innovative competitive system that tracks your performance against your personal best. It creates an internal competition where you battle against your own "SHADOW" - your strongest historical 7-day rolling average.
-
-### ⚔ How SHADOW Works
-
-**The Shadow Concept**: Your SHADOW is calculated from your historical data - it's the best 7-day rolling average you've achieved. Every day, you're competing to match or exceed this benchmark.
-
-- **Shadow Average**: Your strongest historical 7-day average (dynamically updated as you improve)
-- **Current Performance**: Your actual productivity today and this week
-- **Competitive Metrics**: Real-time comparison showing how close you are to breaking your personal standard
-
-### 📊 SHADOW Metrics Dashboard
-
-#### Current You Card
-- **Weekly 7-Day Average**: Your actual average for the past 7 days
-- **Momentum**: 📈 Growing, ➡️ Stable, 📉 Declining
-- **Gap vs Shadow**: How far ahead (+) or behind (-) you are from your Shadow
-- **Weekly Delta**: Weekly gap analysis vs your SHADOW
-- **Today's Target**: Minimum minutes needed today to maintain/exceed Shadow
-- **Progress Percentage**: Real-time progress toward today's target
-
-#### The SHADOW Card
-- **SHADOW Average**: Your strongest historical 7-day average
-- **Rank Tier**: Current tier based on minutes tracked
-- **Monthly Wins**: Days this month you've met or exceeded your SHADOW
-- **Days Since Last Win**: How many days since you last beat your SHADOW
-- **Shadow Lead Streak**: How many consecutive days your SHADOW is winning
-
-### 🏆 Status Indicators
-
-Your daily status is determined by how close you are to breaking your SHADOW:
-
-- **🟢 STANDARD BROKEN** (100%+): You've exceeded your SHADOW! Victory!
-- **🔵 AT THE GATE** (90-99%): So close! Nearly there!
-- **🟡 TRAILING** (70-89%): Making progress but still behind
-- **🔴 OUT OF RANGE** (<70%): Significant gap to close
-
-### 🎖️ Ranking Tier System
-
-As you increase your SHADOW average, you unlock new ranks:
-
-| Tier | Minutes | Badge |
-|------|---------|-------|
-| Initiate | 0+ | Baseline |
-| Builder | 120+ | Builder |
-| Operator | 180+ | Operator |
-| Executor | 240+ | Executor |
-| Elite | 300+ | Elite |
-| Apex | 360+ | Apex |
-| Overdrive | 420+ | Legend |
-
-### 🎯 Monthly Win Tracking
-
-Track your competitive performance throughout the month:
-
-- **My Wins**: Days you've met or exceeded your SHADOW
-- **Shadow Wins**: Days your SHADOW has beaten you
-- **Active Days**: Total days with logged productivity
-- **Win Percentage**: Your success rate for the month
-
-## 🎨 Design & UI
-
-- **Dark Professional Theme**: Modern gradient background with glassmorphism effects
-- **Responsive Layout**: Optimized for desktop, tablet, and mobile devices
-- **Smooth Animations**: Fade transitions, hover effects, pulse animations
-- **Accessibility**: Font Awesome icons, high contrast text, semantic HTML
-- **Zero Dependencies**: Pure vanilla HTML/CSS/JavaScript (except Chart.js & Firebase App SDKs)
-
-### Responsive Breakpoints
-- **Desktop** (1400px): Full featured layout with side graphs and SHADOW cards
-- **Tablet** (768px): Single column with stacked components
-- **Mobile** (480px): Optimized touch-friendly interface
-
-## 🚀 Quick Start
-
-### Installation
-1. Clone or download this repository.
-2. Ensure you are running the files on a local or remote web server (e.g., Live Server, GitHub Pages, Vercel) to allow Firebase Google Sign-In to function properly. `file:///` protocol is not supported for authentication.
-3. Open `index.html` in your web browser.
-
-### Usage
-
-#### Starting a Task
-1. Enter a task name in the input field
-2. Click **Start** button (or press Enter)
-3. Watch the stopwatch timer count up
-4. Click **Stop** when finished
-5. Task automatically saves with timestamp and duration
-
-#### Competing with Your SHADOW
-1. View the SHADOW section at the top of the app
-2. Check your current performance vs your SHADOW
-3. Track daily progress toward your target
-4. Watch your momentum and pressure indicators
-5. Aim to beat your SHADOW each day!
-6. Celebrate new rank tiers as you improve
-
-## 💾 Data Storage
-
-All data is stored primarily in the cloud via **Firebase Firestore** (when authenticated), and mirrored in browser's **localStorage** for offline support:
-- `discipline_tracker_tasks`: All logged tasks with timestamps
-- `discipline_tracker_favorites`: Quick-start favorite tasks
-- `discipline_tracker_streak`: Current streak count
-- `discipline_tracker_last_activity`: Last activity date
-- `discipline_tracker_active_task`: Currently running task (survives page refresh)
-- `discipline_tracker_shadow_avg`: Your current SHADOW 7-day average
-
-## 🔧 Technical Details
-
-### Architecture
-Built with class-based JavaScript architecture for clean, maintainable code:
-
-- **DisciplineTracker**: Main application controller
-- **StopwatchManager**: Timer logic and task recording
-- **TaskManager**: Task CRUD operations and rendering
-- **UIManager**: UI updates, reports, and motivation
-- **GraphManager**: Chart.js integration for analytics
-- **EventManager**: Event binding and user interactions
-- **ShadowEngine**: Competitive tracking system with historical analysis
-- **FirebaseCloudManager**: Handles authentication, sync state, and Firestore queries
-- **TrainerEngine**: Roadmap and guided training logic
-- **FlowProtocolEngine**: Advanced dynamic pacing and metrics
-
-### Technologies
-- **HTML5**: Semantic markup
-- **CSS3**: Custom properties, gradients, animations, Grid/Flexbox
-- **Vanilla JavaScript (ES6+)**: Modular modern JS integration
-- **Firebase SDK**: Goole Auth & Firestore data synchronization
-- **Chart.js**: Data visualization library
-- **Font Awesome 6.4.0**: Icon library
-
-## 🎓 How to Master the SHADOW System
-
-1. **Week 1**: Build consistency by logging daily activities
-2. **Week 2-3**: Your SHADOW will stabilize around your average
-3. **Week 4+**: Challenge yourself to beat your SHADOW daily
-4. **Monthly**: Review your win rate and compete for new rank tiers
-5. **Ongoing**: Watch your SHADOW rise as you improve and achieve new personal bests
-
-## 🌟 Pro Tips
-
-- Log sleep to get accurate total productivity metrics
-- Use favorites for recurring tasks to speed up logging
-- Check momentum daily to adjust effort levels
-- Aim to beat your SHADOW 70%+ of the month for Elite status
-- Sign in with Google to protect your data with cloud backups across all your devices
-
-## 📄 License
-
-Free to use, modify, and distribute. No attribution required.
-
----
-
-**Version**: 2.5 Pro (with SHADOW Engine, Firebase Auth & Flow Protocol)  
-**Last Updated**: March 2026  
-**Built with ❤️ for discipline and personal mastery**
+## Notes for Development
+- Main runtime changes usually belong in [assets/js/app.js](/D:/Programme/Html/Discipline-main/assets/js/app.js).
+- Shell/summary glue belongs in the sidecar modules under `core/`, `services/`, `ui/`, `analytics/`, `shadow-engine/`, `trainer/`, and `execution/`.
+- Styling changes belong in [assets/css/app.css](/D:/Programme/Html/Discipline-main/assets/css/app.css).

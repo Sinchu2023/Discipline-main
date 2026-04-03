@@ -106,7 +106,7 @@ No strict backend dependency is required for core operation.
 - `index.html`: Main HTML shell, UI structure, style blocks, component mount points.
 - `assets/js/app.js`: Primary application logic with all major engines/managers.
 - `assets/css/app.css`: External stylesheet for extracted styling concerns.
-- `app.js`: Lightweight module bridge exposing `runAfterAuth`.
+- `assets/js/app.js`: Single runtime entrypoint; also exposes `runAfterAuth` through `window.AppModule`.
 - `README.md`: Product-level feature and usage overview.
 - `ARCHITECTURE.md`: Refactor direction and modularization intent.
 
@@ -196,7 +196,7 @@ UI interactions are mostly explicit event bindings (button, input, modal close, 
 
 > This section covers **every function/method** in repository JavaScript files.
 
-### 5.1 `app.js` (module bridge)
+### 5.1 `assets/js/app.js` bootstrap surface
 
 #### `runAfterAuth(callback)`
 - Purpose: Execute callback when Firebase auth resolves with an authenticated user.
@@ -685,7 +685,7 @@ UI updates are deterministic from current state values but implemented via direc
 
 - `StateSyncService` adapts central state into mission/trainer summary fields.
 - `ShadowPanel` and `AnalyticsInsights` adapt existing card text into other UI surfaces.
-- `app.js` bridge (`runAfterAuth`) supports migration boundaries.
+- `window.AppModule.runAfterAuth` in `assets/js/app.js` supports auth-aware extensions.
 
 ### Strategy-Like Policy Rules
 

@@ -1,33 +1,47 @@
-# Shadow System Architecture Refactor Plan
+# Architecture
 
-## 1) Current Architectural Problems
-- HTML previously mixed structure, CSS, and JS in one file.
-- Large script contained UI, business logic, storage, analytics, and orchestration in one place.
-- Module boundaries existed by class naming, but not by file boundaries.
-- Tight coupling to DOM ids made testing and debugging difficult.
+## Runtime Entrypoints
+- `index.html`: app shell, DOM structure, and external asset/script references.
+- `assets/css/app.css`: primary stylesheet extracted from the HTML shell.
+- `firebase-service.js`: Firebase initialization and service exposure.
+- `google-auth.js`: Google sign-in flow and redirect fallback.
+- `assets/js/app.js`: single runtime entrypoint that loads the sidecar modules and the main app runtime.
+- `update-check.js`: optional deployment banner.
 
-## 2) Improved Architecture
-- `Discipline.html`: primary app shell and mounting points.
-- `assets/css/app.css`: all styles.
-- `assets/js/app.js`: all runtime logic (behavior preserved).
-- Future phased migration:
-  - Move bootstrap/state/event bus to `modules/core/`.
-  - Move render managers to `modules/ui/`.
-  - Move engines/rules to `modules/logic/`.
-  - Move storage/sync/import-export to `modules/services/`.
+## Active Module Ownership
+- `assets/js/app.js`: primary runtime controller, task lifecycle, stopwatch, analytics/report UI, SHADOW engine, trainer engine, flow protocol logic, and bootstrap imports for the sidecar modules.
+- `core/state-manager.js`: central runtime snapshot builder used by summary sync helpers.
+- `execution/focus-builder.js`: quick preset input wiring.
+- `analytics/insights.js`: analytics mirror fields derived from live UI state.
+- `shadow-engine/shadow-panel.js`: SHADOW summary mirroring into shell panels.
+- `trainer/recommendation-engine.js`: deterministic trainer advice text builder.
+- `services/state-sync.js`: periodic mission/trainer/shell synchronization.
+- `ui/shell-manager.js`: section navigation and mission CTA wiring.
+- `config/app.config.js`: reserved location for extracted shared config/constants.
 
-## 3) Integration Strategy
-- Single app controller remains the integration point.
-- All feature modules communicate through app state and explicit manager methods.
-- Keep storage keys and existing feature contracts unchanged during migration.
+## Current Structure
+- `core/`: shared runtime state helpers.
+- `services/`: Firebase-adjacent and cross-panel sync services.
+- `execution/`: execution-mode helpers.
+- `analytics/`: analytics presentation helpers.
+- `shadow-engine/`: SHADOW-specific view sync logic.
+- `trainer/`: trainer-specific helper logic.
+- `ui/`: shell navigation and UI wiring outside the main runtime.
+- `assets/css/`: runtime styles.
+- `assets/js/`: main runtime script.
 
-## 4) Performance/Maintainability Improvements
-- Reduced HTML parse/maintenance complexity by externalizing style/script.
-- Enables browser caching for CSS/JS assets.
-- Prepares codebase for incremental modular extraction without feature breakage.
+## Data Contracts Preserved
+- Existing `localStorage` keys remain unchanged.
+- Firebase document locations and task payload semantics remain unchanged.
+- Roadmap, mission, flow, streak, and trainer state semantics remain unchanged.
 
-## 5) Next Upgrades Suggested
-- Introduce event bus (pub/sub) for inter-module coordination.
-- Add unit tests for analytics, penalty, and anti-sandbag logic.
-- Add linting/formatting and CI checks.
-- Split `app.js` by domain classes into module files with ES module imports.
+## Security Notes
+- User-controlled task/favorite text is escaped before HTML rendering in the main runtime.
+- Malformed `localStorage` payloads are rejected and cleared defensively.
+- File imports reject oversized files and ignore non-object JSON entries before normalization.
+
+## Extension Guidance
+- Add new business rules to `assets/js/app.js` only if they are tightly coupled to existing managers.
+- Add new shell/summary behavior to `ui/`, `analytics/`, `shadow-engine/`, or `services/` sidecar modules.
+- Add new shared state readers to `core/`.
+- Add new styling in `assets/css/app.css`, and split further only when a feature area becomes independently maintainable.
