@@ -111,6 +111,25 @@
         border-bottom: 1px solid var(--border);
         margin-bottom: 8px;
       }
+      .profile-rank-guide {
+        margin: 10px 0 8px;
+        padding: 10px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .profile-rank-guide-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+      }
+      .profile-rank-guide-list {
+        font-size: 0.76rem;
+        line-height: 1.45;
+        color: var(--text-primary);
+      }
       .btn {
         background: linear-gradient(145deg, #2a2a2a, #222);
         color: var(--text-primary);

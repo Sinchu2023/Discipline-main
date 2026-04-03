@@ -3581,8 +3581,11 @@ class ShadowEngine {
           : `Need ${srGap} SR • ${shadowRating.gate.reason}`
         : "BrahMos ceiling held";
 
-
-
+    if (this.app.elements["shadow-next-rank-sub"] && nextRank)
+      this.app.elements["shadow-next-rank-sub"].textContent =
+        shadowRating.gate.met
+          ? `${srGap} to go`
+          : `${srGap} to go | ${shadowRating.gate.reason}`;
 
     this.app.elements["shadow-lead-margin"].textContent =
       `Lead Margin: ${Math.abs(scoreDiff)}`;
@@ -4529,14 +4532,20 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     // Phase 0.1: guarantee ONE delegated listener — never per-element
     this._initMissionDelegation();
 
+    const currentMissionDateKey = this.getCurrentMissionDateKey();
+    const forceDateRebuild =
+      this._missionCacheDateKey &&
+      this._missionCacheDateKey !== currentMissionDateKey;
+
     let tasks = null;
-    if (rebuild || !this._missionStateCache) {
+    if (rebuild || forceDateRebuild || !this._missionStateCache) {
       tasks = this.getDailyMissionTasks();
       const checks = this.getTodayManualMissionChecks();
       let nowH = new Date().getHours() + new Date().getMinutes() / 60;
       if (nowH < 5) nowH += 24;
       // Phase 0.2: rebuild local state cache
       this._missionStateCache = this._buildMissionCache(tasks, checks, nowH);
+      this._missionCacheDateKey = currentMissionDateKey;
     }
     this.updateMissionChecklistScore(this._missionStateCache);
     this.scheduleMissionBoundaryPulse();
@@ -5903,6 +5912,8 @@ document.addEventListener("visibilitychange", () => {
     window.app.taskManager.renderTasks();
     window.app.taskManager.renderFavorites();
     if (window.app.shadowEngine) window.app.shadowEngine.refresh(false);
+    if (window.app.trainerEngine)
+      window.app.trainerEngine.syncMissionFromRoadmap({ rebuild: true });
     if (window.app.flowEngine) window.app.flowEngine.refresh();
   }
 });
