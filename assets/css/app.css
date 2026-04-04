@@ -112,11 +112,24 @@
         margin-bottom: 8px;
       }
       .profile-rank-guide {
+        width: 100%;
+        text-align: left;
         margin: 10px 0 8px;
         padding: 10px 8px;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 10px;
         background: rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+        transition: var(--transition);
+      }
+      .profile-rank-guide:hover {
+        transform: translateY(-1px);
+        border-color: rgba(0, 123, 255, 0.4);
+        background: rgba(0, 123, 255, 0.08);
+      }
+      .profile-rank-guide:focus-visible {
+        outline: 2px solid rgba(0, 123, 255, 0.75);
+        outline-offset: 2px;
       }
       .profile-rank-guide-title {
         font-size: 0.72rem;
@@ -1004,6 +1017,87 @@
         );
         border: 1px solid rgba(255, 255, 255, 0.08);
         box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+      }
+
+      #shadow-ranks-modal .modal {
+        max-width: 980px;
+      }
+
+      #shadow-ranks-modal .modal-content {
+        background:
+          radial-gradient(circle at top right, rgba(0, 123, 255, 0.1), transparent 35%),
+          linear-gradient(180deg, rgba(13, 13, 15, 0.96), rgba(10, 10, 12, 0.96));
+      }
+
+      .shadow-ranks-intro {
+        margin-bottom: 18px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .shadow-ranks-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .shadow-rank-card {
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 16px;
+        padding: 16px;
+        background: linear-gradient(160deg, rgba(23, 24, 29, 0.96), rgba(14, 14, 18, 0.96));
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+      }
+
+      .shadow-rank-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .shadow-rank-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-accent);
+      }
+
+      .shadow-rank-threshold {
+        white-space: nowrap;
+        font-size: 0.8rem;
+        color: var(--primary);
+        border: 1px solid rgba(0, 123, 255, 0.25);
+        background: rgba(0, 123, 255, 0.12);
+        border-radius: 999px;
+        padding: 6px 10px;
+      }
+
+      .shadow-rank-tagline {
+        margin-bottom: 12px;
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .shadow-rank-copy {
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-bottom: 12px;
+      }
+
+      .shadow-rank-famous {
+        color: var(--text-primary);
+        line-height: 1.55;
+      }
+
+      .shadow-rank-famous strong {
+        color: var(--text-accent);
+      }
+
+      @media (max-width: 768px) {
+        .shadow-ranks-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       .trainer-meta {

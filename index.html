@@ -70,12 +70,19 @@
               <div class="profile-name" id="auth-user-name"></div>
               <button class="btn" id="import-data" role="menuitem"><i class="fas fa-upload"></i> Import</button>
               <button class="btn" id="export-data" role="menuitem"><i class="fas fa-download"></i> Export</button>
-              <div class="profile-rank-guide">
+              <button
+                class="profile-rank-guide"
+                id="open-shadow-ranks"
+                type="button"
+                role="menuitem"
+                aria-haspopup="dialog"
+                aria-controls="shadow-ranks-modal"
+              >
                 <div class="profile-rank-guide-title">SHADOW Ranks</div>
                 <div class="profile-rank-guide-list">
                   Stinger, Javelin, Exocet, Astra, Tomahawk, Prithvi, Agni, Trident, Minuteman, BrahMos
                 </div>
-              </div>
+              </button>
               <a href="https://www.linkedin.com/in/sinchan-chandrashekhar-180248263/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
                 <button class="btn" style="color:var(--primary); font-size:0.8rem; margin:10px 0;"><i class="fab fa-linkedin"></i> Credits: Sinchan Chandrashekhar</button>
               </a>
@@ -519,6 +526,26 @@
             <i class="fas fa-print"></i> Print
           </button>
           <button class="btn btn-primary" id="close-report">Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-overlay" id="shadow-ranks-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">SHADOW Ranks</h2>
+          <button
+            class="btn"
+            id="close-shadow-ranks-modal"
+            style="position: absolute; right: 20px; top: 20px"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-content" id="shadow-ranks-content">
+          <!-- Shadow rank details will be dynamically inserted -->
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="close-shadow-ranks">Close</button>
         </div>
       </div>
     </div>

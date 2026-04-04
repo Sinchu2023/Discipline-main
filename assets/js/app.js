@@ -1210,12 +1210,17 @@ class DisciplineTracker {
       "view-report",
       "export-data",
       "import-data",
+      "open-shadow-ranks",
       "import-file",
       "report-modal",
       "report-content",
       "close-modal",
       "print-report",
       "close-report",
+      "shadow-ranks-modal",
+      "shadow-ranks-content",
+      "close-shadow-ranks",
+      "close-shadow-ranks-modal",
       "open-trainer",
       "trainer-modal",
       "ai-roadmap-topic",
@@ -2494,6 +2499,33 @@ class UIManager {
   hideReport() {
     this.app.elements["report-modal"].style.display = "none";
   }
+  showShadowRanksGuide() {
+    const shadowRanks = this.app.shadowEngine.rankTiers
+      .map(
+        (rank) => `
+          <article class="shadow-rank-card">
+            <div class="shadow-rank-card-head">
+              <div class="shadow-rank-name">${this.app.escapeHtml(rank.title)}</div>
+              <div class="shadow-rank-threshold">${this.app.escapeHtml(`${rank.min}+ rating`)}</div>
+            </div>
+            <div class="shadow-rank-tagline">${this.app.escapeHtml(rank.tagline)}</div>
+            <div class="shadow-rank-copy">${this.app.escapeHtml(rank.profile)}</div>
+            <div class="shadow-rank-famous"><strong>Why it is famous:</strong> ${this.app.escapeHtml(rank.fame)}</div>
+          </article>`,
+      )
+      .join("");
+
+    this.app.elements["shadow-ranks-content"].innerHTML = `
+      <div class="shadow-ranks-intro">
+        Each SHADOW rank is named after a well-known missile system and mapped to a discipline tier. Open this window any time from the profile menu to understand what each rank means and why that name was chosen.
+      </div>
+      <div class="shadow-ranks-grid">${shadowRanks}</div>
+    `;
+    this.app.elements["shadow-ranks-modal"].style.display = "flex";
+  }
+  hideShadowRanksGuide() {
+    this.app.elements["shadow-ranks-modal"].style.display = "none";
+  }
   exportData() {
     const now = new Date();
     const report = AnalyticsService.buildMonthlyReport(
@@ -2710,16 +2742,96 @@ class ShadowEngine {
     this.app = app;
     this.shadowSevenDayAverage = 0;
     this.rankTiers = [
-      { min: 0, title: "Stinger" },
-      { min: 100, title: "Javelin" },
-      { min: 180, title: "Exocet" },
-      { min: 260, title: "Astra" },
-      { min: 350, title: "Tomahawk" },
-      { min: 450, title: "Prithvi" },
-      { min: 560, title: "Agni" },
-      { min: 680, title: "Trident" },
-      { min: 800, title: "Minuteman" },
-      { min: 900, title: "BrahMos" },
+      {
+        min: 0,
+        title: "Stinger",
+        tagline: "Reactive, mobile, and just entering the fight.",
+        profile:
+          "This is the first rank. It represents a user who has started building discipline but is still inconsistent and operating in short bursts.",
+        fame:
+          "Named after the Stinger missile, famous for being lightweight, fast to deploy, and effective in the hands of a prepared operator.",
+      },
+      {
+        min: 100,
+        title: "Javelin",
+        tagline: "You are learning to strike with intent, not impulse.",
+        profile:
+          "Javelin marks a stronger base. You are no longer only reacting to the day. You are beginning to plan, aim, and deliver effort with more control.",
+        fame:
+          "Named after the Javelin anti-tank missile, famous for its fire-and-forget precision and its ability to punish stronger targets through good guidance.",
+      },
+      {
+        min: 180,
+        title: "Exocet",
+        tagline: "Focused pressure is starting to matter.",
+        profile:
+          "At Exocet, your output is visible. You are putting together enough serious work to affect your weekly momentum and create noticeable progress.",
+        fame:
+          "Named after the Exocet missile, famous for low-altitude sea-skimming attacks and for becoming known worldwide through decisive real combat impact.",
+      },
+      {
+        min: 260,
+        title: "Astra",
+        tagline: "Your discipline is getting faster, cleaner, and more self-directed.",
+        profile:
+          "Astra represents improved control. You are building the ability to stay on task with less drag and better recovery after distractions.",
+        fame:
+          "Named after Astra, India’s beyond-visual-range air-to-air missile, known for speed, range, and homegrown precision engineering.",
+      },
+      {
+        min: 350,
+        title: "Tomahawk",
+        tagline: "Long-range consistency has started to define you.",
+        profile:
+          "Tomahawk means you can hold productive behavior across longer windows. You are not just having good days, you are sustaining campaigns.",
+        fame:
+          "Named after the Tomahawk cruise missile, famous for long-range precision strikes and for being used when accuracy over distance matters.",
+      },
+      {
+        min: 450,
+        title: "Prithvi",
+        tagline: "You now have grounded power and dependable delivery.",
+        profile:
+          "Prithvi marks solid operational discipline. Your routines are becoming dependable, and your output is less dependent on mood or external pressure.",
+        fame:
+          "Named after Prithvi, one of India’s first indigenous ballistic missile systems, famous as a foundational milestone in strategic capability.",
+      },
+      {
+        min: 560,
+        title: "Agni",
+        tagline: "You are becoming dangerous in a disciplined way.",
+        profile:
+          "Agni means intensity with structure. Your effort, recovery, and mission focus are now combining into a serious long-term profile.",
+        fame:
+          "Named after the Agni missile series, famous for strategic reach, technological maturity, and its role in symbolizing credible deterrence.",
+      },
+      {
+        min: 680,
+        title: "Trident",
+        tagline: "Pressure, precision, and reliability are all present now.",
+        profile:
+          "Trident is an elite consistency rank. You are delivering under pressure, keeping standards high, and stacking wins without needing constant resets.",
+        fame:
+          "Named after the Trident submarine-launched ballistic missile, famous for stealth deployment, survivability, and high strategic reliability.",
+      },
+      {
+        min: 800,
+        title: "Minuteman",
+        tagline: "You are battle-ready on demand.",
+        profile:
+          "Minuteman reflects top-tier readiness. Your system is resilient, your discipline is stable, and you can produce when it matters without warm-up chaos.",
+        fame:
+          "Named after the Minuteman missile, famous for rapid readiness and for borrowing its name from colonial militia who had to be ready at a minute’s notice.",
+      },
+      {
+        min: 900,
+        title: "BrahMos",
+        tagline: "Maximum speed, maximum pressure, minimum hesitation.",
+        profile:
+          "BrahMos is the apex rank. It means your execution is fast, repeatable, and respected. You are not merely disciplined; you operate with force and clarity.",
+        fame:
+          "Named after the BrahMos supersonic cruise missile, famous for extreme speed, precision, and its reputation as one of the fastest in its class.",
+      },
     ];
   }
 
@@ -5824,6 +5936,10 @@ class EventManager {
     this.app.elements["import-data"].addEventListener("click", () =>
       (this.app.uiManager.triggerImportPicker(), this.app.cloudManager.closeProfileMenu()),
     );
+    this.app.elements["open-shadow-ranks"].addEventListener("click", () => {
+      this.app.uiManager.showShadowRanksGuide();
+      this.app.cloudManager.closeProfileMenu();
+    });
     this.app.elements["import-file"].addEventListener("change", (e) => {
       const file = e.target.files?.[0];
       this.app.uiManager.importDataFromFile(file);
@@ -5869,6 +5985,13 @@ class EventManager {
     this.app.elements["close-report"].addEventListener("click", () =>
       this.app.uiManager.hideReport(),
     );
+    this.app.elements["close-shadow-ranks"].addEventListener("click", () =>
+      this.app.uiManager.hideShadowRanksGuide(),
+    );
+    this.app.elements["close-shadow-ranks-modal"].addEventListener(
+      "click",
+      () => this.app.uiManager.hideShadowRanksGuide(),
+    );
     this.app.elements["print-report"].addEventListener("click", () =>
       window.print(),
     );
@@ -5893,6 +6016,10 @@ class EventManager {
     this.app.elements["report-modal"].addEventListener("click", (e) => {
       if (e.target === this.app.elements["report-modal"])
         this.app.uiManager.hideReport();
+    });
+    this.app.elements["shadow-ranks-modal"].addEventListener("click", (e) => {
+      if (e.target === this.app.elements["shadow-ranks-modal"])
+        this.app.uiManager.hideShadowRanksGuide();
     });
     this.app.elements["trainer-modal"].addEventListener("click", (e) => {
       if (e.target === this.app.elements["trainer-modal"])
