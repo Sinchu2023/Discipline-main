@@ -136,12 +136,6 @@
         text-transform: uppercase;
         letter-spacing: 0.4px;
         color: var(--text-secondary);
-        margin-bottom: 6px;
-      }
-      .profile-rank-guide-list {
-        font-size: 0.76rem;
-        line-height: 1.45;
-        color: var(--text-primary);
       }
       .btn {
         background: linear-gradient(145deg, #2a2a2a, #222);
