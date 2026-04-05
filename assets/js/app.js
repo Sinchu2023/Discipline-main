@@ -1297,6 +1297,13 @@ class DisciplineTracker {
       "shadow-battle-shadow",
       "shadow-next-rank",
       "shadow-next-rank-sub",
+      "shadow-rank-state",
+      "shadow-shield-status",
+      "shadow-promotion-trial",
+      "shadow-promotion-requirements",
+      "shadow-rank-note",
+      "shadow-rank-note-sub",
+      "shadow-rank-ladder",
       "shadow-note",
       "shadow-weekly-average",
       "shadow-momentum",
@@ -3058,6 +3065,216 @@ class ShadowEngine {
     this.refresh(false);
   }
 
+  getRankIndexByTitle(title) {
+    return this.rankTiers.findIndex((tier) => tier.title === title);
+  }
+
+  getRankTierByIndex(index) {
+    return this.rankTiers[Math.max(0, Math.min(index, this.rankTiers.length - 1))] || null;
+  }
+
+  getRankProgressState() {
+    const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+    const rankProgress = stored.rankProgress || {};
+    return {
+      unlockedRankIndex:
+        Number.isInteger(rankProgress.unlockedRankIndex)
+          ? rankProgress.unlockedRankIndex
+          : null,
+      shieldCharges:
+        Number.isInteger(rankProgress.shieldCharges)
+          ? rankProgress.shieldCharges
+          : 1,
+      decayStreak:
+        Number.isInteger(rankProgress.decayStreak)
+          ? rankProgress.decayStreak
+          : 0,
+      lastProcessedDate: rankProgress.lastProcessedDate || null,
+      eventNote: rankProgress.eventNote || "",
+    };
+  }
+
+  saveRankProgressState(rankProgress) {
+    const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE, {
+      ...stored,
+      rankProgress,
+    });
+  }
+
+  getTrialRequiredDays(nextRank) {
+    if (!nextRank) return 0;
+    if (nextRank.min >= 680) return 4;
+    if (nextRank.min >= 350) return 3;
+    return 2;
+  }
+
+  getPromotionTargetMinutes(shadowStandard, shadowAvg, nextRank) {
+    let baseline = Math.max(
+      120,
+      Math.round(Math.max(shadowStandard || 0, (shadowAvg || 0) * 0.9)),
+    );
+    if (nextRank?.min >= 560) baseline = Math.max(baseline, 240);
+    return baseline;
+  }
+
+  getConsecutiveDaysOverMinutes(dailyMap, targetMinutes, lookback = 7) {
+    let streak = 0;
+    for (let i = 0; i < lookback; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const date = this.app.getDateString(d);
+      const minutes = dailyMap.get(date) || 0;
+      if (minutes >= targetMinutes) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  resolveRankProgress({
+    rawRating,
+    rawRank,
+    gate,
+    dailyMap,
+    productiveDays7,
+    shadowStandard,
+    shadowAvg,
+  }) {
+    const today = this.app.getDateString(new Date());
+    const rawRankIndex = this.getRankIndexByTitle(rawRank.title);
+    const progress = this.getRankProgressState();
+
+    if (!Number.isInteger(progress.unlockedRankIndex)) {
+      progress.unlockedRankIndex = rawRankIndex;
+      progress.shieldCharges = 1;
+      progress.decayStreak = 0;
+    }
+
+    progress.unlockedRankIndex = Math.max(0, progress.unlockedRankIndex);
+    progress.shieldCharges = Math.max(0, Math.min(1, progress.shieldCharges));
+
+    let currentRank = this.getRankTierByIndex(progress.unlockedRankIndex);
+    let nextRank = this.rankTiers[progress.unlockedRankIndex + 1] || null;
+    let eventNote = progress.eventNote || "";
+
+    const trialRequired = this.getTrialRequiredDays(nextRank);
+    const trialTargetMinutes = this.getPromotionTargetMinutes(
+      shadowStandard,
+      shadowAvg,
+      nextRank,
+    );
+    const trialProgress = nextRank
+      ? this.getConsecutiveDaysOverMinutes(dailyMap, trialTargetMinutes)
+      : 0;
+    const stableDaysNeeded = nextRank
+      ? Math.min(7, Math.max(trialRequired + 1, nextRank.min >= 560 ? 5 : 4))
+      : 0;
+    const stableDaysMet = nextRank ? productiveDays7 >= stableDaysNeeded : true;
+    const canPromote = Boolean(
+      nextRank &&
+      rawRating >= nextRank.min &&
+      gate.met &&
+      trialProgress >= trialRequired &&
+      stableDaysMet,
+    );
+    const atRisk = rawRating < currentRank.min;
+
+    if (progress.lastProcessedDate !== today) {
+      if (canPromote) {
+        progress.unlockedRankIndex = Math.min(
+          rawRankIndex,
+          progress.unlockedRankIndex + 1,
+        );
+        progress.shieldCharges = 1;
+        progress.decayStreak = 0;
+        eventNote = `${nextRank.title} unlocked after clearing the promotion trial.`;
+      } else if (atRisk) {
+        progress.decayStreak += 1;
+        if (progress.decayStreak >= 2) {
+          if (progress.shieldCharges > 0) {
+            progress.shieldCharges = 0;
+            progress.decayStreak = 0;
+            eventNote = `${currentRank.title} shield absorbed the decay hit.`;
+          } else if (progress.unlockedRankIndex > 0) {
+            progress.unlockedRankIndex -= 1;
+            progress.shieldCharges = 1;
+            progress.decayStreak = 0;
+            currentRank = this.getRankTierByIndex(progress.unlockedRankIndex);
+            eventNote = `Rank slipped to ${currentRank.title}. Rebuild the floor.`;
+          }
+        } else {
+          eventNote = `${currentRank.title} is under decay watch. One more weak day breaks the shield.`;
+        }
+      } else {
+        progress.decayStreak = 0;
+        if (
+          progress.shieldCharges === 0 &&
+          rawRating >= currentRank.min + 25 &&
+          productiveDays7 >= 4
+        ) {
+          progress.shieldCharges = 1;
+          eventNote = `${currentRank.title} shield restored through stable work.`;
+        }
+      }
+
+      progress.lastProcessedDate = today;
+      progress.eventNote = eventNote;
+      this.saveRankProgressState(progress);
+      currentRank = this.getRankTierByIndex(progress.unlockedRankIndex);
+      nextRank = this.rankTiers[progress.unlockedRankIndex + 1] || null;
+    }
+
+    const reasons = [];
+    if (nextRank) {
+      const srGap = Math.max(0, nextRank.min - rawRating);
+      if (srGap > 0) reasons.push(`${srGap} SR short`);
+      if (trialProgress < trialRequired)
+        reasons.push(`${trialProgress}/${trialRequired} trial days`);
+      if (!stableDaysMet)
+        reasons.push(`${productiveDays7}/${stableDaysNeeded} productive days`);
+      if (!gate.met) reasons.push(gate.reason);
+    }
+
+    return {
+      progress,
+      effectiveRank: currentRank,
+      nextRank,
+      trialProgress,
+      trialRequired,
+      trialTargetMinutes,
+      stableDaysNeeded,
+      reasons,
+      eventNote: progress.eventNote || eventNote,
+      rawRankIndex,
+    };
+  }
+
+  renderRankLadder(activeRankIndex, rawRankIndex) {
+    return this.rankTiers
+      .map((tier, index) => {
+        const classes = ["shadow-ladder-step"];
+        if (index < activeRankIndex) classes.push("completed");
+        if (index === activeRankIndex) classes.push("current");
+        if (index > activeRankIndex) classes.push("locked");
+        if (index > activeRankIndex && index <= rawRankIndex)
+          classes.push("raw-eligible");
+
+        let tag = "Locked";
+        if (index < activeRankIndex) tag = "Cleared";
+        if (index === activeRankIndex) tag = "Current";
+        if (index > activeRankIndex && index <= rawRankIndex) tag = "Trial pending";
+
+        return `
+          <div class="${classes.join(" ")}">
+            <div class="shadow-ladder-name">${this.app.escapeHtml(tier.title)}</div>
+            <div class="shadow-ladder-meta">${this.app.escapeHtml(`${tier.min}+ SR`)}</div>
+            <div class="shadow-ladder-tag">${this.app.escapeHtml(tag)}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
   getDailyProductiveMap() {
     const dailyMap = new Map();
     this.app.state.tasks.forEach((task) => {
@@ -3828,7 +4045,17 @@ class ShadowEngine {
       recovery: shadowRating.factors.recovery,
       currentRank: rank,
     });
-    const nextRank = shadowRating.nextRank;
+    const rankProgress = this.resolveRankProgress({
+      rawRating: shadowRating.rating,
+      rawRank: rank,
+      gate: shadowRating.gate,
+      dailyMap,
+      productiveDays7,
+      shadowStandard,
+      shadowAvg,
+    });
+    const activeRank = rankProgress.effectiveRank;
+    const nextRank = rankProgress.nextRank;
     const srGap = nextRank
       ? Math.max(0, nextRank.min - shadowRating.rating)
       : 0;
@@ -3941,8 +4168,9 @@ class ShadowEngine {
       : pressure.label;
     pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
-    this.app.elements["shadow-rank"].textContent = rank.title;
-    this.app.elements["shadow-badge"].textContent = `SR: ${shadowRating.rating}`;
+    this.app.elements["shadow-rank"].textContent = activeRank.title;
+    this.app.elements["shadow-badge"].textContent =
+      `SR: ${shadowRating.rating} | Shield ${rankProgress.progress.shieldCharges ? "Ready" : "Broken"}`;
     this.app.elements["shadow-score"].textContent =
       `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
     if (this.app.elements["shadow-battle-you"])
@@ -3981,6 +4209,43 @@ class ShadowEngine {
       scoreDiff >= 0
         ? `You lead monthly by ${Math.abs(scoreDiff)} day-win(s); hold at least ${this.app.formatDuration(defenseTarget)} tomorrow. Mission ${missionScore}/100.`
         : `You are behind by ${this.app.formatDuration(neededTie)} today and ${Math.abs(scoreDiff)} monthly day-win(s). Mission ${missionScore}/100.`;
+
+    if (this.app.elements["shadow-next-rank-sub"])
+      this.app.elements["shadow-next-rank-sub"].textContent = nextRank
+        ? rankProgress.reasons.length
+          ? rankProgress.reasons.join(" | ")
+          : `${srGap} to go`
+        : "BrahMos ceiling held";
+    if (this.app.elements["shadow-rank-state"])
+      this.app.elements["shadow-rank-state"].textContent =
+        `${activeRank.title} active`;
+    if (this.app.elements["shadow-shield-status"])
+      this.app.elements["shadow-shield-status"].textContent =
+        rankProgress.progress.shieldCharges > 0
+          ? `Shield ready | Decay watch ${rankProgress.progress.decayStreak}/2`
+          : `Shield broken | Decay watch ${rankProgress.progress.decayStreak}/2`;
+    if (this.app.elements["shadow-promotion-trial"])
+      this.app.elements["shadow-promotion-trial"].textContent = nextRank
+        ? `${rankProgress.trialProgress}/${rankProgress.trialRequired} days`
+        : "Apex secured";
+    if (this.app.elements["shadow-promotion-requirements"])
+      this.app.elements["shadow-promotion-requirements"].textContent = nextRank
+        ? rankProgress.reasons.length
+          ? rankProgress.reasons.join(" | ")
+          : `Trial clear at ${this.app.formatDuration(rankProgress.trialTargetMinutes)}`
+        : "No further trial required";
+    if (this.app.elements["shadow-rank-note"])
+      this.app.elements["shadow-rank-note"].textContent =
+        rankProgress.eventNote || activeRank.tagline;
+    if (this.app.elements["shadow-rank-note-sub"])
+      this.app.elements["shadow-rank-note-sub"].textContent = nextRank
+        ? `Need ${srGap} SR and ${rankProgress.stableDaysNeeded}/7 stable days. Daily trial target: ${this.app.formatDuration(rankProgress.trialTargetMinutes)}.`
+        : "BrahMos held. Focus on maintaining the floor.";
+    if (this.app.elements["shadow-rank-ladder"])
+      this.app.elements["shadow-rank-ladder"].innerHTML = this.renderRankLadder(
+        this.getRankIndexByTitle(activeRank.title),
+        rankProgress.rawRankIndex,
+      );
 
 
     if (this.app.trainerEngine?.syncMissionFromRoadmap)
