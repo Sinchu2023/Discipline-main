@@ -3548,10 +3548,10 @@ class ShadowEngine {
   }
 
   getCurrentStatus(percentage) {
-    if (percentage >= 100) return "STANDARD BROKEN";
-    if (percentage >= 90) return "AT THE GATE";
-    if (percentage >= 70) return "TRAILING";
-    return "OUT OF RANGE";
+    if (percentage >= 100) return "IN THE FLOW";
+    if (percentage >= 90) return "ALMOST THERE";
+    if (percentage >= 70) return "BUILDING RHYTHM";
+    return "WARMING UP";
   }
 
   getProgressStyle(percentage) {
@@ -3613,20 +3613,24 @@ class ShadowEngine {
 
     if (level <= 0)
       return {
-        label: "Pressure: Controlled",
+        label: "Buddy check: Smooth",
         cls: "shadow-pressure-low",
         reasons,
       };
     if (level === 1)
       return {
-        label: "Pressure: Elevated",
+        label: "Buddy check: Stay steady",
         cls: "shadow-pressure-mid",
         reasons,
       };
     if (level === 2)
-      return { label: "Pressure: High", cls: "shadow-pressure-mid", reasons };
+      return {
+        label: "Buddy check: Needs focus",
+        cls: "shadow-pressure-mid",
+        reasons,
+      };
     return {
-      label: "Pressure: Critical",
+      label: "Buddy check: Needs support",
       cls: "shadow-pressure-high",
       reasons,
     };
@@ -3944,28 +3948,28 @@ class ShadowEngine {
     this.app.elements["shadow-rank"].textContent = rank.title;
     this.app.elements["shadow-badge"].textContent = `SR: ${shadowRating.rating}`;
     this.app.elements["shadow-score"].textContent =
-      `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
+      `Monthly rhythm (days): You ${competition.myWins} | Buddy ${competition.shadowWins}`;
     if (this.app.elements["shadow-battle-you"])
       this.app.elements["shadow-battle-you"].textContent = `${competition.myWins}`;
     if (this.app.elements["shadow-battle-shadow"])
       this.app.elements["shadow-battle-shadow"].textContent = `${competition.shadowWins}`;
     this.app.elements["shadow-duel"].textContent =
       scoreDiff === 0
-        ? "Monthly battle tied"
+        ? "You and buddy are aligned this month"
         : scoreDiff > 0
-          ? `You lead by ${Math.abs(scoreDiff)} day-win(s)`
-          : `Shadow leads by ${Math.abs(scoreDiff)} day-win(s)`;
+          ? `You are ahead by ${Math.abs(scoreDiff)} day-win(s)`
+          : `Buddy standard is ahead by ${Math.abs(scoreDiff)} day-win(s)`;
 
     if (this.app.elements["shadow-next-rank"])
       this.app.elements["shadow-next-rank"].textContent = nextRank
         ? nextRank.title
-        : "Top rank secured";
+        : "Top rank held";
     if (this.app.elements["shadow-next-rank-sub"])
       this.app.elements["shadow-next-rank-sub"].textContent = nextRank
         ? shadowRating.gate.met
           ? `Need ${srGap} SR`
           : `Need ${srGap} SR • ${shadowRating.gate.reason}`
-        : "BrahMos ceiling held";
+        : "Buddy says BrahMos is locked in";
 
     if (this.app.elements["shadow-next-rank-sub"] && nextRank)
       this.app.elements["shadow-next-rank-sub"].textContent =
@@ -3974,7 +3978,7 @@ class ShadowEngine {
           : `${srGap} to go | ${shadowRating.gate.reason}`;
 
     this.app.elements["shadow-lead-margin"].textContent =
-      `Lead Margin: ${Math.abs(scoreDiff)}`;
+      `Rhythm Gap: ${Math.abs(scoreDiff)}`;
     this.app.elements["shadow-trend"].textContent =
       `Monthly trend: ${(competition.recentWinRate * 100).toFixed(0)}% win rate`;
     this.app.elements["shadow-verdict"].textContent =
