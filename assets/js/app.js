@@ -3089,6 +3089,11 @@ class ShadowEngine {
         Number.isInteger(rankProgress.decayStreak)
           ? rankProgress.decayStreak
           : 0,
+      srPenalty:
+        Number.isFinite(rankProgress.srPenalty) && rankProgress.srPenalty > 0
+          ? Math.round(rankProgress.srPenalty)
+          : 0,
+      trainingCamp: this.normalizeTrainingCampState(rankProgress.trainingCamp),
       lastProcessedDate: rankProgress.lastProcessedDate || null,
       eventNote: rankProgress.eventNote || "",
     };
@@ -3102,11 +3107,50 @@ class ShadowEngine {
     });
   }
 
-  getTrialRequiredDays(nextRank) {
-    if (!nextRank) return 0;
-    if (nextRank.min >= 680) return 4;
-    if (nextRank.min >= 350) return 3;
-    return 2;
+  normalizeTrainingCampState(trainingCamp = null) {
+    return {
+      active: Boolean(trainingCamp?.active),
+      provisionalRankIndex: Number.isInteger(trainingCamp?.provisionalRankIndex)
+        ? trainingCamp.provisionalRankIndex
+        : null,
+      previousRankIndex: Number.isInteger(trainingCamp?.previousRankIndex)
+        ? trainingCamp.previousRankIndex
+        : null,
+      startDate: trainingCamp?.startDate || null,
+      targetMinutes:
+        Number.isFinite(trainingCamp?.targetMinutes) && trainingCamp.targetMinutes > 0
+          ? Math.round(trainingCamp.targetMinutes)
+          : 0,
+      daysCompleted:
+        Number.isInteger(trainingCamp?.daysCompleted) && trainingCamp.daysCompleted >= 0
+          ? trainingCamp.daysCompleted
+          : 0,
+      successDays:
+        Number.isInteger(trainingCamp?.successDays) && trainingCamp.successDays >= 0
+          ? trainingCamp.successDays
+          : 0,
+      failDays:
+        Number.isInteger(trainingCamp?.failDays) && trainingCamp.failDays >= 0
+          ? trainingCamp.failDays
+          : 0,
+      consecutiveFails:
+        Number.isInteger(trainingCamp?.consecutiveFails) && trainingCamp.consecutiveFails >= 0
+          ? trainingCamp.consecutiveFails
+          : 0,
+      lastEvaluatedDate: trainingCamp?.lastEvaluatedDate || null,
+    };
+  }
+
+  getTrainingCampLength() {
+    return 10;
+  }
+
+  getTrainingCampSuccessRequirement() {
+    return 7;
+  }
+
+  getTrainingCampSrPenalty() {
+    return 15;
   }
 
   getPromotionTargetMinutes(shadowStandard, shadowAvg, nextRank) {
@@ -3131,6 +3175,25 @@ class ShadowEngine {
     return streak;
   }
 
+  getDateStringsBetween(startDateStr, endDateStr) {
+    if (!startDateStr || !endDateStr) return [];
+
+    const start = new Date(`${startDateStr}T12:00:00`);
+    const end = new Date(`${endDateStr}T12:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end)
+      return [];
+
+    const dates = [];
+    for (
+      const cursor = new Date(start);
+      cursor <= end;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      dates.push(this.app.getDateString(cursor));
+    }
+    return dates;
+  }
+
   resolveRankProgress({
     rawRating,
     rawRank,
@@ -3152,43 +3215,155 @@ class ShadowEngine {
 
     progress.unlockedRankIndex = Math.max(0, progress.unlockedRankIndex);
     progress.shieldCharges = Math.max(0, Math.min(1, progress.shieldCharges));
+    progress.srPenalty = Math.max(0, Math.round(progress.srPenalty || 0));
+    progress.trainingCamp = this.normalizeTrainingCampState(progress.trainingCamp);
 
     let currentRank = this.getRankTierByIndex(progress.unlockedRankIndex);
     let nextRank = this.rankTiers[progress.unlockedRankIndex + 1] || null;
     let eventNote = progress.eventNote || "";
+    let effectiveRating = Math.max(0, rawRating - progress.srPenalty);
+    let rankState = "confirmed";
 
-    const trialRequired = this.getTrialRequiredDays(nextRank);
     const trialTargetMinutes = this.getPromotionTargetMinutes(
       shadowStandard,
       shadowAvg,
       nextRank,
     );
-    const trialProgress = nextRank
-      ? this.getConsecutiveDaysOverMinutes(dailyMap, trialTargetMinutes)
-      : 0;
-    const stableDaysNeeded = nextRank
-      ? Math.min(7, Math.max(trialRequired + 1, nextRank.min >= 560 ? 5 : 4))
-      : 0;
-    const stableDaysMet = nextRank ? productiveDays7 >= stableDaysNeeded : true;
+    const trainingCampLength = this.getTrainingCampLength();
+    const trainingCampSuccessRequirement =
+      this.getTrainingCampSuccessRequirement();
+    const stableDaysNeeded = 0;
     const canPromote = Boolean(
       nextRank &&
-      rawRating >= nextRank.min &&
-      gate.met &&
-      trialProgress >= trialRequired &&
-      stableDaysMet,
+      effectiveRating >= nextRank.min &&
+      gate.met,
     );
     const atRisk = rawRating < currentRank.min;
+    let trainingCamp = progress.trainingCamp;
 
-    if (progress.lastProcessedDate !== today) {
-      if (canPromote) {
-        progress.unlockedRankIndex = Math.min(
-          rawRankIndex,
-          progress.unlockedRankIndex + 1,
-        );
-        progress.shieldCharges = 1;
-        progress.decayStreak = 0;
-        eventNote = `${nextRank.title} unlocked after clearing the promotion trial.`;
-      } else if (atRisk) {
+    if (!trainingCamp.active && canPromote && nextRank) {
+      trainingCamp = this.normalizeTrainingCampState({
+        active: true,
+        provisionalRankIndex: progress.unlockedRankIndex + 1,
+        previousRankIndex: progress.unlockedRankIndex,
+        startDate: today,
+        targetMinutes: trialTargetMinutes,
+        daysCompleted: 0,
+        successDays: 0,
+        failDays: 0,
+        consecutiveFails: 0,
+        lastEvaluatedDate: null,
+      });
+      progress.trainingCamp = trainingCamp;
+      progress.unlockedRankIndex = trainingCamp.provisionalRankIndex;
+      currentRank = this.getRankTierByIndex(progress.unlockedRankIndex);
+      nextRank = this.rankTiers[progress.unlockedRankIndex + 1] || null;
+      rankState = "provisional";
+      eventNote = `${currentRank.title} provisional. Training camp started.`;
+    }
+
+    if (trainingCamp.active) {
+      const provisionalRank = this.getRankTierByIndex(
+        trainingCamp.provisionalRankIndex,
+      );
+      const previousRank = this.getRankTierByIndex(trainingCamp.previousRankIndex);
+      currentRank = provisionalRank || currentRank;
+      rankState = "provisional";
+
+      const pendingDates = trainingCamp.lastEvaluatedDate
+        ? this.getDateStringsBetween(
+            this.app.getDateString(
+              new Date(
+                new Date(`${trainingCamp.lastEvaluatedDate}T12:00:00`).getTime() +
+                  86400000,
+              ),
+            ),
+            today,
+          )
+        : this.getDateStringsBetween(trainingCamp.startDate, today);
+
+      for (const date of pendingDates) {
+        if (trainingCamp.daysCompleted >= trainingCampLength) break;
+
+        const dayMinutes = dailyMap.get(date) || 0;
+        const passedDay = dayMinutes >= trainingCamp.targetMinutes;
+
+        trainingCamp.daysCompleted += 1;
+        trainingCamp.lastEvaluatedDate = date;
+
+        if (passedDay) {
+          trainingCamp.successDays += 1;
+          trainingCamp.consecutiveFails = 0;
+          eventNote = `Shadow Buddy says ${currentRank.title} training camp day ${trainingCamp.daysCompleted}/${trainingCampLength} clear.`;
+        } else {
+          trainingCamp.failDays += 1;
+          trainingCamp.consecutiveFails += 1;
+          const consecutiveFailTriggered = trainingCamp.consecutiveFails >= 2;
+          const totalFailTriggered = trainingCamp.failDays >= 3;
+
+          if (progress.shieldCharges > 0) {
+            progress.shieldCharges = 0;
+            eventNote = `${currentRank.title} training camp miss ${trainingCamp.failDays}/3. Shield damaged.`;
+          } else {
+            progress.srPenalty += this.getTrainingCampSrPenalty();
+            eventNote = `${currentRank.title} training camp miss ${trainingCamp.failDays}/3. SR penalty -${this.getTrainingCampSrPenalty()}.`;
+          }
+
+          if (consecutiveFailTriggered || totalFailTriggered) {
+            progress.unlockedRankIndex = Math.max(
+              0,
+              trainingCamp.previousRankIndex ?? progress.unlockedRankIndex - 1,
+            );
+            currentRank =
+              previousRank || this.getRankTierByIndex(progress.unlockedRankIndex);
+            progress.shieldCharges = 1;
+            progress.srPenalty = 0;
+            progress.decayStreak = 0;
+            progress.lastProcessedDate = today;
+            progress.trainingCamp = this.normalizeTrainingCampState();
+            trainingCamp = progress.trainingCamp;
+            rankState = "confirmed";
+            eventNote = consecutiveFailTriggered
+              ? `${provisionalRank?.title || "Provisional rank"} training camp failed with 2 consecutive misses. Demoted to ${currentRank.title}.`
+              : `${provisionalRank?.title || "Provisional rank"} training camp failed at 3 misses. Demoted to ${currentRank.title}.`;
+            break;
+          }
+        }
+
+        if (trainingCamp.daysCompleted >= trainingCampLength) {
+          if (trainingCamp.successDays >= trainingCampSuccessRequirement) {
+            progress.unlockedRankIndex = trainingCamp.provisionalRankIndex;
+            currentRank = provisionalRank || currentRank;
+            progress.srPenalty = 0;
+            progress.decayStreak = 0;
+            progress.lastProcessedDate = today;
+            progress.trainingCamp = this.normalizeTrainingCampState();
+            trainingCamp = progress.trainingCamp;
+            rankState = "confirmed";
+            eventNote = `${currentRank.title} confirmed after clearing the 10-day training camp.`;
+          } else {
+            progress.unlockedRankIndex = Math.max(
+              0,
+              trainingCamp.previousRankIndex ?? progress.unlockedRankIndex - 1,
+            );
+            currentRank =
+              previousRank || this.getRankTierByIndex(progress.unlockedRankIndex);
+            progress.shieldCharges = 1;
+            progress.srPenalty = 0;
+            progress.decayStreak = 0;
+            progress.lastProcessedDate = today;
+            progress.trainingCamp = this.normalizeTrainingCampState();
+            trainingCamp = progress.trainingCamp;
+            rankState = "confirmed";
+            eventNote = `${provisionalRank?.title || "Provisional rank"} training camp ended below ${trainingCampSuccessRequirement}/10 successful days. Demoted to ${currentRank.title}.`;
+          }
+          break;
+        }
+      }
+    }
+
+    if (!progress.trainingCamp.active && progress.lastProcessedDate !== today) {
+      if (atRisk) {
         progress.decayStreak += 1;
         if (progress.decayStreak >= 2) {
           if (progress.shieldCharges > 0) {
@@ -3218,34 +3393,56 @@ class ShadowEngine {
       }
 
       progress.lastProcessedDate = today;
-      progress.eventNote = eventNote;
-      this.saveRankProgressState(progress);
       currentRank = this.getRankTierByIndex(progress.unlockedRankIndex);
       nextRank = this.rankTiers[progress.unlockedRankIndex + 1] || null;
     }
 
+    effectiveRating = Math.max(0, rawRating - progress.srPenalty);
+    if (progress.trainingCamp.active) {
+      currentRank =
+        this.getRankTierByIndex(progress.trainingCamp.provisionalRankIndex) ||
+        currentRank;
+      nextRank = this.rankTiers[progress.trainingCamp.provisionalRankIndex + 1] || null;
+      rankState = "provisional";
+    }
+
     const reasons = [];
-    if (nextRank) {
-      const srGap = Math.max(0, nextRank.min - rawRating);
+    if (progress.trainingCamp.active) {
+      const camp = progress.trainingCamp;
+      if (camp.successDays < trainingCampSuccessRequirement)
+        reasons.push(`${camp.successDays}/${trainingCampSuccessRequirement} successful days`);
+      if (camp.failDays > 0) reasons.push(`${camp.failDays}/2 misses used`);
+      if (camp.consecutiveFails > 0)
+        reasons.push(`${camp.consecutiveFails}/2 consecutive fails`);
+      if (camp.targetMinutes > 0)
+        reasons.push(`Daily floor ${this.app.formatDuration(camp.targetMinutes)}`);
+    } else if (nextRank) {
+      const srGap = Math.max(0, nextRank.min - effectiveRating);
       if (srGap > 0) reasons.push(`${srGap} SR short`);
-      if (trialProgress < trialRequired)
-        reasons.push(`${trialProgress}/${trialRequired} trial days`);
-      if (!stableDaysMet)
+      if (stableDaysNeeded > 0 && productiveDays7 < stableDaysNeeded)
         reasons.push(`${productiveDays7}/${stableDaysNeeded} productive days`);
       if (!gate.met) reasons.push(gate.reason);
     }
+
+    progress.eventNote = eventNote;
+    this.saveRankProgressState(progress);
 
     return {
       progress,
       effectiveRank: currentRank,
       nextRank,
-      trialProgress,
-      trialRequired,
+      trialProgress: progress.trainingCamp.active
+        ? progress.trainingCamp.daysCompleted
+        : 0,
+      trialRequired: progress.trainingCamp.active ? trainingCampLength : 0,
       trialTargetMinutes,
       stableDaysNeeded,
       reasons,
-      eventNote: progress.eventNote || eventNote,
+      eventNote,
       rawRankIndex,
+      adjustedRating: effectiveRating,
+      rankState,
+      trainingCamp: progress.trainingCamp,
     };
   }
 
@@ -4057,8 +4254,15 @@ class ShadowEngine {
     const activeRank = rankProgress.effectiveRank;
     const nextRank = rankProgress.nextRank;
     const srGap = nextRank
-      ? Math.max(0, nextRank.min - shadowRating.rating)
+      ? Math.max(0, nextRank.min - rankProgress.adjustedRating)
       : 0;
+    const campActive = rankProgress.trainingCamp.active;
+    const camp = rankProgress.trainingCamp;
+    const activeRankLabel = campActive
+      ? `${activeRank.title} Provisional`
+      : `${activeRank.title} Confirmed`;
+    const shieldLabel =
+      rankProgress.progress.shieldCharges > 0 ? "Ready" : "Broken";
 
     this.app.elements["shadow-current-minutes"].textContent =
       this.app.formatDuration(todayMinutes);
@@ -4168,9 +4372,9 @@ class ShadowEngine {
       : pressure.label;
     pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
-    this.app.elements["shadow-rank"].textContent = activeRank.title;
+    this.app.elements["shadow-rank"].textContent = activeRankLabel;
     this.app.elements["shadow-badge"].textContent =
-      `SR: ${shadowRating.rating} | Shield ${rankProgress.progress.shieldCharges ? "Ready" : "Broken"}`;
+      `SR: ${rankProgress.adjustedRating} | Shield ${shieldLabel}`;
     this.app.elements["shadow-score"].textContent =
       `Monthly Score (days): You ${competition.myWins} - Shadow ${competition.shadowWins}`;
     if (this.app.elements["shadow-battle-you"])
@@ -4241,6 +4445,42 @@ class ShadowEngine {
       this.app.elements["shadow-rank-note-sub"].textContent = nextRank
         ? `Need ${srGap} SR and ${rankProgress.stableDaysNeeded}/7 stable days. Daily trial target: ${this.app.formatDuration(rankProgress.trialTargetMinutes)}.`
         : "BrahMos held. Focus on maintaining the floor.";
+    if (campActive) {
+      if (this.app.elements["shadow-next-rank"])
+        this.app.elements["shadow-next-rank"].textContent =
+          `${activeRank.title} Confirmed`;
+      if (this.app.elements["shadow-next-rank-sub"])
+        this.app.elements["shadow-next-rank-sub"].textContent =
+          `${camp.successDays}/${this.getTrainingCampSuccessRequirement()} clears | ${camp.failDays}/2 misses`;
+      if (this.app.elements["shadow-rank-state"])
+        this.app.elements["shadow-rank-state"].textContent = activeRankLabel;
+      if (this.app.elements["shadow-shield-status"])
+        this.app.elements["shadow-shield-status"].textContent =
+          `Shield ${shieldLabel} | Fail streak ${camp.consecutiveFails}/2`;
+      if (this.app.elements["shadow-promotion-trial"])
+        this.app.elements["shadow-promotion-trial"].textContent =
+          `Day ${camp.daysCompleted}/${this.getTrainingCampLength()}`;
+      if (this.app.elements["shadow-promotion-requirements"])
+        this.app.elements["shadow-promotion-requirements"].textContent =
+          `${camp.successDays}/${this.getTrainingCampSuccessRequirement()} success | ${camp.failDays}/2 misses | Floor ${this.app.formatDuration(camp.targetMinutes)}`;
+      if (this.app.elements["shadow-rank-note-sub"])
+        this.app.elements["shadow-rank-note-sub"].textContent =
+          `Shadow Buddy says ${activeRank.title} training camp day ${camp.daysCompleted}/${this.getTrainingCampLength()}. Need ${this.getTrainingCampSuccessRequirement()}/10 clears. Instant demotion on 2 consecutive failed days.`;
+    } else {
+      if (this.app.elements["shadow-rank-state"])
+        this.app.elements["shadow-rank-state"].textContent = activeRankLabel;
+      if (this.app.elements["shadow-promotion-trial"] && nextRank)
+        this.app.elements["shadow-promotion-trial"].textContent =
+          "Camp not started";
+      if (this.app.elements["shadow-promotion-requirements"] && nextRank)
+        this.app.elements["shadow-promotion-requirements"].textContent =
+          rankProgress.reasons.length
+            ? rankProgress.reasons.join(" | ")
+            : `Promotion opens at ${nextRank.min} SR`;
+      if (this.app.elements["shadow-rank-note-sub"] && nextRank)
+        this.app.elements["shadow-rank-note-sub"].textContent =
+          `Need ${srGap} SR to enter ${nextRank.title} provisional. Camp floor: ${this.app.formatDuration(rankProgress.trialTargetMinutes)} for 10 days.`;
+    }
     if (this.app.elements["shadow-rank-ladder"])
       this.app.elements["shadow-rank-ladder"].innerHTML = this.renderRankLadder(
         this.getRankIndexByTitle(activeRank.title),
