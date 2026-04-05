@@ -713,47 +713,6 @@
           box-shadow 420ms ease;
         background: #dc3545;
       }
-      .shadow-rank-climb {
-        margin-top: 0.9rem;
-        display: grid;
-        gap: 0.8rem;
-      }
-      .shadow-rank-climb-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.75rem;
-      }
-      .shadow-rank-chip {
-        padding: 0.72rem 0.8rem;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.03);
-        min-width: 0;
-      }
-      .shadow-rank-chip-label {
-        font-size: 0.68rem;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        color: var(--text-secondary);
-        margin-bottom: 0.16rem;
-      }
-      .shadow-rank-chip-value {
-        font-size: 0.92rem;
-        font-weight: 700;
-        color: var(--text-accent);
-        line-height: 1.35;
-      }
-      .shadow-rank-chip-sub {
-        margin-top: 0.18rem;
-        font-size: 0.74rem;
-        color: var(--text-secondary);
-        line-height: 1.45;
-      }
-      .shadow-rank-ladder {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 0.55rem;
-      }
       .shadow-ladder-step {
         position: relative;
         padding: 0.62rem 0.7rem;
@@ -849,19 +808,6 @@
         100% {
           box-shadow: var(--shadow);
           border-color: var(--border);
-        }
-      }
-      @media (max-width: 980px) {
-        .shadow-rank-climb-grid {
-          grid-template-columns: 1fr;
-        }
-        .shadow-rank-ladder {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-      @media (max-width: 640px) {
-        .shadow-rank-ladder {
-          grid-template-columns: 1fr;
         }
       }
       /* Graphs Container */
