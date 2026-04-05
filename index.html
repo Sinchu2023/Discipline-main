@@ -501,6 +501,71 @@
               </div>
               <div id="ai-roadmap-status" style="margin-top: 10px; font-size: 0.9em; color: var(--text-secondary); display: none;"></div>
             </form>
+
+            <section class="sleep-journal-panel" id="sleep-journal-panel">
+              <div class="sleep-journal-head">
+                <div>
+                  <h3 class="sleep-journal-title"><i class="fas fa-book-open"></i> Night Journal</h3>
+                  <p class="sleep-journal-subtitle">Write your end-of-day thoughts before sleep. Tonight's entry is required before a sleep session can start.</p>
+                </div>
+                <div class="sleep-journal-date" id="sleep-journal-date">Today</div>
+              </div>
+              <div class="sleep-journal-grid">
+                <label class="sleep-journal-field">
+                  <span>How was your day?</span>
+                  <select id="sleep-journal-mood">
+                    <option value="">Select mood</option>
+                    <option value="Amazing">Amazing</option>
+                    <option value="Happy">Happy</option>
+                    <option value="Okay">Okay</option>
+                    <option value="Low">Low</option>
+                    <option value="Exhausted">Exhausted</option>
+                  </select>
+                </label>
+                <label class="sleep-journal-field">
+                  <span>Day score</span>
+                  <select id="sleep-journal-rating">
+                    <option value="">Rate day</option>
+                    <option value="10">10/10</option>
+                    <option value="9">9/10</option>
+                    <option value="8">8/10</option>
+                    <option value="7">7/10</option>
+                    <option value="6">6/10</option>
+                    <option value="5">5/10</option>
+                    <option value="4">4/10</option>
+                    <option value="3">3/10</option>
+                    <option value="2">2/10</option>
+                    <option value="1">1/10</option>
+                  </select>
+                </label>
+              </div>
+              <label class="sleep-journal-field">
+                <span>Daily thoughts</span>
+                <textarea id="sleep-journal-thoughts" rows="5" placeholder="What happened today? What are you feeling before sleep?"></textarea>
+              </label>
+              <div class="sleep-journal-grid">
+                <label class="sleep-journal-field">
+                  <span>Best part of today</span>
+                  <textarea id="sleep-journal-highlight" rows="3" placeholder="One thing that made today good"></textarea>
+                </label>
+                <label class="sleep-journal-field">
+                  <span>Tomorrow focus</span>
+                  <textarea id="sleep-journal-tomorrow" rows="3" placeholder="What matters most tomorrow?"></textarea>
+                </label>
+              </div>
+              <div class="sleep-journal-actions">
+                <button class="btn" id="journal-save-btn" type="button">
+                  <i class="fas fa-save"></i> Save Note
+                </button>
+                <button class="btn btn-primary" id="journal-save-sleep-btn" type="button">
+                  <i class="fas fa-bed"></i> Save And Sleep
+                </button>
+                <button class="btn" id="journal-download-btn" type="button">
+                  <i class="fas fa-download"></i> Download Notes
+                </button>
+              </div>
+              <div class="sleep-journal-status" id="sleep-journal-status"></div>
+            </section>
           </div>
         </div>
         <div class="modal-footer">

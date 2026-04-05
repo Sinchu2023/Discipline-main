@@ -1329,6 +1329,115 @@
         font-weight: 700;
       }
 
+      .sleep-journal-panel {
+        margin: 18px 16px 16px;
+        padding: 16px;
+        border: 1px solid rgba(0, 123, 255, 0.22);
+        border-radius: 14px;
+        background: linear-gradient(
+          180deg,
+          rgba(12, 18, 29, 0.94),
+          rgba(10, 14, 22, 0.9)
+        );
+      }
+
+      .sleep-journal-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .sleep-journal-title {
+        margin: 0;
+        font-size: 1rem;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .sleep-journal-subtitle {
+        margin: 6px 0 0;
+        color: var(--text-secondary);
+        font-size: 0.84rem;
+        line-height: 1.45;
+      }
+
+      .sleep-journal-date {
+        white-space: nowrap;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-secondary);
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .sleep-journal-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .sleep-journal-field {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .sleep-journal-field span {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.45px;
+      }
+
+      .sleep-journal-field select,
+      .sleep-journal-field textarea {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        resize: vertical;
+      }
+
+      .sleep-journal-field select:focus,
+      .sleep-journal-field textarea:focus {
+        outline: none;
+        border-color: rgba(0, 123, 255, 0.75);
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
+      }
+
+      .sleep-journal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .sleep-journal-status {
+        min-height: 20px;
+        margin-top: 12px;
+        font-size: 0.86rem;
+        color: var(--text-secondary);
+      }
+
+      .sleep-journal-status.is-error {
+        color: #ff8e8e;
+      }
+
+      .sleep-journal-status.is-success {
+        color: #79d995;
+      }
+
       .graph-kpi-row {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1491,6 +1600,9 @@
         }
         .trainer-overview {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .sleep-journal-grid {
+          grid-template-columns: 1fr;
         }
         .trainer-row {
           grid-template-columns: 1fr;

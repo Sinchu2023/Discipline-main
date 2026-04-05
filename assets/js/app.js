@@ -59,6 +59,7 @@ const CONFIG = {
     TRAINER_STATE: "discipline_tracker_trainer_state",
     FLOW_PROTOCOL: "discipline_tracker_flow_protocol",
     ROADMAP_STATE: "discipline_tracker_roadmap_state",
+    JOURNAL_ENTRIES: "discipline_tracker_journal_entries",
     FIREBASE_USER: "discipline_tracker_firebase_user",
     CLIENT_VERSION: "discipline_tracker_client_version",
     TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
@@ -1201,6 +1202,8 @@ class DisciplineTracker {
       lastActivityDate: this.loadFromStorage(
         CONFIG.STORAGE_KEYS.LAST_ACTIVITY,
       ),
+      journalEntries:
+        this.loadFromStorage(CONFIG.STORAGE_KEYS.JOURNAL_ENTRIES) || {},
       activeTask: this.loadFromStorage(CONFIG.STORAGE_KEYS.ACTIVE_TASK),
       charts: { productivity: null, sleep: null },
     };
@@ -1282,6 +1285,17 @@ class DisciplineTracker {
       "close-trainer-modal",
       "refresh-trainer",
       "copy-trainer",
+      "sleep-journal-panel",
+      "sleep-journal-date",
+      "sleep-journal-mood",
+      "sleep-journal-rating",
+      "sleep-journal-thoughts",
+      "sleep-journal-highlight",
+      "sleep-journal-tomorrow",
+      "sleep-journal-status",
+      "journal-save-btn",
+      "journal-save-sleep-btn",
+      "journal-download-btn",
       "shadow-current-card",
       "shadow-standard-card",
       "shadow-current-minutes",
@@ -1393,6 +1407,33 @@ class DisciplineTracker {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+  getJournalEntry(dateStr = this.getDateString()) {
+    return this.state.journalEntries?.[dateStr] || null;
+  }
+  isJournalEntryComplete(entry) {
+    if (!entry || typeof entry !== "object") return false;
+    return !!(String(entry.mood || "").trim() && String(entry.thoughts || "").trim());
+  }
+  saveJournalEntry(dateStr, entry) {
+    if (!dateStr || !entry) return;
+    this.state.journalEntries = {
+      ...(this.state.journalEntries || {}),
+      [dateStr]: {
+        ...entry,
+        updatedAt: Date.now(),
+      },
+    };
+    this.saveToStorage(
+      CONFIG.STORAGE_KEYS.JOURNAL_ENTRIES,
+      this.state.journalEntries,
+    );
+  }
+  ensureJournalBeforeSleep() {
+    const todayEntry = this.getJournalEntry(this.getDateString());
+    if (this.isJournalEntryComplete(todayEntry)) return true;
+    this.uiManager?.promptRequiredJournalForSleep?.();
+    return false;
   }
   migrateSchema() {
     const current =
@@ -1773,6 +1814,7 @@ class StopwatchManager {
     }
   }
   startSleep() {
+    if (!this.app.ensureJournalBeforeSleep()) return;
     if (this.app.trainerEngine?.armRoadmapSlotRollover) {
       this.app.trainerEngine.armRoadmapSlotRollover();
     }
@@ -2547,10 +2589,12 @@ class UIManager {
   constructor(app) {
     this.app = app;
     this.currentMotivationIndex = 0;
+    this.pendingSleepAfterJournal = false;
   }
   initialize() {
     this.updateDateTime();
     this.startMotivationRotation();
+    this.renderSleepJournal();
   }
   updateDateTime() {
     const updateTime = () => {
@@ -2748,6 +2792,146 @@ class UIManager {
   hideShadowRanksGuide() {
     this.app.elements["shadow-ranks-modal"].style.display = "none";
   }
+  getSleepJournalDraft() {
+    return {
+      date: this.app.getDateString(),
+      mood: this.app.elements["sleep-journal-mood"]?.value || "",
+      rating: this.app.elements["sleep-journal-rating"]?.value || "",
+      thoughts: (this.app.elements["sleep-journal-thoughts"]?.value || "").trim(),
+      highlight: (this.app.elements["sleep-journal-highlight"]?.value || "").trim(),
+      tomorrow: (this.app.elements["sleep-journal-tomorrow"]?.value || "").trim(),
+    };
+  }
+
+  setSleepJournalStatus(message, tone = "") {
+    const el = this.app.elements["sleep-journal-status"];
+    if (!el) return;
+    el.textContent = message || "";
+    el.classList.remove("is-error", "is-success");
+    if (tone) el.classList.add(tone);
+  }
+
+  renderSleepJournal(dateStr = this.app.getDateString()) {
+    const entry = this.app.getJournalEntry(dateStr) || {};
+    const dateLabel = this.app.elements["sleep-journal-date"];
+    if (dateLabel) {
+      const date = new Date(`${dateStr}T00:00:00`);
+      dateLabel.textContent = date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+    }
+    if (this.app.elements["sleep-journal-mood"])
+      this.app.elements["sleep-journal-mood"].value = entry.mood || "";
+    if (this.app.elements["sleep-journal-rating"])
+      this.app.elements["sleep-journal-rating"].value = entry.rating || "";
+    if (this.app.elements["sleep-journal-thoughts"])
+      this.app.elements["sleep-journal-thoughts"].value = entry.thoughts || "";
+    if (this.app.elements["sleep-journal-highlight"])
+      this.app.elements["sleep-journal-highlight"].value = entry.highlight || "";
+    if (this.app.elements["sleep-journal-tomorrow"])
+      this.app.elements["sleep-journal-tomorrow"].value = entry.tomorrow || "";
+
+    if (this.app.isJournalEntryComplete(entry)) {
+      this.setSleepJournalStatus("Tonight's journal is saved.", "is-success");
+    } else {
+      this.setSleepJournalStatus(
+        "Mood and daily thoughts are required before sleep starts.",
+      );
+    }
+  }
+
+  saveSleepJournal({ startSleepAfterSave = false } = {}) {
+    const draft = this.getSleepJournalDraft();
+    if (!this.app.isJournalEntryComplete(draft)) {
+      this.setSleepJournalStatus(
+        "Select your mood and write your daily thoughts before sleep.",
+        "is-error",
+      );
+      this.app.elements["sleep-journal-thoughts"]?.focus();
+      return false;
+    }
+    this.app.saveJournalEntry(draft.date, draft);
+    this.setSleepJournalStatus("Night journal saved.", "is-success");
+    this.pendingSleepAfterJournal = false;
+    if (startSleepAfterSave) {
+      this.app.trainerEngine.hideWindow();
+      this.app.stopwatch.startSleep();
+    }
+    return true;
+  }
+
+  promptRequiredJournalForSleep() {
+    this.pendingSleepAfterJournal = true;
+    this.app.trainerEngine.showWindow();
+    this.renderSleepJournal();
+    this.setSleepJournalStatus(
+      "Complete tonight's journal first, then use Save And Sleep.",
+      "is-error",
+    );
+    this.app.elements["sleep-journal-panel"]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    this.app.elements["sleep-journal-thoughts"]?.focus();
+  }
+
+  buildJournalTextExport(entries) {
+    const dates = Object.keys(entries || {}).sort();
+    return dates
+      .map((dateStr) => {
+        const entry = entries[dateStr] || {};
+        return [
+          `Date: ${dateStr}`,
+          `Mood: ${entry.mood || "-"}`,
+          `Day Score: ${entry.rating || "-"}/10`,
+          `Thoughts: ${entry.thoughts || "-"}`,
+          `Best Part: ${entry.highlight || "-"}`,
+          `Tomorrow Focus: ${entry.tomorrow || "-"}`,
+          "",
+        ].join("\n");
+      })
+      .join("\n");
+  }
+
+  downloadJournalEntries() {
+    const entries = this.app.state.journalEntries || {};
+    const dates = Object.keys(entries);
+    if (!dates.length) {
+      this.setSleepJournalStatus("No notes saved yet.", "is-error");
+      return;
+    }
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      entries,
+    };
+    const files = [
+      [
+        "json",
+        new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json",
+        }),
+      ],
+      [
+        "txt",
+        new Blob([this.buildJournalTextExport(entries)], {
+          type: "text/plain",
+        }),
+      ],
+    ];
+    files.forEach(([ext, blob]) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `discipline-journal-${this.app.getDateString()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+    this.setSleepJournalStatus("Journal downloaded.", "is-success");
+  }
   exportData() {
     const now = new Date();
     const report = AnalyticsService.buildMonthlyReport(
@@ -2785,6 +2969,7 @@ class UIManager {
             schemaVersion: CONFIG.DB_SCHEMA_VERSION,
             exportedAt: new Date().toISOString(),
             entries: this.app.state.tasks,
+            journalEntries: this.app.state.journalEntries || {},
             monthlyReport: report,
           },
           null,
@@ -5860,6 +6045,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
 
   showWindow() {
     this.refresh();
+    this.app.uiManager?.renderSleepJournal?.();
     this.app.elements["trainer-modal"].style.display = "flex";
   }
 
@@ -6812,6 +6998,15 @@ class EventManager {
     });
     this.app.elements["copy-trainer"].addEventListener("click", () =>
       this.app.trainerEngine.copyPlan(),
+    );
+    this.app.elements["journal-save-btn"].addEventListener("click", () =>
+      this.app.uiManager.saveSleepJournal(),
+    );
+    this.app.elements["journal-save-sleep-btn"].addEventListener("click", () =>
+      this.app.uiManager.saveSleepJournal({ startSleepAfterSave: true }),
+    );
+    this.app.elements["journal-download-btn"].addEventListener("click", () =>
+      this.app.uiManager.downloadJournalEntries(),
     );
     this.app.elements["close-streak"].addEventListener("click", () =>
       this.app.uiManager.hideStreakPopup(),
