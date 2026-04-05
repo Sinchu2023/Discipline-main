@@ -3105,7 +3105,57 @@ class ShadowEngine {
       .reduce((sum, task) => sum + task.duration, 0);
   }
 
+  getHistoricalShadowThresholdMap(
+    startDateStr = null,
+    endDateStr = this.app.getDateString(new Date()),
+  ) {
+    const dailyMap = this.getDailyProductiveMap();
+    const baseline = Math.max(
+      1,
+      Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
+    );
+    const firstTrackedDate = [...dailyMap.keys()].sort()[0] || endDateStr;
+    const startDate = new Date(
+      `${(startDateStr && startDateStr < firstTrackedDate)
+        ? startDateStr
+        : firstTrackedDate}T12:00:00`,
+    );
+    const endDate = new Date(`${endDateStr}T12:00:00`);
+    const days = [];
+    const thresholdMap = new Map();
+
+    for (
+      const cursor = new Date(startDate);
+      cursor <= endDate;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      days.push(this.app.getDateString(cursor));
+    }
+
+    const prefix = new Array(days.length + 1).fill(0);
+    let bestAvg = 0;
+    for (let i = 0; i < days.length; i++) {
+      const dateStr = days[i];
+      thresholdMap.set(
+        dateStr,
+        Math.max(1, Math.round(bestAvg > 0 ? bestAvg : baseline)),
+      );
+      prefix[i + 1] = prefix[i] + (dailyMap.get(dateStr) || 0);
+      const completedDays = i + 1;
+      const candidate =
+        completedDays < 7
+          ? prefix[completedDays] / 7
+          : (prefix[completedDays] - prefix[completedDays - 7]) / 7;
+      if (candidate > bestAvg) bestAvg = candidate;
+    }
+
+    return thresholdMap;
+  }
+
   getWinLadder(dailyMap, shadowAvg) {
+    const thresholdMap = this.getHistoricalShadowThresholdMap(
+      this.app.getDateString(new Date(Date.now() - 6 * 86400000)),
+    );
     const days = [];
     const today = new Date(this.app.getDateString());
     for (let i = 6; i >= 0; i--) {
@@ -3113,7 +3163,8 @@ class ShadowEngine {
       d.setDate(today.getDate() - i);
       const ds = this.app.getDateString(d);
       const minutes = dailyMap.get(ds) || 0;
-      days.push({ date: ds, win: minutes >= shadowAvg });
+      const threshold = thresholdMap.get(ds) || shadowAvg;
+      days.push({ date: ds, win: minutes >= threshold, threshold });
     }
     const winsIn5 = days.slice(-5).filter((d) => d.win).length;
     const winsIn7 = days.filter((d) => d.win).length;
@@ -3517,7 +3568,7 @@ class ShadowEngine {
   }
 
   countShadowWinsThisMonth(dailyMap, shadowAvg) {
-    if (shadowAvg <= 0)
+    if (shadowAvg <= 0 && dailyMap.size === 0)
       return {
         myWins: 0,
         shadowWins: 0,
@@ -3530,14 +3581,17 @@ class ShadowEngine {
     const monthDays = [];
     let myWins = 0;
     const activeDays = now.getDate(); // elapsed days in current month
+    const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const thresholdMap = this.getHistoricalShadowThresholdMap(monthStart);
 
     for (let day = 1; day <= activeDays; day++) {
       const d = new Date(year, month, day);
       const date = this.app.getDateString(d);
       const minutes = dailyMap.get(date) || 0;
-      const isWin = minutes >= shadowAvg;
+      const threshold = thresholdMap.get(date) || shadowAvg;
+      const isWin = minutes >= threshold;
       if (isWin) myWins++;
-      monthDays.push({ date, isWin });
+      monthDays.push({ date, isWin, threshold });
     }
 
     monthDays.sort((a, b) => a.date.localeCompare(b.date));
@@ -5964,16 +6018,22 @@ class GraphManager {
       d.setDate(today.getDate() - i);
       dates.push(this.app.getDateString(d));
     }
+    const thresholdMap = this.app.shadowEngine.getHistoricalShadowThresholdMap(
+      dates[0],
+      dates[dates.length - 1],
+    );
 
     const days = dates.map((dateStr) => {
       const productive = productiveMap.get(dateStr) || 0;
       const tracked = trackedMap.get(dateStr) || 0;
       const hasData = tracked > 0;
-      const isWin = productive >= target;
+      const threshold = thresholdMap.get(dateStr) || target;
+      const isWin = productive >= threshold;
       return {
         dateStr,
         productive,
         tracked,
+        threshold,
         hasData,
         isWin,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
@@ -6031,7 +6091,7 @@ class GraphManager {
       if (bestStreak > 0 && index >= bestStartIndex && index <= bestEndIndex) {
         cell.dataset.best = "true";
       }
-      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | ${this.app.formatDuration(day.productive)} | Streak ${day.streak || 0}`;
+      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | ${this.app.formatDuration(day.productive)} / ${this.app.formatDuration(day.threshold || target)} | Streak ${day.streak || 0}`;
       grid.appendChild(cell);
     });
 
