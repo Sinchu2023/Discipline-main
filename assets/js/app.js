@@ -512,9 +512,11 @@ class FirebaseCloudManager {
     this.redirectLoginKey = "discipline_google_redirect_started";
     this.authButtonsBound = false;
     this.firebaseReadyListenerBound = false;
-    this.timerUnsubscribe = null;
-    this.tasksUnsubscribe = null;
-    this.roadmapUnsubscribe = null;
+    this.timerUnsub = null;
+    this.tasksUnsub = null;
+    this.roadmapUnsub = null;
+    this.favoritesUnsub = null;
+    this.userUnsub = null;
     this.firebaseInitCompleted = false;
   }
 
@@ -622,6 +624,7 @@ class FirebaseCloudManager {
         try {
           await this.bootstrapUserData();
           this.listenToTimerState();
+          this.listenToTasks();
           this.listenToRoadmap();
           this.listenToFavorites();
         } catch (error) {
@@ -983,7 +986,6 @@ class FirebaseCloudManager {
     if (!this.isReady) return;
     const patch = {};
     // Keep cloud writes minimal to preserve Firestore quota.
-    if (key === CONFIG.STORAGE_KEYS.TASKS) patch.tasks = value || [];
     if (key === CONFIG.STORAGE_KEYS.FAVORITES) {
       // Write favorites to dedicated doc for cross-device sync
       const ref = window.FirebaseServices.doc(this.db, "users", this.user.uid, "state", "favorites");
@@ -1017,6 +1019,7 @@ class FirebaseCloudManager {
           timeSpent: 0,
         };
     }
+    if (Object.keys(patch).length) await this.writePatch(patch);
   }
 
   async setTimerState(state) {
@@ -1024,6 +1027,12 @@ class FirebaseCloudManager {
     await window.FirebaseServices.setDoc(this.timerDoc(), state, {
       merge: true,
     });
+  }
+
+  async getTimerState() {
+    if (!this.isReady) return null;
+    const snap = await window.FirebaseServices.getDoc(this.timerDoc());
+    return snap.exists() ? (snap.data() || null) : null;
   }
 
   listenToTimerState() {
@@ -1072,6 +1081,25 @@ class FirebaseCloudManager {
         }
       },
       (err) => console.warn("Roadmap sync listener failed", err)
+    );
+  }
+
+  listenToTasks() {
+    if (!this.isReady) return;
+    this.detachTasksListener();
+    if (typeof window.FirebaseServices.onSnapshot !== "function") return;
+    this.tasksUnsub = window.FirebaseServices.onSnapshot(
+      this.tasksCollection(),
+      (snap) => {
+        const changes = snap.docChanges().map((change) => ({
+          type: change.type,
+          id: change.doc.id,
+          data: change.type === "removed" ? null : (change.doc.data() || {}),
+        }));
+        if (!changes.length) return;
+        this.app.taskManager.applyRemoteTaskChanges(changes);
+      },
+      (err) => console.warn("Task sync listener failed", err),
     );
   }
 
@@ -1579,6 +1607,7 @@ class StopwatchManager {
     this.isRunning = false;
     this.pendingMeta = null;
     this.lastRenderedTime = null;
+    this.startGuardInFlight = false;
   }
   formatElapsed(ms) {
     const h = Math.floor(ms / 3600000);
@@ -1657,9 +1686,24 @@ class StopwatchManager {
 
     return { category, subcategory, description };
   }
-  start(taskName = null, meta = null) {
+  async start(taskName = null, meta = null) {
+    if (this.startGuardInFlight) return;
     if (this.isRunning)
       return alert("A task is already running. Stop it first.");
+    this.startGuardInFlight = true;
+    try {
+      const remoteTimerState =
+        await this.app.cloudManager?.getTimerState?.();
+      if (
+        remoteTimerState?.status === "running" &&
+        remoteTimerState?.activeTask?.startTime
+      ) {
+        this.restoreFromCloud(remoteTimerState);
+        alert(
+          "A timer is already running on another device. Stop that timer before starting a new one.",
+        );
+        return;
+      }
     const rawName = (taskName || this.getTaskInputValue() || "").trim();
     if (!meta && !rawName) {
       alert("Task name cannot be empty.");
@@ -1704,6 +1748,9 @@ class StopwatchManager {
       this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
     }
     this.startTicking();
+    } finally {
+      this.startGuardInFlight = false;
+    }
   }
   startSleep() {
     if (this.app.trainerEngine?.armRoadmapSlotRollover) {
