@@ -3510,14 +3510,19 @@ class ShadowEngine {
     const recovery = this.clampScore(
       100 - sleepCompromises * 18 - distractionPenalty,
     );
+    const stabilityRatio = productiveDays7 / 7;
+    const disciplineDepth = 0.15 + stabilityRatio * 0.85;
+    const battleReadiness =
+      productiveDays7 >= 3 ? battle : battle * (productiveDays7 / 3);
 
-    const rating = Math.round(
+    const rawRating = Math.round(
       (output * 0.35 +
         consistency * 0.25 +
         mission * 0.15 +
-        battle * 0.15 +
+        battleReadiness * 0.15 +
         recovery * 0.10) * 10,
     );
+    const rating = Math.round(rawRating * disciplineDepth);
     const nextRank = this.getNextShadowRank(rating);
     const gate = this.getRankGate({
       nextRank,
