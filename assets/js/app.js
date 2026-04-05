@@ -1930,8 +1930,10 @@ class TaskManager {
     tasks.forEach((task) => {
       const el = document.createElement("div");
       const isSleep = task.category === "Sleep";
+      const editLabel = isSleep ? "Edit Sleep" : "Edit Task";
+      const editClass = isSleep ? "edit-sleep-btn" : "edit-task-btn";
       el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
-      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${this.app.escapeHtml(task.category)} • ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions">${isSleep ? `<button class="btn edit-sleep-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> Edit Sleep</button>` : ""}<button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
+      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${this.app.escapeHtml(task.category)} • ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions"><button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
       c.appendChild(el);
     });
     document
@@ -1939,6 +1941,13 @@ class TaskManager {
       .forEach((btn) =>
         btn.addEventListener("click", (e) =>
           this.deleteTask(e.currentTarget.getAttribute("data-id")),
+        ),
+      );
+    document
+      .querySelectorAll(".edit-task-btn")
+      .forEach((btn) =>
+        btn.addEventListener("click", (e) =>
+          this.editTask(e.currentTarget.getAttribute("data-id")),
         ),
       );
     document
@@ -1950,55 +1959,24 @@ class TaskManager {
       );
   }
 
-  editSleepTask(taskId) {
-    const task = this.app.state.tasks.find(
-      (t) => t.id === taskId && t.category === "Sleep",
-    );
-    if (!task) return;
+  toEditableDateTime(ts) {
+    const d = new Date(ts);
+    const Y = d.getFullYear();
+    const M = String(d.getMonth() + 1).padStart(2, "0");
+    const D = String(d.getDate()).padStart(2, "0");
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    return `${Y}-${M}-${D} ${h}:${m}`;
+  }
 
-    const toEditable = (ts) => {
-      const d = new Date(ts);
-      const Y = d.getFullYear();
-      const M = String(d.getMonth() + 1).padStart(2, "0");
-      const D = String(d.getDate()).padStart(2, "0");
-      const h = String(d.getHours()).padStart(2, "0");
-      const m = String(d.getMinutes()).padStart(2, "0");
-      return `${Y}-${M}-${D} ${h}:${m}`;
-    };
+  parseEditableDateTime(value) {
+    if (!value) return null;
+    const parsed = new Date(value.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+  }
 
-    const parseEditable = (value) => {
-      if (!value) return null;
-      const parsed = new Date(value.replace(" ", "T"));
-      return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
-    };
-
-    const startInput = prompt(
-      "Sleep start (YYYY-MM-DD HH:mm)",
-      toEditable(task.startTime),
-    );
-    if (startInput === null) return;
-    const endInput = prompt(
-      "Sleep end (YYYY-MM-DD HH:mm)",
-      toEditable(task.endTime),
-    );
-    if (endInput === null) return;
-
-    const newStart = parseEditable(startInput.trim());
-    const newEnd = parseEditable(endInput.trim());
-    if (!newStart || !newEnd || newEnd <= newStart) {
-      alert("Invalid sleep time range.");
-      return;
-    }
-
-    task.startTime = newStart;
-    task.endTime = newEnd;
-    task.duration = Math.min(
-      24 * 60,
-      Math.max(1, Math.round((newEnd - newStart) / 60000)),
-    );
-    task.date = this.app.getDateString(new Date(newStart));
+  persistTaskUpdate(task) {
     task.updatedAt = Date.now();
-
     this.app.saveToStorage(
       CONFIG.STORAGE_KEYS.TASKS,
       this.app.state.tasks,
@@ -2011,6 +1989,110 @@ class TaskManager {
     });
     this.app.syncManager.flushQueue();
     this.refreshViews();
+  }
+
+  editTask(taskId) {
+    const task = this.app.state.tasks.find(
+      (t) => t.id === taskId && t.category !== "Sleep",
+    );
+    if (!task) return;
+
+    const categoryOptions = Object.keys(CATEGORY_DEFINITIONS).filter(
+      (category) => category !== "Sleep",
+    );
+    const categoryInput = prompt(
+      `Task category (${categoryOptions.join(" / ")})`,
+      task.category,
+    );
+    if (categoryInput === null) return;
+
+    const category =
+      this.app.resolveCategory(categoryInput.trim()) || task.category;
+    const subcategoryOptions = CATEGORY_DEFINITIONS[category] || ["General"];
+    const subcategoryInput = prompt(
+      `Subcategory for ${category} (${subcategoryOptions.join(" / ")})`,
+      task.subcategory,
+    );
+    if (subcategoryInput === null) return;
+
+    const descriptionInput = prompt(
+      "Task description",
+      task.description || "",
+    );
+    if (descriptionInput === null) return;
+
+    const startInput = prompt(
+      "Task start (YYYY-MM-DD HH:mm)",
+      this.toEditableDateTime(task.startTime),
+    );
+    if (startInput === null) return;
+
+    const endInput = prompt(
+      "Task end (YYYY-MM-DD HH:mm)",
+      this.toEditableDateTime(task.endTime),
+    );
+    if (endInput === null) return;
+
+    const newStart = this.parseEditableDateTime(startInput.trim());
+    const newEnd = this.parseEditableDateTime(endInput.trim());
+    if (!newStart || !newEnd || newEnd <= newStart) {
+      alert("Invalid task time range.");
+      return;
+    }
+
+    task.category = category;
+    task.subcategory =
+      (subcategoryInput.trim() || subcategoryOptions[0] || "General").slice(
+        0,
+        60,
+      );
+    task.description = descriptionInput.trim().slice(0, 120);
+    task.startTime = newStart;
+    task.endTime = newEnd;
+    task.duration = Math.min(
+      24 * 60,
+      Math.max(1, Math.round((newEnd - newStart) / 60000)),
+    );
+    task.date = this.app.getDateString(new Date(newStart));
+
+    Object.assign(task, this.app.normalizeTask(task));
+    this.persistTaskUpdate(task);
+  }
+
+  editSleepTask(taskId) {
+    const task = this.app.state.tasks.find(
+      (t) => t.id === taskId && t.category === "Sleep",
+    );
+    if (!task) return;
+
+    const startInput = prompt(
+      "Sleep start (YYYY-MM-DD HH:mm)",
+      this.toEditableDateTime(task.startTime),
+    );
+    if (startInput === null) return;
+    const endInput = prompt(
+      "Sleep end (YYYY-MM-DD HH:mm)",
+      this.toEditableDateTime(task.endTime),
+    );
+    if (endInput === null) return;
+
+    const newStart = this.parseEditableDateTime(startInput.trim());
+    const newEnd = this.parseEditableDateTime(endInput.trim());
+    if (!newStart || !newEnd || newEnd <= newStart) {
+      alert("Invalid sleep time range.");
+      return;
+    }
+
+    task.startTime = newStart;
+    task.endTime = newEnd;
+    task.duration = Math.min(
+      24 * 60,
+      Math.max(1, Math.round((newEnd - newStart) / 60000)),
+    );
+    task.date = this.app.getDateString(new Date(newStart));
+
+    Object.assign(task, this.app.normalizeTask(task));
+    this.persistTaskUpdate(task);
   }
   renderFavorites() {
     const container = this.app.elements["favorites-grid"];
