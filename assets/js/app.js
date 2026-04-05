@@ -517,6 +517,7 @@ class FirebaseCloudManager {
     this.roadmapUnsub = null;
     this.favoritesUnsub = null;
     this.userUnsub = null;
+    this.hasHydratedTasks = false;
     this.firebaseInitCompleted = false;
   }
 
@@ -932,6 +933,7 @@ class FirebaseCloudManager {
     this.app.state.tasks = tasksSnap.docs
       .map((d) => this.app.normalizeTask({ id: d.id, ...(d.data() || {}) }))
       .sort((a, b) => a.startTime - b.startTime);
+    this.hasHydratedTasks = true;
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASKS, this.app.state.tasks);
   }
 
@@ -1088,9 +1090,20 @@ class FirebaseCloudManager {
     if (!this.isReady) return;
     this.detachTasksListener();
     if (typeof window.FirebaseServices.onSnapshot !== "function") return;
+    let isInitialSnapshot = true;
     this.tasksUnsub = window.FirebaseServices.onSnapshot(
       this.tasksCollection(),
       (snap) => {
+        if (
+          isInitialSnapshot &&
+          this.hasHydratedTasks &&
+          snap.docs.length === this.app.state.tasks.length &&
+          snap.docChanges().every((change) => change.type === "added")
+        ) {
+          isInitialSnapshot = false;
+          return;
+        }
+        isInitialSnapshot = false;
         const changes = snap.docChanges().map((change) => ({
           type: change.type,
           id: change.doc.id,
