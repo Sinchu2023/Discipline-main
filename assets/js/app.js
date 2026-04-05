@@ -1150,6 +1150,9 @@ class DisciplineTracker {
       tasks: (this.loadFromStorage(CONFIG.STORAGE_KEYS.TASKS) || []).map(
         (t) => this.normalizeTask(t),
       ),
+      selectedTaskDate:
+        this.loadFromStorage("discipline_tracker_selected_task_date") ||
+        this.getDateString(),
       favorites:
         this.loadFromStorage(CONFIG.STORAGE_KEYS.FAVORITES) || [],
       streak:
@@ -1186,6 +1189,11 @@ class DisciplineTracker {
       "active-task-name",
       "active-task-start",
       "favorites-grid",
+      "tasks-prev-day",
+      "tasks-next-day",
+      "tasks-today-btn",
+      "tasks-date-picker",
+      "tasks-date-label",
       "tasks-list",
       "productive-time",
       "sleep-time",
@@ -1322,6 +1330,13 @@ class DisciplineTracker {
       console.error("storage save failed", e);
     }
     this.cloudManager?.syncByStorageKey?.(key, data);
+  }
+  setSelectedTaskDate(dateStr) {
+    this.state.selectedTaskDate = dateStr || this.getDateString();
+    this.saveToStorage(
+      "discipline_tracker_selected_task_date",
+      this.state.selectedTaskDate,
+    );
   }
   escapeHtml(value = "") {
     return String(value)
@@ -1808,9 +1823,61 @@ class TaskManager {
     this.app = app;
   }
   initialize() {
+    if (!this.app.state.selectedTaskDate)
+      this.app.setSelectedTaskDate(this.app.getDateString());
+    this.syncTaskDateControls();
     this.updateStats();
     this.renderTasks();
     this.renderFavorites();
+  }
+  formatCalendarDate(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+  formatTaskDateLabel(dateStr) {
+    if (!dateStr) return "Today";
+    const today = this.app.getDateString();
+    if (dateStr === today) return "Today";
+    const yesterday = this.app.getDateString(
+      new Date(Date.now() - 86400000),
+    );
+    if (dateStr === yesterday) return "Yesterday";
+    const d = new Date(`${dateStr}T00:00:00`);
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+  syncTaskDateControls() {
+    const selectedDate =
+      this.app.state.selectedTaskDate || this.app.getDateString();
+    if (this.app.elements["tasks-date-picker"])
+      this.app.elements["tasks-date-picker"].value = selectedDate;
+    if (this.app.elements["tasks-date-picker"])
+      this.app.elements["tasks-date-picker"].max =
+        this.app.getDateString();
+    if (this.app.elements["tasks-date-label"])
+      this.app.elements["tasks-date-label"].textContent =
+        this.formatTaskDateLabel(selectedDate);
+    if (this.app.elements["tasks-next-day"]) {
+      this.app.elements["tasks-next-day"].disabled =
+        selectedDate >= this.app.getDateString();
+    }
+  }
+  setTaskViewDate(dateStr) {
+    this.app.setSelectedTaskDate(dateStr);
+    this.syncTaskDateControls();
+    this.renderTasks();
+  }
+  shiftTaskViewDate(offsetDays) {
+    const selectedDate =
+      this.app.state.selectedTaskDate || this.app.getDateString();
+    const d = new Date(`${selectedDate}T12:00:00`);
+    d.setDate(d.getDate() + offsetDays);
+    const nextDate = this.formatCalendarDate(d);
+    const today = this.app.getDateString();
+    this.setTaskViewDate(nextDate > today ? today : nextDate);
   }
   mergeTasks(incoming) {
     const map = new Map(this.app.state.tasks.map((t) => [t.id, t]));
@@ -1917,14 +1984,20 @@ class TaskManager {
     if (this.app.flowEngine) this.app.flowEngine.refresh();
   }
   renderTasks() {
-    const today = this.app.getDateString();
+    const selectedDate =
+      this.app.state.selectedTaskDate || this.app.getDateString();
     const tasks = this.app.state.tasks
-      .filter((task) => task.date === today)
+      .filter((task) => task.date === selectedDate)
       .sort((a, b) => b.startTime - a.startTime);
     const c = this.app.elements["tasks-list"];
+    this.syncTaskDateControls();
     c.innerHTML = "";
     if (!tasks.length) {
-      c.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><i class="fas fa-clipboard-list" style="font-size: 3rem; margin-bottom: 1rem;"></i><p>No tasks recorded today</p><p style="font-size: 0.9rem;">Start tracking your first task</p></div>`;
+      const label =
+        selectedDate === this.app.getDateString()
+          ? "today"
+          : this.formatTaskDateLabel(selectedDate);
+      c.innerHTML = `<div style="text-align: center; padding: 3rem; color: var(--text-secondary);"><i class="fas fa-clipboard-list" style="font-size: 3rem; margin-bottom: 1rem;"></i><p>No tasks recorded for ${this.app.escapeHtml(label)}</p><p style="font-size: 0.9rem;">Choose another date or start tracking a task</p></div>`;
       return;
     }
     tasks.forEach((task) => {
@@ -5993,6 +6066,24 @@ class EventManager {
     this.app.elements["add-favorite"].addEventListener("click", () =>
       this.app.taskManager.addFavorite(),
     );
+    if (this.app.elements["tasks-prev-day"])
+      this.app.elements["tasks-prev-day"].addEventListener("click", () =>
+        this.app.taskManager.shiftTaskViewDate(-1),
+      );
+    if (this.app.elements["tasks-next-day"])
+      this.app.elements["tasks-next-day"].addEventListener("click", () =>
+        this.app.taskManager.shiftTaskViewDate(1),
+      );
+    if (this.app.elements["tasks-today-btn"])
+      this.app.elements["tasks-today-btn"].addEventListener("click", () =>
+        this.app.taskManager.setTaskViewDate(this.app.getDateString()),
+      );
+    if (this.app.elements["tasks-date-picker"])
+      this.app.elements["tasks-date-picker"].addEventListener("change", (e) =>
+        this.app.taskManager.setTaskViewDate(
+          e.target.value || this.app.getDateString(),
+        ),
+      );
     this.app.elements["task-input"].addEventListener("keypress", (e) => {
       if (e.key === "Enter" && !this.app.stopwatch.isRunning)
         this.app.stopwatch.start();

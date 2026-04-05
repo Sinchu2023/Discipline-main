@@ -352,7 +352,27 @@
         display: flex;
         gap: 8px;
       }
-      /* Today's Tasks */
+      /* Activities */
+      .task-history-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .task-date-picker {
+        min-width: 170px;
+        padding: 10px 12px;
+        background: rgba(30, 30, 30, 0.85);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+      }
+      .task-history-label {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        margin-left: auto;
+      }
       .tasks-list {
         max-height: 400px;
         overflow-y: auto;
@@ -1434,6 +1454,10 @@
         }
         .task-input-container {
           flex-direction: column;
+        }
+        .task-history-label {
+          width: 100%;
+          margin-left: 0;
         }
       }
       @media (max-width: 480px) {

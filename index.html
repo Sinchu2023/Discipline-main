@@ -356,10 +356,23 @@
           <div class="favorites-grid" id="favorites-grid">
             <!-- Favorites will be dynamically inserted here -->
           </div>
-          <!-- Today's Tasks -->
+          <!-- Activities -->
           <h3 class="section-title">
-            <i class="fas fa-tasks"></i> Today's Activities
+            <i class="fas fa-tasks"></i> Activities
           </h3>
+          <div class="task-history-bar">
+            <button class="btn" id="tasks-prev-day" type="button">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <input type="date" id="tasks-date-picker" class="task-date-picker" />
+            <button class="btn" id="tasks-today-btn" type="button">
+              Today
+            </button>
+            <button class="btn" id="tasks-next-day" type="button">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="task-history-label" id="tasks-date-label">Today</div>
+          </div>
           <div class="tasks-list" id="tasks-list">
             <!-- Tasks will be dynamically inserted here -->
           </div>
