@@ -6398,6 +6398,16 @@ class GraphManager {
     return true;
   }
 
+  getFilteredMinutesForDate(dateStr, filter = "productivity") {
+    return this.app.state.tasks
+      .filter(
+        (t) =>
+          t.date === dateStr &&
+          this.passesProductivityFilter(t, filter),
+      )
+      .reduce((sum, t) => sum + t.duration, 0);
+  }
+
   getColorScheme() {
     return {
       border: "rgb(40, 180, 99)",
@@ -6476,74 +6486,48 @@ class GraphManager {
     const data = [];
     const labels = [];
     const today = new Date();
-    const days =
-      range === "weekly" ? 84 : CONFIG.CHART_RANGES[range] || 7;
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const ds = this.app.getDateString(d);
-      let mins = 0;
-      if (range === "weekly") {
+    const rangeDates = [];
+
+    if (range === "weekly") {
+      const weeks = 12;
+      for (let i = weeks - 1; i >= 0; i--) {
+        const weekEnd = new Date(today);
+        weekEnd.setDate(today.getDate() - i * 7);
+
         let weekMinutes = 0;
         for (let w = 0; w < 7; w++) {
-          const wd = new Date(d);
-          wd.setDate(d.getDate() - w);
+          const wd = new Date(weekEnd);
+          wd.setDate(weekEnd.getDate() - w);
           const wds = this.app.getDateString(wd);
-          weekMinutes += this.app.state.tasks
-            .filter(
-              (t) =>
-                t.date === wds &&
-                this.passesProductivityFilter(t, activeFilter),
-            )
-            .reduce((a, t) => a + t.duration, 0);
+          weekMinutes += this.getFilteredMinutesForDate(wds, activeFilter);
         }
-        mins = weekMinutes / 7;
-      } else {
-        mins = this.app.state.tasks
-          .filter(
-            (t) =>
-              t.date === ds &&
-              this.passesProductivityFilter(t, activeFilter),
-          )
-          .reduce((a, t) => a + t.duration, 0);
+
+        labels.push(
+          weekEnd.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+        );
+        rangeDates.push(this.app.getDateString(weekEnd));
+        data.push(parseFloat((weekMinutes / 7 / 60).toFixed(2)));
       }
-      labels.push(
-        d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      );
-      data.push(parseFloat((mins / 60).toFixed(2)));
+    } else {
+      const days = CONFIG.CHART_RANGES[range] || 7;
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const ds = this.app.getDateString(d);
+        const mins = this.getFilteredMinutesForDate(ds, activeFilter);
+        labels.push(
+          d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        );
+        rangeDates.push(ds);
+        data.push(parseFloat((mins / 60).toFixed(2)));
+      }
     }
 
     const colors = this.getColorScheme();
-
-    // Build a per-date map of productive minutes for rolling average calculation.
-    const dailyProductiveMap = new Map();
-    this.app.state.tasks.forEach((task) => {
-      if (!this.passesProductivityFilter(task, activeFilter)) return;
-      dailyProductiveMap.set(
-        task.date,
-        (dailyProductiveMap.get(task.date) || 0) + task.duration,
-      );
-    });
-
-    // For each chart label date, compute the 7-day rolling average ending on that date.
-    const shadowData = labels.map((_, i) => {
-      const today = new Date();
-      const pointDate = new Date(today);
-      pointDate.setDate(today.getDate() - (days - 1 - i));
-      let rollingSum = 0;
-      let rollingCount = 0;
-      for (let w = 0; w < 7; w++) {
-        const wd = new Date(pointDate);
-        wd.setDate(pointDate.getDate() - w);
-        const wds = this.app.getDateString(wd);
-        if (dailyProductiveMap.has(wds)) {
-          rollingSum += dailyProductiveMap.get(wds);
-          rollingCount++;
-        }
-      }
-      if (rollingCount === 0) return null;
-      return parseFloat(((rollingSum / 7) / 60).toFixed(2));
-    });
+    const shadowData = this.buildShadowSeries(rangeDates, activeFilter);
     return {
       labels,
       datasets: [
@@ -6618,13 +6602,13 @@ class GraphManager {
     return `${h}h ${String(m).padStart(2, "0")}m (${safe.toFixed(2)}h)`;
   }
 
-  buildShadowSeries(labels, rangeDates) {
+  buildShadowSeries(rangeDates, filter = "productivity") {
     const minuteByDate = new Map();
     this.app.state.tasks.forEach((task) => {
       if (
         !task ||
         !task.date ||
-        !this.passesProductivityFilter(task, "productivity")
+        !this.passesProductivityFilter(task, filter)
       )
         return;
       minuteByDate.set(
