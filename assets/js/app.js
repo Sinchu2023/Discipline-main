@@ -6336,6 +6336,7 @@ class GraphManager {
 
   updateGraphKpis() {
     const range = this.app.elements["prod-range"].value;
+    const filter = this.getCurrentFilter();
     const rangeDates = this.getRangeDates(range);
     const dateSet = new Set(rangeDates);
 
@@ -6343,7 +6344,7 @@ class GraphManager {
       .filter(
         (t) =>
           dateSet.has(t.date) &&
-          this.app.isProductiveCategory(t.category),
+          this.passesProductivityFilter(t, filter),
       )
       .reduce((sum, t) => sum + t.duration, 0);
 
@@ -6377,7 +6378,7 @@ class GraphManager {
   }
 
   getCurrentFilter() {
-    return "productivity";
+    return this.app.elements["prod-filter"]?.value || "productivity";
   }
 
   passesProductivityFilter(task, filter) {
@@ -6471,7 +6472,7 @@ class GraphManager {
   }
 
   getProductivityData(range = "7d", filter = "productivity") {
-    const activeFilter = "productivity";
+    const activeFilter = filter || "productivity";
     const data = [];
     const labels = [];
     const today = new Date();
@@ -6517,7 +6518,7 @@ class GraphManager {
     // Build a per-date map of productive minutes for rolling average calculation.
     const dailyProductiveMap = new Map();
     this.app.state.tasks.forEach((task) => {
-      if (!this.app.isProductiveCategory(task.category)) return;
+      if (!this.passesProductivityFilter(task, activeFilter)) return;
       dailyProductiveMap.set(
         task.date,
         (dailyProductiveMap.get(task.date) || 0) + task.duration,
