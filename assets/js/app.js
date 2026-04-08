@@ -6441,12 +6441,15 @@ class GraphManager {
             intersect: false,
             callbacks: {
               label: (ctx) =>
-                `${ctx.dataset.label}: ${Number(ctx.parsed.y || 0).toFixed(2)}h`,
+                `${ctx.dataset.label}: ${this.formatHoursForTooltip(ctx.parsed.y)}`,
             },
           },
         },
         scales: {
-          y: { beginAtZero: true, ticks: { callback: (v) => v + "h" } },
+          y: {
+            beginAtZero: true,
+            ticks: { callback: (v) => this.formatHoursForTooltip(v) },
+          },
         },
         interaction: { mode: "nearest", intersect: false, axis: "x" },
         elements: {
@@ -6469,12 +6472,20 @@ class GraphManager {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 380, easing: "easeOutQuad" },
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) =>
+                `${ctx.dataset.label}: ${this.formatHoursForTooltip(ctx.parsed.y)}`,
+            },
+          },
+        },
         scales: {
           y: {
             beginAtZero: true,
             max: 12,
-            ticks: { callback: (v) => v + "h" },
+            ticks: { callback: (v) => this.formatHoursForTooltip(v) },
           },
         },
       },
@@ -6599,7 +6610,7 @@ class GraphManager {
     const minutes = Math.round(safe * 60);
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return `${h}h ${String(m).padStart(2, "0")}m (${safe.toFixed(2)}h)`;
+    return `${h}:${String(m).padStart(2, "0")}`;
   }
 
   buildShadowSeries(rangeDates, filter = "productivity") {
