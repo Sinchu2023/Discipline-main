@@ -6647,7 +6647,7 @@ class GraphManager {
           60
         ).toFixed(2),
       );
-      return Array.from({ length: labels.length }, () => fallback);
+      return Array.from({ length: rangeDates.length }, () => fallback);
     }
     return shadowHours;
   }
