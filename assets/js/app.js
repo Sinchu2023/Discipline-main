@@ -6538,7 +6538,7 @@ class GraphManager {
     }
 
     const colors = this.getColorScheme();
-    const shadowData = this.buildShadowSeries(rangeDates, activeFilter);
+    const shadowData = this.buildShadowSeries(rangeDates, range);
     return {
       labels,
       datasets: [
@@ -6613,40 +6613,46 @@ class GraphManager {
     return `${h}:${String(m).padStart(2, "0")}`;
   }
 
-  buildShadowSeries(rangeDates, filter = "productivity") {
-    const minuteByDate = new Map();
-    this.app.state.tasks.forEach((task) => {
-      if (
-        !task ||
-        !task.date ||
-        !this.passesProductivityFilter(task, filter)
-      )
-        return;
-      minuteByDate.set(
-        task.date,
-        (minuteByDate.get(task.date) || 0) + Number(task.duration || 0),
-      );
-    });
+  buildShadowSeries(rangeDates, range = "7d") {
+    if (!rangeDates.length) return [];
+
+    const firstDate = new Date(`${rangeDates[0]}T12:00:00`);
+    const thresholdStartDate = new Date(firstDate);
+    if (range === "weekly") {
+      thresholdStartDate.setDate(thresholdStartDate.getDate() - 6);
+    }
+
+    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
+      this.app.getDateString(thresholdStartDate),
+      rangeDates[rangeDates.length - 1],
+    );
+
+    const fallback = parseFloat(
+      (
+        Math.max(0, Number(this.app.shadowEngine?.shadowSevenDayAverage || 0)) /
+        60
+      ).toFixed(2),
+    );
 
     const shadowHours = rangeDates.map((dateStr) => {
-      const date = new Date(dateStr);
-      let total = 0;
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(date);
-        d.setDate(date.getDate() - i);
-        const key = this.app.getDateString(d);
-        total += minuteByDate.get(key) || 0;
+      if (!thresholdMap) return fallback;
+
+      if (range === "weekly") {
+        const date = new Date(`${dateStr}T12:00:00`);
+        let total = 0;
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(date);
+          d.setDate(date.getDate() - i);
+          const key = this.app.getDateString(d);
+          total += thresholdMap.get(key) || 0;
+        }
+        return parseFloat((total / 7 / 60).toFixed(2));
       }
-      return parseFloat((total / 7 / 60).toFixed(2));
+
+      return parseFloat((((thresholdMap.get(dateStr) || 0) / 60)).toFixed(2));
     });
 
     if (!shadowHours.some((v) => v > 0)) {
-      const fallback = parseFloat(
-        (
-          Math.max(0, Number(this.app.shadowEngine?.shadowSevenDayAverage || 0)) /
-          60
-        ).toFixed(2),
-      );
       return Array.from({ length: rangeDates.length }, () => fallback);
     }
     return shadowHours;
