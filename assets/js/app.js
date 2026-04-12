@@ -6569,6 +6569,7 @@ class GraphManager {
   buildProductivityBuckets(range, filter = "productivity") {
     const rangeDates = this.getRangeDates(range);
     if (!rangeDates.length) return [];
+    const firstProductiveDate = this.getFirstProductiveDate();
 
     const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
       rangeDates[0],
@@ -6608,8 +6609,16 @@ class GraphManager {
         0,
       );
       const shadowTotal = dates.reduce(
-        (sum, dateStr) => sum + (thresholdMap?.get(dateStr) || 0),
+        (sum, dateStr) =>
+          sum +
+          (this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate)
+            ? 0
+            : (thresholdMap?.get(dateStr) || 0)),
         0,
+      );
+      const hasAnyShadowHistory = dates.some(
+        (dateStr) =>
+          !this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate),
       );
       const firstDate = new Date(`${dates[0]}T12:00:00`);
       const lastDate = new Date(`${dates[dates.length - 1]}T12:00:00`);
@@ -6637,7 +6646,11 @@ class GraphManager {
         value: parseFloat((minutesTotal / dates.length / 60).toFixed(2)),
         shadow: parseFloat(
           (
-            (shadowTotal > 0 ? shadowTotal / dates.length : fallbackShadowHours * 60) /
+            (
+              hasAnyShadowHistory
+                ? (shadowTotal > 0 ? shadowTotal / dates.length : fallbackShadowHours * 60)
+                : 0
+            ) /
             60
           ).toFixed(2),
         ),
@@ -6687,6 +6700,10 @@ class GraphManager {
 
   buildShadowSeries(rangeDates, range = "7d") {
     if (!rangeDates.length) return [];
+    const firstProductiveDate = this.getFirstProductiveDate();
+    if (!firstProductiveDate) {
+      return Array.from({ length: rangeDates.length }, () => 0);
+    }
 
     const firstDate = new Date(`${rangeDates[0]}T12:00:00`);
     const thresholdStartDate = new Date(firstDate);
@@ -6707,6 +6724,9 @@ class GraphManager {
     );
 
     const shadowHours = rangeDates.map((dateStr) => {
+      if (this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate)) {
+        return 0;
+      }
       if (!thresholdMap) return fallback;
 
       if (range === "weekly") {
@@ -6716,7 +6736,9 @@ class GraphManager {
           const d = new Date(date);
           d.setDate(date.getDate() - i);
           const key = this.app.getDateString(d);
-          total += thresholdMap.get(key) || 0;
+          total += this.isBeforeFirstProductiveDate(key, firstProductiveDate)
+            ? 0
+            : (thresholdMap.get(key) || 0);
         }
         return parseFloat((total / 7 / 60).toFixed(2));
       }
@@ -6724,10 +6746,16 @@ class GraphManager {
       return parseFloat((((thresholdMap.get(dateStr) || 0) / 60)).toFixed(2));
     });
 
-    if (!shadowHours.some((v) => v > 0)) {
-      return Array.from({ length: rangeDates.length }, () => fallback);
-    }
     return shadowHours;
+  }
+
+  getFirstProductiveDate() {
+    const dailyMap = this.app.shadowEngine?.getDailyProductiveMap?.() || new Map();
+    return [...dailyMap.keys()].sort()[0] || null;
+  }
+
+  isBeforeFirstProductiveDate(dateStr, firstProductiveDate = this.getFirstProductiveDate()) {
+    return !!firstProductiveDate && dateStr < firstProductiveDate;
   }
 
   getCurrentFilteredTotalMinutes() {
