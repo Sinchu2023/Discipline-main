@@ -6582,7 +6582,7 @@ class GraphManager {
     }
 
     const colors = this.getColorScheme();
-    const isLongRange = range === "6m" || range === "1y";
+    const isLongRange = range === "1y";
     return {
       labels,
       datasets: [
@@ -6809,10 +6809,13 @@ class GraphManager {
     const track = document.getElementById("productivity-chart-track");
     if (!container || !track) return;
 
-    const isLongRange = range === "6m" || range === "1y";
+    const isLongRange = range === "1y";
     const baseWidth = Math.max(container.clientWidth || 0, 320);
     const pointCount = range === "weekly" ? 12 : (CONFIG.CHART_RANGES[range] || 7);
-    const pixelsPerPoint = range === "1y" ? 5 : range === "6m" ? 7 : 0;
+    const visiblePointCount = range === "1y" ? 31 : pointCount;
+    const pixelsPerPoint = isLongRange
+      ? Math.max(10, Math.round(baseWidth / visiblePointCount))
+      : 0;
     const targetWidth = isLongRange
       ? Math.max(baseWidth, Math.round(pointCount * pixelsPerPoint))
       : baseWidth;
