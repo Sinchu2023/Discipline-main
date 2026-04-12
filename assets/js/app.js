@@ -6814,6 +6814,8 @@ class GraphManager {
       }
     });
     const bestStartIndex = bestStreak > 0 ? (bestEndIndex - bestStreak + 1) : -1;
+    const hasBrokenBestStreak =
+      bestStreak > 0 && bestEndIndex >= 0 && bestEndIndex < days.length - 1;
 
           const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
           const todayDate = this.app.getDateString(today);
@@ -6840,8 +6842,12 @@ class GraphManager {
       if (currentStreak > 0 && index >= currentStreakStartIndex) {
         cell.dataset.streak = "active";
       }
-      if (bestStreak > 0 && index >= bestStartIndex && index <= bestEndIndex) {
-        cell.dataset.best = "true";
+      if (
+        hasBrokenBestStreak &&
+        index >= bestStartIndex &&
+        index <= bestEndIndex
+      ) {
+        cell.dataset.best = "broken";
       }
       cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | ${this.app.formatDuration(day.productive)} / ${this.app.formatDuration(day.threshold || target)} | Streak ${day.streak || 0}`;
       grid.appendChild(cell);

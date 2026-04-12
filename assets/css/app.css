@@ -1996,8 +1996,10 @@
   border-color: rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
-.github-cell[data-best="true"] {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+.github-cell[data-best="broken"] {
+  background-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .github-cell:hover {
   transform: scale(1.12);
@@ -2094,8 +2096,10 @@
   border-color: rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
-.github-cell[data-best="true"] {
-  box-shadow: none;
+.github-cell[data-best="broken"] {
+  background-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .github-cell:hover {
   transform: scale(1.08);
