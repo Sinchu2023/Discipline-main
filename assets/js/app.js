@@ -6446,6 +6446,14 @@ class GraphManager {
           },
         },
         scales: {
+          x: {
+            ticks: {
+              autoSkip: true,
+              maxTicksLimit: 8,
+              maxRotation: 0,
+              minRotation: 0,
+            },
+          },
           y: {
             beginAtZero: true,
             ticks: { callback: (v) => this.formatHoursForTooltip(v) },
@@ -6496,33 +6504,18 @@ class GraphManager {
     const activeFilter = filter || "productivity";
     const data = [];
     const labels = [];
-    const today = new Date();
-    const rangeDates = [];
+    let shadowData = [];
 
-    if (range === "weekly") {
-      const weeks = 12;
-      for (let i = weeks - 1; i >= 0; i--) {
-        const weekEnd = new Date(today);
-        weekEnd.setDate(today.getDate() - i * 7);
-
-        let weekMinutes = 0;
-        for (let w = 0; w < 7; w++) {
-          const wd = new Date(weekEnd);
-          wd.setDate(weekEnd.getDate() - w);
-          const wds = this.app.getDateString(wd);
-          weekMinutes += this.getFilteredMinutesForDate(wds, activeFilter);
-        }
-
-        labels.push(
-          weekEnd.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          }),
-        );
-        rangeDates.push(this.app.getDateString(weekEnd));
-        data.push(parseFloat((weekMinutes / 7 / 60).toFixed(2)));
-      }
+    if (range === "weekly" || range === "6m" || range === "1y") {
+      const buckets = this.buildProductivityBuckets(range, activeFilter);
+      buckets.forEach((bucket) => {
+        labels.push(bucket.label);
+        data.push(bucket.value);
+        shadowData.push(bucket.shadow);
+      });
     } else {
+      const today = new Date();
+      const rangeDates = [];
       const days = CONFIG.CHART_RANGES[range] || 7;
       for (let i = days - 1; i >= 0; i--) {
         const d = new Date(today);
@@ -6535,10 +6528,10 @@ class GraphManager {
         rangeDates.push(ds);
         data.push(parseFloat((mins / 60).toFixed(2)));
       }
+      shadowData = this.buildShadowSeries(rangeDates, range);
     }
 
     const colors = this.getColorScheme();
-    const shadowData = this.buildShadowSeries(rangeDates, range);
     return {
       labels,
       datasets: [
@@ -6571,6 +6564,85 @@ class GraphManager {
         },
       ],
     };
+  }
+
+  buildProductivityBuckets(range, filter = "productivity") {
+    const rangeDates = this.getRangeDates(range);
+    if (!rangeDates.length) return [];
+
+    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
+      rangeDates[0],
+      rangeDates[rangeDates.length - 1],
+    );
+    const fallbackShadowHours = parseFloat(
+      (
+        Math.max(0, Number(this.app.shadowEngine?.shadowSevenDayAverage || 0)) /
+        60
+      ).toFixed(2),
+    );
+
+    const groups = [];
+    if (range === "1y") {
+      let currentGroup = [];
+      let currentKey = "";
+      rangeDates.forEach((dateStr) => {
+        const date = new Date(`${dateStr}T12:00:00`);
+        const key = `${date.getFullYear()}-${date.getMonth()}`;
+        if (currentGroup.length && key !== currentKey) {
+          groups.push(currentGroup);
+          currentGroup = [];
+        }
+        currentKey = key;
+        currentGroup.push(dateStr);
+      });
+      if (currentGroup.length) groups.push(currentGroup);
+    } else {
+      for (let i = 0; i < rangeDates.length; i += 7) {
+        groups.push(rangeDates.slice(i, i + 7));
+      }
+    }
+
+    return groups.map((dates) => {
+      const minutesTotal = dates.reduce(
+        (sum, dateStr) => sum + this.getFilteredMinutesForDate(dateStr, filter),
+        0,
+      );
+      const shadowTotal = dates.reduce(
+        (sum, dateStr) => sum + (thresholdMap?.get(dateStr) || 0),
+        0,
+      );
+      const firstDate = new Date(`${dates[0]}T12:00:00`);
+      const lastDate = new Date(`${dates[dates.length - 1]}T12:00:00`);
+
+      let label = lastDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      if (range === "1y") {
+        label = lastDate.toLocaleDateString("en-US", {
+          month: "short",
+          year: "2-digit",
+        });
+      } else if (range === "6m") {
+        const sameMonth =
+          firstDate.getMonth() === lastDate.getMonth() &&
+          firstDate.getFullYear() === lastDate.getFullYear();
+        label = sameMonth
+          ? `${firstDate.toLocaleDateString("en-US", { month: "short" })} ${firstDate.getDate()}-${lastDate.getDate()}`
+          : `${firstDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}-${lastDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+      }
+
+      return {
+        label,
+        value: parseFloat((minutesTotal / dates.length / 60).toFixed(2)),
+        shadow: parseFloat(
+          (
+            (shadowTotal > 0 ? shadowTotal / dates.length : fallbackShadowHours * 60) /
+            60
+          ).toFixed(2),
+        ),
+      };
+    });
   }
 
   getSleepData(range = "7d") {
