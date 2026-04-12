@@ -6325,14 +6325,38 @@ class GraphManager {
   }
 
   getRangeDates(range) {
-    const days =
-      range === "weekly" ? 84 : CONFIG.CHART_RANGES[range] || 7;
     const today = new Date();
+    if (range === "weekly") {
+      return this.buildTrailingDateRange(84, today);
+    }
+    if (range === "15davg") {
+      return this.buildTrailingDateRange(180, today);
+    }
+    if (range === "monthlyavg") {
+      const start = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+      return this.buildDateRange(start, today);
+    }
+    return this.buildTrailingDateRange(CONFIG.CHART_RANGES[range] || 7, today);
+  }
+
+  buildTrailingDateRange(days, endDate = new Date()) {
     const dates = [];
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
+      const d = new Date(endDate);
+      d.setDate(endDate.getDate() - i);
       dates.push(this.app.getDateString(d));
+    }
+    return dates;
+  }
+
+  buildDateRange(startDate, endDate) {
+    const dates = [];
+    for (
+      const cursor = new Date(startDate);
+      cursor <= endDate;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      dates.push(this.app.getDateString(cursor));
     }
     return dates;
   }
@@ -6509,31 +6533,36 @@ class GraphManager {
     const labels = [];
     let shadowData = [];
     if (range === "weekly") {
-      const today = new Date();
-      const rangeDates = [];
-      const weeks = 12;
-      for (let i = weeks - 1; i >= 0; i--) {
-        const weekEnd = new Date(today);
-        weekEnd.setDate(today.getDate() - i * 7);
-
-        let weekMinutes = 0;
-        for (let w = 0; w < 7; w++) {
-          const wd = new Date(weekEnd);
-          wd.setDate(weekEnd.getDate() - w);
-          const wds = this.app.getDateString(wd);
-          weekMinutes += this.getFilteredMinutesForDate(wds, activeFilter);
-        }
-
-        labels.push(
-          weekEnd.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          }),
-        );
-        rangeDates.push(this.app.getDateString(weekEnd));
-        data.push(parseFloat((weekMinutes / 7 / 60).toFixed(2)));
-      }
-      shadowData = this.buildShadowSeries(rangeDates, range);
+      const buckets = this.buildFixedAverageBuckets({
+        bucketDays: 7,
+        bucketCount: 12,
+        filter: activeFilter,
+        labelMode: "week-end",
+      });
+      buckets.forEach((bucket) => {
+        labels.push(bucket.label);
+        data.push(bucket.value);
+        shadowData.push(bucket.shadow);
+      });
+    } else if (range === "15davg") {
+      const buckets = this.buildFixedAverageBuckets({
+        bucketDays: 15,
+        bucketCount: 12,
+        filter: activeFilter,
+        labelMode: "range",
+      });
+      buckets.forEach((bucket) => {
+        labels.push(bucket.label);
+        data.push(bucket.value);
+        shadowData.push(bucket.shadow);
+      });
+    } else if (range === "monthlyavg") {
+      const buckets = this.buildMonthlyAverageBuckets(12, activeFilter);
+      buckets.forEach((bucket) => {
+        labels.push(bucket.label);
+        data.push(bucket.value);
+        shadowData.push(bucket.shadow);
+      });
     } else {
       const today = new Date();
       const rangeDates = [];
@@ -6626,6 +6655,153 @@ class GraphManager {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return `${h}:${String(m).padStart(2, "0")}`;
+  }
+
+  buildFixedAverageBuckets({
+    bucketDays,
+    bucketCount,
+    filter = "productivity",
+    labelMode = "range",
+  }) {
+    const today = new Date();
+    const firstBucketStart = new Date(today);
+    firstBucketStart.setDate(today.getDate() - (bucketCount * bucketDays - 1));
+    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
+      this.app.getDateString(firstBucketStart),
+      this.app.getDateString(today),
+    );
+    const firstProductiveDate = this.getFirstProductiveDate();
+    const fallbackShadowMinutes = Math.max(
+      0,
+      Number(this.app.shadowEngine?.shadowSevenDayAverage || 0),
+    );
+
+    const buckets = [];
+    for (let i = bucketCount - 1; i >= 0; i--) {
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() - i * bucketDays);
+      const startDate = new Date(endDate);
+      startDate.setDate(endDate.getDate() - (bucketDays - 1));
+      const dates = this.buildDateRange(startDate, endDate);
+      const average = this.buildAverageBucketMetrics(
+        dates,
+        filter,
+        thresholdMap,
+        firstProductiveDate,
+        fallbackShadowMinutes,
+      );
+
+      let label = this.formatDateLabel(endDate);
+      if (labelMode === "range") {
+        label = this.formatDateSpanLabel(startDate, endDate);
+      }
+
+      buckets.push({
+        label,
+        value: average.value,
+        shadow: average.shadow,
+      });
+    }
+    return buckets;
+  }
+
+  buildMonthlyAverageBuckets(monthCount = 12, filter = "productivity") {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth() - (monthCount - 1), 1);
+    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
+      this.app.getDateString(start),
+      this.app.getDateString(today),
+    );
+    const firstProductiveDate = this.getFirstProductiveDate();
+    const fallbackShadowMinutes = Math.max(
+      0,
+      Number(this.app.shadowEngine?.shadowSevenDayAverage || 0),
+    );
+
+    const buckets = [];
+    for (let i = monthCount - 1; i >= 0; i--) {
+      const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthEnd =
+        i === 0
+          ? new Date(today)
+          : new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
+      const dates = this.buildDateRange(monthStart, monthEnd);
+      const average = this.buildAverageBucketMetrics(
+        dates,
+        filter,
+        thresholdMap,
+        firstProductiveDate,
+        fallbackShadowMinutes,
+      );
+      buckets.push({
+        label: monthEnd.toLocaleDateString("en-US", {
+          month: "short",
+          year: "2-digit",
+        }),
+        value: average.value,
+        shadow: average.shadow,
+      });
+    }
+    return buckets;
+  }
+
+  buildAverageBucketMetrics(
+    dates,
+    filter,
+    thresholdMap,
+    firstProductiveDate,
+    fallbackShadowMinutes = 0,
+  ) {
+    if (!dates.length) return { value: 0, shadow: 0 };
+
+    const minutesTotal = dates.reduce(
+      (sum, dateStr) => sum + this.getFilteredMinutesForDate(dateStr, filter),
+      0,
+    );
+    const hasAnyShadowHistory = dates.some(
+      (dateStr) =>
+        !this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate),
+    );
+    const shadowTotal = dates.reduce(
+      (sum, dateStr) =>
+        sum +
+        (this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate)
+          ? 0
+          : (thresholdMap?.get(dateStr) || 0)),
+      0,
+    );
+
+    return {
+      value: parseFloat((minutesTotal / dates.length / 60).toFixed(2)),
+      shadow: parseFloat(
+        (
+          (
+            hasAnyShadowHistory
+              ? (shadowTotal > 0 ? shadowTotal : fallbackShadowMinutes * dates.length)
+              : 0
+          ) /
+          dates.length /
+          60
+        ).toFixed(2),
+      ),
+    };
+  }
+
+  formatDateLabel(date) {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  formatDateSpanLabel(startDate, endDate) {
+    const sameMonth =
+      startDate.getMonth() === endDate.getMonth() &&
+      startDate.getFullYear() === endDate.getFullYear();
+    if (sameMonth) {
+      return `${startDate.toLocaleDateString("en-US", { month: "short" })} ${startDate.getDate()}-${endDate.getDate()}`;
+    }
+    return `${this.formatDateLabel(startDate)}-${this.formatDateLabel(endDate)}`;
   }
 
   applyProductivityChartViewport(range = "7d") {
