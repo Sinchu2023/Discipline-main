@@ -6314,6 +6314,9 @@ class GraphManager {
   initialize() {
     if (!window.Chart) return;
     this.createCharts();
+    this.applyProductivityChartViewport(
+      this.app.elements["prod-range"]?.value || "7d",
+    );
     this.setupChartControls();
     this.lastFilteredTotalMinutes = this.getCurrentFilteredTotalMinutes();
     this.animateFilteredTotal(0, this.lastFilteredTotalMinutes);
@@ -6625,6 +6628,30 @@ class GraphManager {
     return `${h}:${String(m).padStart(2, "0")}`;
   }
 
+  applyProductivityChartViewport(range = "7d") {
+    const container = document.getElementById("productivity-chart-container");
+    const track = document.getElementById("productivity-chart-track");
+    if (!container || !track) return;
+
+    const isLongRange = range === "6m" || range === "1y";
+    const baseWidth = Math.max(container.clientWidth || 0, 320);
+    const pointCount = range === "weekly" ? 12 : (CONFIG.CHART_RANGES[range] || 7);
+    const pixelsPerPoint = range === "1y" ? 5 : range === "6m" ? 7 : 0;
+    const targetWidth = isLongRange
+      ? Math.max(baseWidth, Math.round(pointCount * pixelsPerPoint))
+      : baseWidth;
+
+    container.dataset.scrollable = isLongRange ? "true" : "false";
+    track.style.width = `${targetWidth}px`;
+
+    requestAnimationFrame(() => {
+      this.charts.productivity?.resize();
+      container.scrollLeft = isLongRange
+        ? Math.max(0, container.scrollWidth - container.clientWidth)
+        : 0;
+    });
+  }
+
   buildShadowSeries(rangeDates, range = "7d") {
     if (!rangeDates.length) return [];
     const firstProductiveDate = this.getFirstProductiveDate();
@@ -6733,6 +6760,7 @@ class GraphManager {
       filter,
     );
     this.charts.sleep.data = this.getSleepData(sleepRange);
+    this.applyProductivityChartViewport(prodRange);
     this.charts.productivity.update();
     this.charts.sleep.update();
 
