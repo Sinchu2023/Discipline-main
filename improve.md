@@ -1,287 +1,168 @@
-## SYSTEM ROLE
+# Prompt Generator Workflow
 
-You are not an assistant.
-You are a **senior system architect, control-system engineer, and performance debugger**.
-
-You must:
-
-* Think in deterministic systems
-* Avoid assumptions
-* Avoid rewriting unrelated code
-* Apply minimal, surgical, high-impact fixes
-
----
-
-## SYSTEM CONTEXT (CRITICAL)
-
-The project is a **Discipline Control System (Shadow Engine 2.0)**.
-
-Current state:
-
-* Tracking layer = ✅ implemented
-* UI layer = ✅ implemented (but laggy)
-* Core control logic = ❌ missing
-* Mission UI real-time behavior = ❌ broken
-* Trainer pipeline = ❌ incomplete
-
-Reference truth:
-
-* The system currently behaves as a **tracker**, not a **control system**
-
----
-
-## PRIMARY OBJECTIVE
-
-Transform the system into a:
-
-> Deterministic, self-learning discipline control engine
-> with real-time UI correctness and zero interaction lag
-
----
-
-# 🔴 EXECUTION ORDER (STRICT — DO NOT CHANGE)
-
-You MUST implement in this exact order:
-
----
-
-# 🔥 PHASE 0 — PERFORMANCE + UI STABILITY (MANDATORY FIRST)
+This file explains the intended workflow for the generator section inside the Roadmap Console.
 
 ## Goal
 
-Eliminate lag and incorrect UI behavior
+The generator section is not supposed to directly create final plans inside the app.
 
-## Problems to fix
+It is supposed to generate strict prompt text that the user can copy and paste into another AI system such as ChatGPT or Gemini.
 
-* Checkbox delay
-* Undo delay
-* Full re-render on every interaction
-* UI using stale state
-* No real-time expiry
+That external AI should then return output in one of two exact formats:
 
-## Required Fixes
+1. Roadmap JSON
+2. `makeTask(...)` scheduler code
 
-### 1. Replace all inline handlers with event delegation
+## Current UI Contract
 
-* Only ONE listener for mission container
-* No per-element listeners
+There are exactly two helper cards:
 
----
+1. `Generate Roadmap`
+2. `Generate Task Format`
 
-### 2. Introduce local mission state layer
+There is no timetable generator anymore.
 
-* Use in-memory structure (Map or object)
-* DO NOT recompute from scratch on every click
+## Roadmap Helper
 
----
-
-### 3. Remove full `innerHTML` re-rendering
-
-* Update only affected task node
-* No full panel redraw
-
----
-
-### 4. Implement real-time expiry engine
-
-* Run every 30–60 seconds
-* Compare current time vs task end time
-* If expired AND not completed → apply grey state
-
----
-
-### 5. Separate UI state from generation logic
-
-* UI must NOT depend on regeneration
-* UI must update independently
-
----
-
-## Success Criteria (Phase 0)
-
-* Checkbox response < 50ms
-* Undo response instant
-* No UI freeze
-* Expired tasks turn grey in real-time
-* No unnecessary re-render
-
----
-
-# 🟠 PHASE 1 — CONFIGURATION LAYER
-
-Add the following constants:
-
-* LEARNING_RATE_FAILURE_SEVERE = 0.1
-* LEARNING_RATE_FAILURE_MODERATE = 0.2
-* LEARNING_RATE_STABLE = 0.3
-* EFFORT_SUCCESS_THRESHOLD = 0.7
-* FLEXIBLE_TASK_MULTIPLIER = 1.5
-* MAX_DAILY_SHIFT_LIMIT = 30
-* MIN_SLEEP_LIMIT (must exist)
-* MAX_SLEEP_COMPROMISES_PER_7_DAYS = 2
-
----
-
-# 🟠 PHASE 2 — BEHAVIORAL STATE ENGINE
-
-Implement:
-
-detectBehavioralState()
-
-Return:
-
-* RECOVERY
-* STABLE
-* GROWTH
-
-Rules:
-
-* RECOVERY → low success, frequent misses
-* STABLE → moderate consistency
-* GROWTH → high success, upward trend
-
----
-
-# 🟠 PHASE 3 — TIME SHIFT ENGINE (CORE CONTROL)
-
-Implement:
-
-next_time = current + (ideal - current) * learning_rate
-
-Constraints:
-
-* Max shift = 30 minutes/day
-* RECOVERY → small shift
-* STABLE → moderate shift
-* GROWTH → slightly higher but capped
-
-Apply to:
-
-* Sleep time
-* Wake time
-* Deep work start
-
----
-
-# 🟠 PHASE 4 — TASK INTELLIGENCE LAYER
-
-Each task must include:
-
-* discipline_type (STRICT / FLEXIBLE)
-* estimated_minutes
-* target_minutes
-* priority
-
-Rules:
-
-STRICT:
-
-* Delay > 5 min = failure
-
-FLEXIBLE:
-
-* Allow 1.5x–2x buffer
-* No harsh penalty
-
----
-
-# 🟡 PHASE 5 — SLEEP CONTROL SYSTEM
-
-Implement:
-
-* Sleep compromise detection
-
-* Condition:
-
-  * Only for high-value tasks
-  * Only if effort ≥ 70%
-
-* Rules:
-
-  * Max 2 compromises / 7 days
-  * If exceeded → block compromise
-  * If used → reduce next-day load by 15%
-
----
-
-# 🟡 PHASE 6 — TRAINER ENGINE PIPELINE
-
-Implement FULL deterministic pipeline:
-
-1. readTodayData()
-2. analyzeBehavior()
-3. detectBehavioralState()
-4. applyCorrection()
-5. generateMissions()
-6. applyRules()
-7. outputPlan()
-
-No skipping. No merging steps.
-
----
-
-# 🟡 PHASE 7 — ANTI-MISUSE SYSTEM
-
-Detect:
-
-* Flexible task abuse
-
-If:
-
-* output < 70% consistently
-
-Then:
-
-* Reduce flexibility
-* Eventually convert to STRICT
-
----
-
-# ⚠️ CRITICAL DESIGN RULES
-
-* No random behavior
-* No hidden state mutation
-* No UI-driven logic decisions
-* No recomputation loops
-* No full DOM rebuilds
-* No blocking synchronous storage calls
-* Every output must be explainable
-
----
-
-# 🔍 DEBUGGING REQUIREMENTS
-
-You MUST:
-
-* Trace checkbox click flow
-* Identify all functions triggered
-* Detect duplicate renders
-* Detect redundant calculations
-* Detect expensive loops
-
----
-
-# 📦 DELIVERABLES (MANDATORY)
-
-1. Root cause analysis of lag
-2. Exact code patches (only changed parts)
-3. List of modified functions/files
-4. Performance improvements explanation
-5. Verification checklist
-
----
-
-# 🎯 SUCCESS DEFINITION
-
-System must behave as:
-
-* A control system (not tracker)
-* A gradual habit corrector
-* A real-time responsive UI
-* A deterministic engine
-
----
-
-# 🧠 FINAL PRINCIPLE
-
-Move the user toward the ideal schedule step-by-step, never by force.
+### Purpose
+
+This helper creates a prompt that asks another AI to return roadmap JSON only.
+
+### User flow
+
+1. User types a topic such as `Analog IC Design`.
+2. User clicks `Generate Roadmap Prompt`.
+3. App fills the roadmap output textarea with a strict prompt.
+4. User clicks `Copy`.
+5. User pastes that prompt into another AI.
+6. Other AI returns valid JSON only.
+7. User can then manually use that JSON as needed.
+
+### Output rules for the external AI
+
+The external AI must follow these rules:
+
+1. Return valid JSON only.
+2. Do not use markdown fences.
+3. Do not add explanation text.
+4. Use this structure:
+
+```json
+{
+  "modules": [
+    {
+      "module": "MODULE NAME",
+      "days": [
+        { "day": 1, "topic": "Topic name", "status": "active" },
+        { "day": 2, "topic": "Topic name", "status": "locked" }
+      ]
+    }
+  ]
+}
+```
+
+5. Day numbers must continue sequentially across modules.
+6. Only day 1 may be `active`.
+7. All other days must be `locked`.
+
+## Task Format Helper
+
+### Purpose
+
+This helper creates a prompt that asks another AI to return exact scheduler code using `makeTask(...)`.
+
+### User flow
+
+1. User types a combined topic or study set such as `IB + Analog IC + Project Work`.
+2. User clicks `Generate Task Prompt`.
+3. App fills the task output textarea with a strict prompt.
+4. User clicks `Copy`.
+5. User pastes that prompt into another AI.
+6. Other AI returns only the final `return [ ... ];` code block.
+
+### Required final shape
+
+The external AI must return only code in this exact shape:
+
+```js
+return [
+  makeTask("TITLE", "FOCUS", [startHour, endHour], "HIGH", "STRICT", 120, "Morning", false, 10),
+  makeTask("TITLE", "FOCUS", [startHour, endHour], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3),
+];
+```
+
+### Strict rules for the external AI
+
+1. Return code only.
+2. Do not use markdown.
+3. Do not add comments.
+4. Do not add explanations.
+5. Use only `makeTask(...)` lines inside one `return [ ... ];`.
+6. Keep tasks in chronological order.
+7. Use decimal hours such as `6.25` for 6:15 and `8.5` for 8:30.
+8. Duration must be in minutes.
+9. Priority must be one of:
+   `HIGH`, `MEDIUM`, `LOW`
+10. Discipline type must be one of:
+   `STRICT`, `FLEXIBLE`
+11. Phase must be one of:
+   `Morning`, `Core Study`, `Breaks`, `Evening`
+12. Optional flag must be `true` or `false`.
+13. Score must be an integer.
+
+### Reference style
+
+The app uses this reference style in the generated prompt:
+
+```js
+return [
+  makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
+  makeTask("ANALOG SET 1", analog1Topic, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("BREAK", "Break + Hydration", [8.25, 8.5], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
+  makeTask("ANALOG SET 2", analog2Topic, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("IB PRACTICE", "IB Practice", [10.5, 12], "MEDIUM", "FLEXIBLE", 90, "Morning", false, 14),
+  makeTask("LUNCH", "Lunch", [12, 12.5], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+  makeTask("BUILD", "Project / Circuits", [12.5, 14.5], "MEDIUM", "FLEXIBLE", 120, "Core Study", false, 10),
+  makeTask("ANALOG SET 3", analog3Topic, [14.5, 16.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("IB REVISION", "IB Revision", [16.5, 17.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+  makeTask("ANALOG REVISION", analogRevisionTopic, [17.5, 18.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+  makeTask("DINNER", "Dinner", [18.5, 19], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+  makeTask("WEAK AREA REVIEW", "Weak-area review", [19, 20], "LOW", "FLEXIBLE", 60, "Evening", true, 4),
+  makeTask("TRAINING", "Training", [20, 21], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3),
+  makeTask("FINAL REVISION", "Final revision / recap", [21, 22], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 3),
+  makeTask("WIND DOWN", "Wind down", [22, 23], "LOW", "FLEXIBLE", 60, "Evening", true, 1),
+  makeTask("REST", "Sleep", [23, 28], "HIGH", "STRICT", 300, "Evening", true, 2),
+];
+```
+
+## Implementation Notes
+
+### What the app should do
+
+1. Accept user input topic text.
+2. Generate a strict prompt.
+3. Place the prompt into a readonly textarea.
+4. Allow copy-to-clipboard.
+5. Show a success or error message.
+
+### What the app should not do
+
+1. It should not directly call Gemini.
+2. It should not ask for an API key.
+3. It should not generate a timetable section.
+4. It should not insert task schedules into the Roadmap Console automatically.
+
+## Low-Level Model Safe Instructions
+
+If a weaker model needs to work on this feature later, follow this exact order:
+
+1. Do not add new generator types.
+2. Keep only two cards in the UI.
+3. First card is for roadmap prompt generation.
+4. Second card is for `makeTask(...)` prompt generation.
+5. Keep both outputs inside readonly textareas.
+6. Keep both copy buttons working.
+7. Do not restore API-key input.
+8. Do not restore timetable rendering.
+9. Do not make the helper directly call any external AI API.
+10. If changing the task-format prompt, preserve the exact `makeTask(...)` signature and reference example.

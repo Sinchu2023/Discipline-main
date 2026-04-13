@@ -1,4 +1,4 @@
-window.AppModule = {
+﻿window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
     if (!services?.auth || typeof services.onAuthStateChanged !== "function") {
@@ -21,7 +21,7 @@ const CONFIG = {
   DAILY_PRODUCTIVITY_THRESHOLD_MINUTES: 240,
   DISTRACTION_BUDGET_MINUTES: 90,
 
-  // ── Shadow Engine 2.0 constants (§6 of improve.md) ──────────────────
+  // â”€â”€ Shadow Engine 2.0 constants (Â§6 of improve.md) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   LEARNING_RATE_FAILURE_SEVERE: 0.1,   // RECOVERY state
   LEARNING_RATE_FAILURE_MODERATE: 0.2,   // moderate slippage
   LEARNING_RATE_STABLE: 0.3,   // STABLE / GROWTH state
@@ -38,12 +38,12 @@ const CONFIG = {
 
   // Mission time-windows for expiry logic (24-h, [startH, endH])
   MISSION_TIME_WINDOWS: {
-    learning: [9, 13],  // 09:00 – 13:00
-    project: [14, 18],  // 14:00 – 18:00
-    revision: [19, 21],  // 19:00 – 21:00
+    learning: [9, 13],  // 09:00 â€“ 13:00
+    project: [14, 18],  // 14:00 â€“ 18:00
+    revision: [19, 21],  // 19:00 â€“ 21:00
     default: [8, 22],
   },
-  // ────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   STORAGE_KEYS: {
     TASKS: "discipline_tracker_tasks",
@@ -79,7 +79,7 @@ const CONFIG = {
 
 const ANALOG_IC_ROADMAP_TEMPLATE = [
   {
-    module: "MODULE 1 — DIODES",
+    module: "MODULE 1 â€” DIODES",
     days: [
       "Basic Semiconductor Physics",
       "Different Models of Diodes",
@@ -89,7 +89,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 2 — MOSFET FUNDAMENTALS",
+    module: "MODULE 2 â€” MOSFET FUNDAMENTALS",
     days: [
       "MOS Physics Fundamentals",
       "MOS Devices: Depletion & Enhancement",
@@ -98,7 +98,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 3 — MOS BIASING",
+    module: "MODULE 3 â€” MOS BIASING",
     days: [
       "Biasing MOS for Amplification",
       "Small Signal Model of MOS",
@@ -107,7 +107,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 4 — MOS AMPLIFIERS",
+    module: "MODULE 4 â€” MOS AMPLIFIERS",
     days: [
       "Common Source Amplifier",
       "Miller Effect in Amplifiers",
@@ -116,7 +116,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 5 — MOS PARASITICS",
+    module: "MODULE 5 â€” MOS PARASITICS",
     days: [
       "MOSFET Capacitances",
       "Noise Fundamentals",
@@ -124,7 +124,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 6 — DIFFERENTIAL PAIR",
+    module: "MODULE 6 â€” DIFFERENTIAL PAIR",
     days: [
       "Mismatch: Systematic & Random",
       "Differential Pair Fundamentals",
@@ -132,7 +132,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 7 — FEEDBACK",
+    module: "MODULE 7 â€” FEEDBACK",
     days: [
       "Types & Effects of Feedback",
       "Negative Feedback Design",
@@ -140,7 +140,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 8 — OPAMP BASICS",
+    module: "MODULE 8 â€” OPAMP BASICS",
     days: [
       "OpAmp Basics",
       "OpAmp with Active Load",
@@ -148,7 +148,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 9 — TELESCOPIC OPAMP",
+    module: "MODULE 9 â€” TELESCOPIC OPAMP",
     days: [
       "Telescopic OpAmp Structure",
       "Telescopic OpAmp Biasing",
@@ -157,7 +157,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 10 — FOLDED CASCODE OPAMP",
+    module: "MODULE 10 â€” FOLDED CASCODE OPAMP",
     days: [
       "Folded Cascode Concept",
       "Folded Cascode Biasing",
@@ -166,7 +166,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 11 — TWO STAGE OPAMP",
+    module: "MODULE 11 â€” TWO STAGE OPAMP",
     days: [
       "Two Stage OpAmp Architecture",
       "Gain Distribution",
@@ -175,7 +175,7 @@ const ANALOG_IC_ROADMAP_TEMPLATE = [
     ],
   },
   {
-    module: "MODULE 12 — ANALOG BLOCK PROJECTS",
+    module: "MODULE 12 â€” ANALOG BLOCK PROJECTS",
     days: [
       "Common Source Amplifier Simulation",
       "Current Mirror Design",
@@ -855,7 +855,7 @@ class FirebaseCloudManager {
           },
           roadmap: {
             currentDay: 1,
-            module: "MODULE 1 — DIODES",
+            module: "MODULE 1 â€” DIODES",
             completedDays: [],
           },
           revision: { status: "pending", timeSpent: 0 },
@@ -1020,7 +1020,7 @@ class FirebaseCloudManager {
     this.detachTimerListener();
     // Defensive guard: fall back to getDoc if onSnapshot not yet loaded
     if (typeof window.FirebaseServices.onSnapshot !== "function") {
-      console.warn("onSnapshot not available — falling back to one-time timer restore");
+      console.warn("onSnapshot not available â€” falling back to one-time timer restore");
       window.FirebaseServices.getDoc(this.timerDoc()).then(snap => {
         if (snap.exists()) this.app.stopwatch.restoreFromCloud(snap.data());
       }).catch(e => console.warn("Timer restore failed", e));
@@ -1254,10 +1254,14 @@ class DisciplineTracker {
       "trainer-modal",
       "ai-roadmap-topic",
       "generate-roadmap-btn",
+      "copy-roadmap-prompt-btn",
+      "ai-roadmap-output",
       "ai-roadmap-status",
-      "ai-timetable-topic",
-      "generate-timetable-btn",
-      "ai-timetable-status",
+      "ai-task-topic",
+      "generate-task-prompt-btn",
+      "copy-task-prompt-btn",
+      "ai-task-output",
+      "ai-task-status",
       "trainer-overview",
       "trainer-content",
       "close-trainer",
@@ -1769,7 +1773,7 @@ class StopwatchManager {
     this.app.elements["stop-btn"].disabled = false;
     this.app.elements["task-input"].disabled = true;
     this.app.elements["active-task-name"].textContent =
-      `${this.app.state.activeTask.category} • ${this.app.state.activeTask.subcategory}`;
+      `${this.app.state.activeTask.category} â€¢ ${this.app.state.activeTask.subcategory}`;
     this.app.elements["active-task-start"].textContent =
       this.app.formatTime(this.startTime);
     this.app.elements["active-task-indicator"].style.display = "block";
@@ -1867,7 +1871,7 @@ class StopwatchManager {
     this.app.elements["stop-btn"].disabled = false;
     this.app.elements["task-input"].disabled = true;
     this.app.elements["active-task-name"].textContent =
-      `${activeTask.category || "Productive Work"} • ${activeTask.subcategory || "General"}`;
+      `${activeTask.category || "Productive Work"} â€¢ ${activeTask.subcategory || "General"}`;
     this.app.elements["active-task-start"].textContent =
       this.app.formatTime(activeTask.startTime);
     this.app.elements["active-task-indicator"].style.display = "block";
@@ -2094,7 +2098,7 @@ class TaskManager {
       const editLabel = isSleep ? "Edit Sleep" : "Edit Task";
       const editClass = isSleep ? "edit-sleep-btn" : "edit-task-btn";
       el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
-      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "💤" : "⚡"} ${this.app.escapeHtml(task.category)} • ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions"><button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
+      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "ðŸ’¤" : "âš¡"} ${this.app.escapeHtml(task.category)} â€¢ ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions"><button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
       c.appendChild(el);
     });
     document
@@ -3162,7 +3166,7 @@ class ShadowEngine {
         profile:
           "Astra represents improved control. You are building the ability to stay on task with less drag and better recovery after distractions.",
         fame:
-          "Named after Astra, India’s beyond-visual-range air-to-air missile, known for speed, range, and homegrown precision engineering.",
+          "Named after Astra, Indiaâ€™s beyond-visual-range air-to-air missile, known for speed, range, and homegrown precision engineering.",
       },
       {
         min: 350,
@@ -3180,7 +3184,7 @@ class ShadowEngine {
         profile:
           "Prithvi marks solid operational discipline. Your routines are becoming dependable, and your output is less dependent on mood or external pressure.",
         fame:
-          "Named after Prithvi, one of India’s first indigenous ballistic missile systems, famous as a foundational milestone in strategic capability.",
+          "Named after Prithvi, one of Indiaâ€™s first indigenous ballistic missile systems, famous as a foundational milestone in strategic capability.",
       },
       {
         min: 560,
@@ -3207,7 +3211,7 @@ class ShadowEngine {
         profile:
           "Minuteman reflects top-tier readiness. Your system is resilient, your discipline is stable, and you can produce when it matters without warm-up chaos.",
         fame:
-          "Named after the Minuteman missile, famous for rapid readiness and for borrowing its name from colonial militia who had to be ready at a minute’s notice.",
+          "Named after the Minuteman missile, famous for rapid readiness and for borrowing its name from colonial militia who had to be ready at a minuteâ€™s notice.",
       },
       {
         min: 900,
@@ -3797,10 +3801,10 @@ class ShadowEngine {
     return series;
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // §7  Phase 2 — Behavioral State Detection
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Â§7  Phase 2 â€” Behavioral State Detection
   // Returns: 'RECOVERY' | 'STABLE' | 'GROWTH'
-  // ══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   detectBehavioralState() {
     const series7 = [];
     const dailyMap = this.getDailyProductiveMap();
@@ -3833,11 +3837,11 @@ class ShadowEngine {
     return state;
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // §3/4  Phase 3 — Progressive Time-Shift Engine
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Â§3/4  Phase 3 â€” Progressive Time-Shift Engine
   // Shifts currentHour toward idealHour using learning_rate.
   // Cap: MAX_DAILY_SHIFT_MINUTES. Returns next hour (fractional).
-  // ══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   applyTimeShift(currentHour, idealHour, state) {
     const rates = {
       RECOVERY: CONFIG.LEARNING_RATE_FAILURE_SEVERE,   // 0.1
@@ -3870,9 +3874,9 @@ class ShadowEngine {
     return schedule;
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // §10  Phase 4 — Sleep Compromise Tracker
-  // ══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Â§10  Phase 4 â€” Sleep Compromise Tracker
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   getSleepCompromiseData() {
     const today = new Date(this.app.getDateString());
     const results = [];
@@ -3915,7 +3919,7 @@ class ShadowEngine {
   getTodayLoadMultiplier() {
     const data = this.getSleepCompromiseData();
     const yesterday = data[data.length - 2]; // index 5 = yesterday
-    if (yesterday?.compromised) return 0.85; // §10: reduce 15% next day
+    if (yesterday?.compromised) return 0.85; // Â§10: reduce 15% next day
     return 1.0;
   }
 
@@ -4493,7 +4497,7 @@ class ShadowEngine {
     );
     const pressureEl = this.app.elements["shadow-pressure"];
     pressureEl.textContent = pressure.reasons.length
-      ? `${pressure.label} • ${pressure.reasons.slice(0, 2).join(", ")}`
+      ? `${pressure.label} â€¢ ${pressure.reasons.slice(0, 2).join(", ")}`
       : pressure.label;
     pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
@@ -4521,7 +4525,7 @@ class ShadowEngine {
       this.app.elements["shadow-next-rank-sub"].textContent = nextRank
         ? shadowRating.gate.met
           ? `Need ${srGap} SR`
-          : `Need ${srGap} SR • ${shadowRating.gate.reason}`
+          : `Need ${srGap} SR â€¢ ${shadowRating.gate.reason}`
         : "BrahMos ceiling held";
 
     if (this.app.elements["shadow-next-rank-sub"] && nextRank)
@@ -5010,10 +5014,10 @@ Next Level Milestone: ${shadowMilestone}
 
 === USER STATUS ===
 Level: ${d.userLevel.current.name} | L${d.userMicroLevel}/100
-Active Penalties: ${this.app.formatDuration(d.penaltyMinutes)} (${d.penaltyPoints}pt) | ${d.penaltyReasons.length ? d.penaltyReasons.join(" • ") : "No active penalty triggers"}
+Active Penalties: ${this.app.formatDuration(d.penaltyMinutes)} (${d.penaltyPoints}pt) | ${d.penaltyReasons.length ? d.penaltyReasons.join(" â€¢ ") : "No active penalty triggers"}
 Mission Score: ${d.missionScore}/100
 Distraction Budget: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (+${this.app.formatDuration(d.distractionOverBudget)} over)` : ""}
-Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " ✓" : ""} • 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " ✓" : ""}
+Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " âœ“" : ""} â€¢ 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " âœ“" : ""}
 Mode: ${d.mode}
 Gap: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
 Minutes to Tie: ${this.app.formatDuration(d.minutesToTie)}
@@ -5097,7 +5101,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           completed: false,
         })),
       })),
-      timetable: null,
       editMode: false,
       startedAt: Date.now(),
     });
@@ -5115,10 +5118,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const merged = createFromTemplate();
     merged.editMode = !!stored.editMode;
     merged.startedAt = stored.startedAt || merged.startedAt;
-    merged.timetable =
-      stored.timetable && Array.isArray(stored.timetable.schedule)
-        ? stored.timetable
-        : null;
     merged.modules.forEach((module, mi) => {
       const fromStored = stored.modules[mi];
       if (!fromStored) return;
@@ -5373,11 +5372,11 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     ];
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Phase 0 — Performance & UI Stability
-  // ══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Phase 0 â€” Performance & UI Stability
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-  // §16/17/18: resolve time-window for a mission item
+  // Â§16/17/18: resolve time-window for a mission item
   getMissionTimeWindow(item) {
     return item.win || [8, 22];
   }
@@ -5392,11 +5391,11 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const hour12 = hour % 12 === 0 ? 12 : hour % 12;
       return `${hour12}:${mins.toString().padStart(2, "0")} ${period}`;
     };
-    return `${fmt(startH)}–${fmt(endH)}`;
+    return `${fmt(startH)}â€“${fmt(endH)}`;
   }
 
-  // ── Phase 0.2: local mission state cache (Map) ────────────────────
-  // Never recomputed on checkbox click — only rebuilt on topology change.
+  // â”€â”€ Phase 0.2: local mission state cache (Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Never recomputed on checkbox click â€” only rebuilt on topology change.
   _buildMissionCache(tasks, checks, nowH) {
     const cache = new Map();
     tasks.forEach((item, idx) => {
@@ -5433,7 +5432,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     row.classList.toggle("mission-active-now", activeNow && !done && !expired);
   }
 
-  // ── Phase 0.4: live expiry ticker — only CSS toggles, never innerHTML ─
+  // â”€â”€ Phase 0.4: live expiry ticker â€” only CSS toggles, never innerHTML â”€
   applyMissionTimeStates(container) {
     if (!container) return;
     const now = new Date();
@@ -5485,9 +5484,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     }, delay);
   }
 
-  // ── Phase 0.5: live loop — 1s precision, no structural re-render ──────
+  // â”€â”€ Phase 0.5: live loop â€” 1s precision, no structural re-render â”€â”€â”€â”€â”€â”€
   startMissionLiveLoop() {
-    if (this._missionLiveLoopId) return; // only one loop ever — never restart on re-render
+    if (this._missionLiveLoopId) return; // only one loop ever â€” never restart on re-render
     this._missionLastDateKey = this.getCurrentMissionDateKey();
     this._missionLiveLoopId = setInterval(() => {
       const currentDateKey = this.getCurrentMissionDateKey();
@@ -5501,7 +5500,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     this.scheduleMissionBoundaryPulse();
   }
 
-  // ── Phase 0.1: single delegated listener — attached ONCE, never re-added
+  // â”€â”€ Phase 0.1: single delegated listener â€” attached ONCE, never re-added
   _initMissionDelegation() {
     if (this._missionDelegationBound) return;
     this._missionDelegationBound = true;
@@ -5515,7 +5514,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const cached = this._missionStateCache?.get(checkId);
       if (cached) cached.done = !!e.target.checked;
 
-      // Phase 0.3: update only THIS row — no innerHTML, no loop
+      // Phase 0.3: update only THIS row â€” no innerHTML, no loop
       const row = e.target.closest(".shadow-goal-item");
       if (row) {
         let nowH = new Date().getHours() + new Date().getMinutes() / 60;
@@ -5540,7 +5539,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     }, { passive: true });
   }
 
-  // ── Main sync: rebuilds innerHTML ONLY when task topology changes ─────
+  // â”€â”€ Main sync: rebuilds innerHTML ONLY when task topology changes â”€â”€â”€â”€â”€
   syncMissionFromRoadmap({ skipRender = false, rebuild = true } = {}) {
     const primaryContainer =
       document.getElementById("shadow-goal-list-primary") ||
@@ -5550,7 +5549,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     );
     if (!primaryContainer) return;
 
-    // Phase 0.1: guarantee ONE delegated listener — never per-element
+    // Phase 0.1: guarantee ONE delegated listener â€” never per-element
     this._initMissionDelegation();
 
     const currentMissionDateKey = this.getCurrentMissionDateKey();
@@ -5608,7 +5607,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       return `<div class="mission-phase-items${secondary ? " secondary" : ""}">${entries.map(({ item, idx }) => renderTask(item, idx)).join("")}</div>`;
     };
 
-    // Phase 0.3: structural innerHTML render — ONLY called here, never on interaction
+    // Phase 0.3: structural innerHTML render â€” ONLY called here, never on interaction
     primaryContainer.innerHTML = renderEntrySet(primaryEntries);
     if (secondaryContainer) {
       secondaryContainer.innerHTML = renderEntrySet(secondaryEntries, true);
@@ -5742,30 +5741,116 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     };
   }
 
-  buildGeneratedTimetable(topic) {
-    const tokens = this.buildTopicTokens(topic);
-    const blockA = this.titleCase(tokens[0] || "Core Study");
-    const blockB = this.titleCase(tokens[1] || `${blockA} Practice`);
-    const blockC = this.titleCase(tokens[2] || `${blockA} Revision`);
-    const blockD = this.titleCase(tokens[3] || "Project Work");
+  setGeneratorOutput(key, value) {
+    const el = this.app.elements[key];
+    if (!el) return;
+    el.value = value || "";
+  }
 
-    return {
-      title: `${blockA} Daily Timetable`,
-      sourceTopic: topic,
-      schedule: [
-        { label: "DEEP START", focus: blockA, time: "05:00-07:00", intensity: "HIGH", mode: "STRICT", duration: 120, phase: "Morning", optional: false, score: 16 },
-        { label: "BREAK", focus: "Hydration + reset", time: "07:00-07:20", intensity: "LOW", mode: "FLEXIBLE", duration: 20, phase: "Breaks", optional: true, score: 1 },
-        { label: "CORE BLOCK 2", focus: blockB, time: "07:20-09:20", intensity: "HIGH", mode: "STRICT", duration: 120, phase: "Morning", optional: false, score: 14 },
-        { label: "PRACTICE", focus: `${blockA} problems`, time: "09:30-11:00", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 90, phase: "Core Study", optional: false, score: 10 },
-        { label: "LUNCH", focus: "Lunch", time: "12:00-12:40", intensity: "LOW", mode: "FLEXIBLE", duration: 40, phase: "Breaks", optional: true, score: 1 },
-        { label: "BUILD", focus: blockD, time: "12:45-14:15", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 90, phase: "Core Study", optional: false, score: 9 },
-        { label: "REVISION", focus: blockC, time: "14:30-15:30", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: false, score: 6 },
-        { label: "WEAK AREA", focus: `${blockA} weak-area review`, time: "16:00-17:00", intensity: "LOW", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: true, score: 4 },
-        { label: "TRAINING", focus: "Training", time: "20:00-21:00", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: true, score: 3 },
-        { label: "FINAL RECAP", focus: `${blockA} recap`, time: "21:00-22:00", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: false, score: 3 },
-        { label: "REST", focus: "Sleep", time: "23:00-04:30", intensity: "HIGH", mode: "STRICT", duration: 330, phase: "Night", optional: true, score: 2 },
-      ],
-    };
+  copyGeneratorOutput(outputKey, statusKey, emptyMessage, successMessage) {
+    const el = this.app.elements[outputKey];
+    const value = el?.value?.trim();
+    if (!value) {
+      this.setGeneratorStatus(statusKey, emptyMessage, "error");
+      return;
+    }
+    navigator.clipboard
+      .writeText(value)
+      .then(() => {
+        this.setGeneratorStatus(statusKey, successMessage, "success");
+      })
+      .catch(() => {
+        this.setGeneratorStatus(
+          statusKey,
+          "Copy failed. Select the text and copy it manually.",
+          "error",
+        );
+      });
+  }
+
+  buildRoadmapPromptSpec(topic) {
+    const roadmapJson = this.buildGeneratedRoadmap(topic);
+    return `You are helping me create a study roadmap for "${topic}".
+
+Return ONLY valid JSON.
+Do not wrap the answer in markdown.
+Do not add explanations before or after the JSON.
+
+Use this exact structure:
+{
+  "modules": [
+    {
+      "module": "MODULE NAME",
+      "days": [
+        { "day": 1, "topic": "Topic name", "status": "active" },
+        { "day": 2, "topic": "Topic name", "status": "locked" }
+      ]
+    }
+  ]
+}
+
+Rules:
+1. Day numbers must continue sequentially across all modules.
+2. Only the very first day can have "status": "active".
+3. Every other day must have "status": "locked".
+4. Create 4 modules.
+5. Create 3 days per module.
+6. Keep module names uppercase and concise.
+7. Keep each topic practical and specific.
+8. Output JSON only.
+
+Reference example:
+${JSON.stringify(roadmapJson, null, 2)}`;
+  }
+
+  buildTaskPromptSpec(topic) {
+    return `You are helping me create a daily scheduler code block for "${topic}".
+
+Return ONLY code.
+Do not use markdown.
+Do not explain anything.
+Do not add comments.
+
+You must return the final answer in this exact shape:
+return [
+  makeTask("TITLE", "FOCUS", [startHour, endHour], "HIGH", "STRICT", 120, "Morning", false, 10),
+  makeTask("TITLE", "FOCUS", [startHour, endHour], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3)
+];
+
+Rules:
+1. Use only makeTask(...) lines inside one return array.
+2. Keep tasks in chronological order.
+3. Use decimal hours like 6.25 for 6:15 and 8.5 for 8:30.
+4. Duration must be in minutes.
+5. Priority must be one of "HIGH", "MEDIUM", "LOW".
+6. Discipline type must be one of "STRICT", "FLEXIBLE".
+7. Phase must be one of "Morning", "Core Study", "Breaks", "Evening".
+8. Optional flag must be true or false.
+9. Score must be an integer.
+10. Output only the code block, nothing else.
+
+Use this exact style reference:
+return [
+  makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
+  makeTask("ANALOG SET 1", analog1Topic, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("BREAK", "Break + Hydration", [8.25, 8.5], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
+  makeTask("ANALOG SET 2", analog2Topic, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("IB PRACTICE", "IB Practice", [10.5, 12], "MEDIUM", "FLEXIBLE", 90, "Morning", false, 14),
+  makeTask("LUNCH", "Lunch", [12, 12.5], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+  makeTask("BUILD", "Project / Circuits", [12.5, 14.5], "MEDIUM", "FLEXIBLE", 120, "Core Study", false, 10),
+  makeTask("ANALOG SET 3", analog3Topic, [14.5, 16.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("IB REVISION", "IB Revision", [16.5, 17.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+  makeTask("ANALOG REVISION", analogRevisionTopic, [17.5, 18.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+  makeTask("DINNER", "Dinner", [18.5, 19], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+  makeTask("WEAK AREA REVIEW", "Weak-area review", [19, 20], "LOW", "FLEXIBLE", 60, "Evening", true, 4),
+  makeTask("TRAINING", "Training", [20, 21], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3),
+  makeTask("FINAL REVISION", "Final revision / recap", [21, 22], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 3),
+  makeTask("WIND DOWN", "Wind down", [22, 23], "LOW", "FLEXIBLE", 60, "Evening", true, 1),
+  makeTask("REST", "Sleep", [23, 28], "HIGH", "STRICT", 300, "Evening", true, 2),
+];
+
+Now create a new schedule for this topic set:
+${topic}`;
   }
 
   generateAIRoadmap() {
@@ -5781,58 +5866,37 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       return;
     }
 
-    const roadmapJson = this.buildGeneratedRoadmap(topic);
-    this.state.roadmap = {
-      modules: roadmapJson.modules.map((module) => ({
-        name: module.module,
-        days: module.days.map((day) => ({
-          day: `Day ${day.day}`,
-          text: day.topic,
-          completed: false,
-        })),
-      })),
-      timetable: this.state.roadmap?.timetable || null,
-      editMode: false,
-      startedAt: Date.now(),
-      sourceTopic: topic,
-    };
-
-    this.app.saveToStorage(
-      CONFIG.STORAGE_KEYS.ROADMAP_STATE,
-      this.state.roadmap,
+    this.setGeneratorOutput(
+      "ai-roadmap-output",
+      this.buildRoadmapPromptSpec(topic),
     );
-    this.refresh();
     this.setGeneratorStatus(
       "ai-roadmap-status",
-      `Roadmap generated for "${topic}".`,
+      `Roadmap prompt generated for "${topic}". Copy it and send it to another AI.`,
       "success",
     );
   }
 
-  generateAITimetable() {
-    const topicEl = this.app.elements["ai-timetable-topic"];
+  generateTaskPrompt() {
+    const topicEl = this.app.elements["ai-task-topic"];
     const topic = topicEl?.value.trim();
 
     if (!topic) {
       this.setGeneratorStatus(
-        "ai-timetable-status",
-        "Enter a timetable topic first.",
+        "ai-task-status",
+        "Enter your task/topic set first.",
         "error",
       );
       return;
     }
 
-    const timetable = this.buildGeneratedTimetable(topic);
-    this.ensureRoadmap();
-    this.state.roadmap.timetable = timetable;
-    this.app.saveToStorage(
-      CONFIG.STORAGE_KEYS.ROADMAP_STATE,
-      this.state.roadmap,
+    this.setGeneratorOutput(
+      "ai-task-output",
+      this.buildTaskPromptSpec(topic),
     );
-    this.renderRoadmap();
     this.setGeneratorStatus(
-      "ai-timetable-status",
-      `Timetable generated for "${topic}".`,
+      "ai-task-status",
+      `Task-format prompt generated for "${topic}". Copy it and send it to another AI.`,
       "success",
     );
   }
@@ -5848,7 +5912,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       content.innerHTML = `
                <div style="text-align: center; padding: 40px 20px;">
                  <h3 style="color: var(--text-accent); margin-bottom: 12px;">Roadmap not generated yet</h3>
-                 <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">Use the structured generator above to create a roadmap and timetable for this account.</p>
+                 <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">Use the helpers above to generate copy-ready roadmap JSON prompts and exact makeTask code prompts.</p>
                </div>
              `;
       return;
@@ -5866,27 +5930,19 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         `;
 
     let html = "";
-    if (this.state.roadmap.timetable?.schedule?.length) {
-      html += `<section class="trainer-section"><div class="trainer-section-title">Daily Timetable</div><div class="trainer-subsection-title">${this.escapeHtml(this.state.roadmap.timetable.title || "Structured schedule")}</div>`;
-      this.state.roadmap.timetable.schedule.forEach((entry) => {
-        html += `<div class="trainer-row timetable-row"><div class="trainer-key">${this.escapeHtml(entry.time || "")}<div class="timetable-meta">${this.escapeHtml(entry.phase || "")}</div></div><div class="trainer-val">${this.escapeHtml(entry.label || "")}<div class="timetable-meta">${this.escapeHtml(entry.focus || "")}</div></div><div class="timetable-meta">${this.escapeHtml(entry.intensity || "")} � ${this.escapeHtml(entry.mode || "")}<br>${this.app.formatDuration(Number(entry.duration || 0))}</div></div>`;
-      });
-      html += `</section>`;
-    }
-
     this.state.roadmap.modules.forEach((mod, mi) => {
       const unlocked = mi <= moduleIndex;
       const done = mod.days.every((d) => d.completed);
       const moduleTitle = this.state.roadmap.editMode
         ? `<input class="roadmap-module-edit" data-module="${mi}" value="${this.escapeHtml(mod.name)}"/>`
         : this.escapeHtml(mod.name);
-      html += `<section class="trainer-section"><div class="trainer-section-title">${moduleTitle} ${done ? "✔" : ""}</div>`;
+      html += `<section class="trainer-section"><div class="trainer-section-title">${moduleTitle} ${done ? "âœ”" : ""}</div>`;
       mod.days.forEach((day, di) => {
         const dayUnlocked =
           unlocked && (di === 0 || mod.days[di - 1].completed);
         const disabled = dayUnlocked ? "" : "disabled";
         const checked = day.completed ? "checked" : "";
-        const stateIcon = day.completed ? "✔" : dayUnlocked ? "●" : "🔒";
+        const stateIcon = day.completed ? "âœ”" : dayUnlocked ? "â—" : "ðŸ”’";
         const stateLabel = day.completed
           ? "Completed"
           : dayUnlocked
@@ -5942,9 +5998,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // §8  Phase 6 — Full 7-Step Daily Sequence Pipeline
-  // ══════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // Â§8  Phase 6 â€” Full 7-Step Daily Sequence Pipeline
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   // Step 1: read today's raw data
   readTodayData() {
@@ -5991,7 +6047,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     return { effectiveLoad, sleepMultiplier, stateMultiplier };
   }
 
-  // Step 5: generate missions — adjusts threshold based on load
+  // Step 5: generate missions â€” adjusts threshold based on load
   generateMissions(effectiveLoad) {
     const missionTasks = this.getDailyMissionTasks();
     return missionTasks.map(task => ({
@@ -6003,18 +6059,18 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     }));
   }
 
-  // Step 6: apply strict / flexible / sleep rules (§9, §10)
+  // Step 6: apply strict / flexible / sleep rules (Â§9, Â§10)
   applyRules(missions, behaviorData) {
     const compromisesLeft = CONFIG.MAX_SLEEP_COMPROMISES_PER_7_DAYS -
       (this.app.shadowEngine?.countSleepCompromisesLast7() || 0);
-    // §11 anti-misuse: track how many missions used full 1.5x buffer
+    // Â§11 anti-misuse: track how many missions used full 1.5x buffer
     return missions.map(m => {
       const progress = this.getTopicProgress(m.topic);
       const ratio = progress.minutes / Math.max(1, m.adjustedThreshold);
-      // §9: strict tasks: delay >5 min = failure signal
+      // Â§9: strict tasks: delay >5 min = failure signal
       const isStrict = m.discipline_type === "STRICT";
       const strictFail = isStrict && behaviorData.wakeDelayMins > 5;
-      // §11: detect flexibility abuse (ratio < 0.7 by buffer window end)
+      // Â§11: detect flexibility abuse (ratio < 0.7 by buffer window end)
       const abused = !isStrict && ratio < CONFIG.EFFORT_SUCCESS_THRESHOLD;
       return { ...m, progress, ratio, strictFail, abused, compromisesLeft };
     });
@@ -6035,10 +6091,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     };
   }
 
-  // Full pipeline — run once per day (§17: separated from UI re-renders)
+  // Full pipeline â€” run once per day (Â§17: separated from UI re-renders)
   runDailySequence() {
     const today = this.app.getDateString(new Date());
-    // §17: skip if already ran today
+    // Â§17: skip if already ran today
     if (this._lastSequenceDate === today) return this._lastPlan || null;
 
     const todayData = this.readTodayData();                          // Step 1
@@ -6052,7 +6108,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     this._lastSequenceDate = today;
     this._lastPlan = plan;
 
-    // §11 Phase 7: anti-misuse — count abused flexible tasks
+    // Â§11 Phase 7: anti-misuse â€” count abused flexible tasks
     this.state.flexAbuseDays = this.state.flexAbuseDays || 0;
     const abuseCount = finalMissions.filter(m => m.abused && !m.isStrict).length;
     if (abuseCount > 0) {
@@ -6060,7 +6116,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     } else {
       this.state.flexAbuseDays = Math.max(0, this.state.flexAbuseDays - 1);
     }
-    // §11: if abused 3+ days, tighten flexible multiplier
+    // Â§11: if abused 3+ days, tighten flexible multiplier
     if (this.state.flexAbuseDays >= 3) {
       // reduce buffer: approaching strict (1.0x instead of 1.5x)
       const tighter = Math.max(1.0, CONFIG.FLEXIBLE_TASK_MULTIPLIER - 0.1 * this.state.flexAbuseDays);
@@ -6078,7 +6134,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     this.renderRoadmap();
     this.syncMissionFromRoadmap();
     this.updatePenaltyTimer();
-    // §8/§17: run full pipeline once per calendar day, not on every render
+    // Â§8/Â§17: run full pipeline once per calendar day, not on every render
     this.runDailySequence();
   }
 
@@ -7195,9 +7251,31 @@ class EventManager {
     if (genBtn) {
       genBtn.addEventListener("click", () => this.app.trainerEngine.generateAIRoadmap());
     }
-    const timeBtn = this.app.elements["generate-timetable-btn"];
-    if (timeBtn) {
-      timeBtn.addEventListener("click", () => this.app.trainerEngine.generateAITimetable());
+    const roadmapCopyBtn = this.app.elements["copy-roadmap-prompt-btn"];
+    if (roadmapCopyBtn) {
+      roadmapCopyBtn.addEventListener("click", () =>
+        this.app.trainerEngine.copyGeneratorOutput(
+          "ai-roadmap-output",
+          "ai-roadmap-status",
+          "Generate a roadmap prompt first.",
+          "Roadmap prompt copied.",
+        ),
+      );
+    }
+    const taskBtn = this.app.elements["generate-task-prompt-btn"];
+    if (taskBtn) {
+      taskBtn.addEventListener("click", () => this.app.trainerEngine.generateTaskPrompt());
+    }
+    const taskCopyBtn = this.app.elements["copy-task-prompt-btn"];
+    if (taskCopyBtn) {
+      taskCopyBtn.addEventListener("click", () =>
+        this.app.trainerEngine.copyGeneratorOutput(
+          "ai-task-output",
+          "ai-task-status",
+          "Generate a task prompt first.",
+          "Task-format prompt copied.",
+        ),
+      );
     }
     this.app.elements["export-data"].addEventListener("click", () =>
       (this.app.uiManager.exportData(), this.app.cloudManager.closeProfileMenu()),
@@ -7326,6 +7404,7 @@ window.addEventListener("beforeunload", () => {
   if (window.app?.stopwatch?.tickIntervalId)
     clearInterval(window.app.stopwatch.tickIntervalId);
 });
+
 
 
 

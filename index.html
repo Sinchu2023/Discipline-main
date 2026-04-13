@@ -495,36 +495,43 @@
             <section class="generator-panel" aria-label="Structured generators">
               <div class="generator-panel-head">
                 <h3 class="generator-panel-title"><i class="fas fa-magic"></i> Structured Generators</h3>
-                <p class="generator-panel-subtitle">Generate roadmap and timetable data directly into the Roadmap Console using local structured templates.</p>
+                <p class="generator-panel-subtitle">Generate copy-ready prompt blocks you can send to another AI to get roadmap JSON or exact `makeTask(...)` lines back.</p>
               </div>
               <div class="generator-grid">
                 <form class="generator-card" onsubmit="return false;">
                   <div class="generator-card-head">
                     <h4><i class="fas fa-route"></i> Generate Roadmap</h4>
-                    <p>Creates module and day progression JSON-style data for the active account.</p>
+                    <p>Builds a strict prompt that asks another AI to return roadmap JSON in the exact structure you need.</p>
                   </div>
                   <input type="text" id="ai-roadmap-topic" class="generator-input" placeholder="e.g. Analog IC Design" />
-                  <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Generate Roadmap</button>
+                  <div class="generator-actions">
+                    <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Generate Roadmap Prompt</button>
+                    <button class="btn" id="copy-roadmap-prompt-btn" type="button"><i class="fas fa-copy"></i> Copy</button>
+                  </div>
                   <pre class="generator-example">{
   "modules": [
     { "module": "FOUNDATIONS", "days": [{ "day": 1, "topic": "Core concepts" }] }
   ]
 }</pre>
+                  <textarea id="ai-roadmap-output" class="generator-output" readonly placeholder="Generated roadmap prompt will appear here."></textarea>
                   <div id="ai-roadmap-status" class="generator-status"></div>
                 </form>
                 <form class="generator-card" onsubmit="return false;">
                   <div class="generator-card-head">
-                    <h4><i class="fas fa-calendar-day"></i> Generate Timetable</h4>
-                    <p>Builds a daily execution schedule and shows it in the Roadmap Console.</p>
+                    <h4><i class="fas fa-code"></i> Generate Task Format</h4>
+                    <p>Builds a strict prompt that asks another AI to return only `makeTask(...)` lines in your exact scheduler format.</p>
                   </div>
-                  <input type="text" id="ai-timetable-topic" class="generator-input" placeholder="e.g. IB + Analog IC + Project Work" />
-                  <button class="btn btn-primary" id="generate-timetable-btn" type="button"><i class="fas fa-table"></i> Generate Timetable</button>
-                  <pre class="generator-example">{
-  "schedule": [
-    { "label": "CORE BLOCK", "focus": "Deep work", "time": "05:00-07:00" }
-  ]
-}</pre>
-                  <div id="ai-timetable-status" class="generator-status"></div>
+                  <input type="text" id="ai-task-topic" class="generator-input" placeholder="e.g. IB + Analog IC + Project Work" />
+                  <div class="generator-actions">
+                    <button class="btn btn-primary" id="generate-task-prompt-btn" type="button"><i class="fas fa-code"></i> Generate Task Prompt</button>
+                    <button class="btn" id="copy-task-prompt-btn" type="button"><i class="fas fa-copy"></i> Copy</button>
+                  </div>
+                  <pre class="generator-example">return [
+  makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
+  makeTask("REST", "Sleep", [23, 28], "HIGH", "STRICT", 300, "Evening", true, 2),
+];</pre>
+                  <textarea id="ai-task-output" class="generator-output" readonly placeholder="Generated task-format prompt will appear here."></textarea>
+                  <div id="ai-task-status" class="generator-status"></div>
                 </form>
               </div>
             </section>
