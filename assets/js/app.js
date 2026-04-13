@@ -83,111 +83,40 @@ const CONFIG = {
 
 const ANALOG_IC_ROADMAP_TEMPLATE = [
   {
-    module: "MODULE 1 â€” DIODES",
+    module: "MODULE 1 - FOUNDATIONS",
     days: [
-      "Basic Semiconductor Physics",
-      "Different Models of Diodes",
-      "Operating Point & Small Signal Analysis of Diode",
-      "Zener Diode as Voltage Regulator",
-      "Series Clipper & Clamper Circuits",
+      "Set one clear goal",
+      "Learn the basic concepts",
+      "Write short notes",
+      "Review key definitions",
+      "Do one simple practice set",
     ],
   },
   {
-    module: "MODULE 2 â€” MOSFET FUNDAMENTALS",
+    module: "MODULE 2 - CORE LEARNING",
     days: [
-      "MOS Physics Fundamentals",
-      "MOS Devices: Depletion & Enhancement",
-      "Simple MOS Circuits",
-      "MOS Non-linear Circuit Concepts",
+      "Study the main topic",
+      "Break topic into sub-parts",
+      "Solve easy examples",
+      "Check weak points",
     ],
   },
   {
-    module: "MODULE 3 â€” MOS BIASING",
+    module: "MODULE 3 - PRACTICE",
     days: [
-      "Biasing MOS for Amplification",
-      "Small Signal Model of MOS",
-      "MOSFET Current Mirrors",
-      "Bias Stability Practice",
+      "Do guided practice",
+      "Do independent practice",
+      "Review mistakes",
+      "Repeat key questions",
     ],
   },
   {
-    module: "MODULE 4 â€” MOS AMPLIFIERS",
+    module: "MODULE 4 - BUILD AND REVIEW",
     days: [
-      "Common Source Amplifier",
-      "Miller Effect in Amplifiers",
-      "Cascode Amplifiers",
-      "Amplifier Gain Review",
-    ],
-  },
-  {
-    module: "MODULE 5 â€” MOS PARASITICS",
-    days: [
-      "MOSFET Capacitances",
-      "Noise Fundamentals",
-      "Noise in Simple Circuits",
-    ],
-  },
-  {
-    module: "MODULE 6 â€” DIFFERENTIAL PAIR",
-    days: [
-      "Mismatch: Systematic & Random",
-      "Differential Pair Fundamentals",
-      "Differential Offset Analysis",
-    ],
-  },
-  {
-    module: "MODULE 7 â€” FEEDBACK",
-    days: [
-      "Types & Effects of Feedback",
-      "Negative Feedback Design",
-      "Stability & Dominant Pole Compensation",
-    ],
-  },
-  {
-    module: "MODULE 8 â€” OPAMP BASICS",
-    days: [
-      "OpAmp Basics",
-      "OpAmp with Active Load",
-      "Differential Amplifier using OpAmp\nActive Load",
-    ],
-  },
-  {
-    module: "MODULE 9 â€” TELESCOPIC OPAMP",
-    days: [
-      "Telescopic OpAmp Structure",
-      "Telescopic OpAmp Biasing",
-      "Telescopic OpAmp Gain Analysis",
-      "Telescopic OpAmp Limitations",
-    ],
-  },
-  {
-    module: "MODULE 10 â€” FOLDED CASCODE OPAMP",
-    days: [
-      "Folded Cascode Concept",
-      "Folded Cascode Biasing",
-      "Folded Cascode Gain Analysis",
-      "Folded Cascode Advantages",
-    ],
-  },
-  {
-    module: "MODULE 11 â€” TWO STAGE OPAMP",
-    days: [
-      "Two Stage OpAmp Architecture",
-      "Gain Distribution",
-      "Miller Compensation",
-      "Frequency Stability",
-    ],
-  },
-  {
-    module: "MODULE 12 â€” ANALOG BLOCK PROJECTS",
-    days: [
-      "Common Source Amplifier Simulation",
-      "Current Mirror Design",
-      "Differential Pair Simulation",
-      "Cascode Amplifier Simulation",
-      "Two Stage OpAmp Simulation",
-      "Bandgap Reference Concept",
-      "LDO Regulator Concept",
+      "Build something small",
+      "Revise the full topic",
+      "Plan the next cycle",
+      "Take a light recovery day",
     ],
   },
 ];
@@ -5366,10 +5295,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       return fallback;
     };
 
-    const analog1Topic = getTopic(0, "MOS Concepts");
-    const analog2Topic = getTopic(1, "Numericals");
-    const analog3Topic = getTopic(2, "Reinforcement");
-    const analogRevisionTopic = "Revision";
+    const focusTopic1 = getTopic(0, "Main topic");
+    const focusTopic2 = getTopic(1, "Practice set");
+    const focusTopic3 = getTopic(2, "Review topic");
+    const focusTopic4 = getTopic(3, "Weak area");
 
     const makeTask = (labelPrefix, topic, win, priority, dType, target, phase, secondary = false, scoreWeight = 0) => {
       const progress = this.getTopicProgress(topic);
@@ -5395,22 +5324,20 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       };
     };
     return [
-      makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
-      makeTask("ANALOG SET 1", analog1Topic, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
-      makeTask("BREAK", "Break + Hydration", [8.25, 8.5], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
-      makeTask("ANALOG SET 2", analog2Topic, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
-      makeTask("IB PRACTICE", "IB Practice", [10.5, 12], "MEDIUM", "FLEXIBLE", 90, "Morning", false, 14),
-      makeTask("LUNCH", "Lunch", [12, 12.5], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
-      makeTask("BUILD", "Project / Circuits", [12.5, 14.5], "MEDIUM", "FLEXIBLE", 120, "Core Study", false, 10),
-      makeTask("ANALOG SET 3", analog3Topic, [14.5, 16.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
-      makeTask("IB REVISION", "IB Revision", [16.5, 17.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
-      makeTask("ANALOG REVISION", analogRevisionTopic, [17.5, 18.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
-      makeTask("DINNER", "Dinner", [18.5, 19], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
-      makeTask("WEAK AREA REVIEW", "Weak-area review", [19, 20], "LOW", "FLEXIBLE", 60, "Evening", true, 4),
-      makeTask("TRAINING", "Training", [20, 21], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3),
-      makeTask("FINAL REVISION", "Final revision / recap", [21, 22], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 3),
-      makeTask("WIND DOWN", "Wind down", [22, 23], "LOW", "FLEXIBLE", 60, "Evening", true, 1),
-      makeTask("REST", "Sleep", [23, 28], "HIGH", "STRICT", 300, "Evening", true, 2),
+      makeTask("START", "Plan the day", [6, 6.5], "LOW", "FLEXIBLE", 30, "Morning", false, 3),
+      makeTask("FOCUS BLOCK 1", focusTopic1, [6.5, 8], "MEDIUM", "STRICT", 90, "Morning", false, 10),
+      makeTask("BREAK", "Break + Hydration", [8, 8.25], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
+      makeTask("FOCUS BLOCK 2", focusTopic2, [8.25, 9.5], "MEDIUM", "STRICT", 75, "Core Study", false, 9),
+      makeTask("PRACTICE", "Practice session", [10, 11], "MEDIUM", "FLEXIBLE", 60, "Morning", false, 8),
+      makeTask("LUNCH", "Lunch", [12.5, 13], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+      makeTask("BUILD", "Build / Project / Assignment", [14, 15], "MEDIUM", "FLEXIBLE", 60, "Core Study", false, 7),
+      makeTask("REVIEW", focusTopic3, [16, 17], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 6),
+      makeTask("WALK", "Walk / Reset", [17, 17.5], "LOW", "FLEXIBLE", 30, "Evening", true, 2),
+      makeTask("WEAK AREA", focusTopic4, [18, 19], "LOW", "FLEXIBLE", 60, "Evening", true, 5),
+      makeTask("DINNER", "Dinner", [19.5, 20], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
+      makeTask("LIGHT RECAP", "Quick recap", [20.5, 21], "LOW", "FLEXIBLE", 30, "Evening", false, 3),
+      makeTask("WIND DOWN", "Wind down", [21, 22], "LOW", "FLEXIBLE", 60, "Evening", true, 1),
+      makeTask("REST", "Sleep", [22.5, 30], "HIGH", "STRICT", 450, "Evening", true, 2),
     ];
   }
 
