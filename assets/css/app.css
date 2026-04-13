@@ -1365,6 +1365,120 @@
         );
       }
 
+      .generator-panel {
+        margin: 18px 16px 0;
+        padding: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .generator-panel-head {
+        margin-bottom: 14px;
+      }
+
+      .generator-panel-title {
+        margin: 0 0 6px;
+        font-size: 1rem;
+        color: var(--text-primary);
+      }
+
+      .generator-panel-subtitle {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 0.84rem;
+        line-height: 1.45;
+      }
+
+      .generator-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .generator-card {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(0, 0, 0, 0.22);
+      }
+
+      .generator-card-head h4 {
+        margin: 0 0 4px;
+        font-size: 0.96rem;
+        color: var(--text-primary);
+      }
+
+      .generator-card-head p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .generator-input {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--text-primary);
+        font-size: 0.95rem;
+      }
+
+      .generator-input:focus {
+        outline: none;
+        border-color: rgba(0, 123, 255, 0.75);
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
+      }
+
+      .generator-example {
+        margin: 0;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.03);
+        color: #b8d7ff;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      .generator-status {
+        min-height: 20px;
+        font-size: 0.86rem;
+        color: var(--text-secondary);
+      }
+
+      .generator-status.is-success {
+        color: #79d995;
+      }
+
+      .generator-status.is-error {
+        color: #ff8e8e;
+      }
+
+      .trainer-subsection-title {
+        margin: 0 0 12px;
+        font-size: 0.92rem;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+
+      .timetable-row {
+        grid-template-columns: 148px minmax(0, 1fr) 126px;
+        align-items: start;
+      }
+
+      .timetable-meta {
+        font-size: 0.76rem;
+        color: var(--text-secondary);
+        line-height: 1.45;
+      }
+
       .sleep-journal-head {
         display: flex;
         align-items: flex-start;
@@ -1637,6 +1751,9 @@
         .flow-lab-grid {
           grid-template-columns: 1fr;
         }
+        .generator-grid {
+          grid-template-columns: 1fr;
+        }
         .favorites-grid {
           grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         }
@@ -1646,6 +1763,9 @@
         .task-history-label {
           width: 100%;
           margin-left: 0;
+        }
+        .timetable-row {
+          grid-template-columns: 1fr;
         }
       }
       @media (max-width: 480px) {

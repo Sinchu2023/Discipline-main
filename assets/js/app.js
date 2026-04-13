@@ -1253,9 +1253,11 @@ class DisciplineTracker {
       "open-trainer",
       "trainer-modal",
       "ai-roadmap-topic",
-      "gemini-api-key",
       "generate-roadmap-btn",
       "ai-roadmap-status",
+      "ai-timetable-topic",
+      "generate-timetable-btn",
+      "ai-timetable-status",
       "trainer-overview",
       "trainer-content",
       "close-trainer",
@@ -5095,6 +5097,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           completed: false,
         })),
       })),
+      timetable: null,
       editMode: false,
       startedAt: Date.now(),
     });
@@ -5112,6 +5115,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const merged = createFromTemplate();
     merged.editMode = !!stored.editMode;
     merged.startedAt = stored.startedAt || merged.startedAt;
+    merged.timetable =
+      stored.timetable && Array.isArray(stored.timetable.schedule)
+        ? stored.timetable
+        : null;
     merged.modules.forEach((module, mi) => {
       const fromStored = stored.modules[mi];
       if (!fromStored) return;
@@ -5662,86 +5669,172 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     el.textContent = `${pending} tasks  Reset if loss`;
   }
 
-  async generateAIRoadmap() {
+  setGeneratorStatus(key, message, kind = "idle") {
+    const el = this.app.elements[key];
+    if (!el) return;
+    el.textContent = message || "";
+    el.classList.remove("is-success", "is-error");
+    if (kind === "success") el.classList.add("is-success");
+    if (kind === "error") el.classList.add("is-error");
+  }
+
+  buildTopicTokens(rawTopic = "") {
+    const cleaned = String(rawTopic)
+      .replace(/[|]/g, "/")
+      .replace(/\s+/g, " ")
+      .trim();
+    const parts = cleaned
+      .split(/,|\/|\+|&/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return parts.length ? parts : [cleaned || "Focused Study"];
+  }
+
+  titleCase(text = "") {
+    return String(text)
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  buildGeneratedRoadmap(topic) {
+    const tokens = this.buildTopicTokens(topic);
+    const primary = this.titleCase(tokens[0] || topic);
+    const secondary = this.titleCase(tokens[1] || `${primary} Practice`);
+    const tertiary = this.titleCase(tokens[2] || `${primary} Revision`);
+
+    return {
+      modules: [
+        {
+          module: `${primary.toUpperCase()} FOUNDATIONS`,
+          days: [
+            { day: 1, topic: `${primary}: core principles and vocabulary` },
+            { day: 2, topic: `${primary}: baseline notes and concept map` },
+            { day: 3, topic: `${primary}: worked examples and first pass problems` },
+          ],
+        },
+        {
+          module: `${primary.toUpperCase()} CORE SYSTEMS`,
+          days: [
+            { day: 4, topic: `${primary}: key mechanisms and patterns` },
+            { day: 5, topic: `${secondary}: guided problem solving` },
+            { day: 6, topic: `${secondary}: error log and correction pass` },
+          ],
+        },
+        {
+          module: `${primary.toUpperCase()} EXECUTION`,
+          days: [
+            { day: 7, topic: `${primary}: timed deep-work block` },
+            { day: 8, topic: `${tertiary}: spaced revision and active recall` },
+            { day: 9, topic: `${primary}: mock application or mini project` },
+          ],
+        },
+        {
+          module: `${primary.toUpperCase()} CONSOLIDATION`,
+          days: [
+            { day: 10, topic: `${secondary}: weak-area repair` },
+            { day: 11, topic: `${tertiary}: exam-style recap` },
+            { day: 12, topic: `${primary}: final review and next-cycle planning` },
+          ],
+        },
+      ],
+    };
+  }
+
+  buildGeneratedTimetable(topic) {
+    const tokens = this.buildTopicTokens(topic);
+    const blockA = this.titleCase(tokens[0] || "Core Study");
+    const blockB = this.titleCase(tokens[1] || `${blockA} Practice`);
+    const blockC = this.titleCase(tokens[2] || `${blockA} Revision`);
+    const blockD = this.titleCase(tokens[3] || "Project Work");
+
+    return {
+      title: `${blockA} Daily Timetable`,
+      sourceTopic: topic,
+      schedule: [
+        { label: "DEEP START", focus: blockA, time: "05:00-07:00", intensity: "HIGH", mode: "STRICT", duration: 120, phase: "Morning", optional: false, score: 16 },
+        { label: "BREAK", focus: "Hydration + reset", time: "07:00-07:20", intensity: "LOW", mode: "FLEXIBLE", duration: 20, phase: "Breaks", optional: true, score: 1 },
+        { label: "CORE BLOCK 2", focus: blockB, time: "07:20-09:20", intensity: "HIGH", mode: "STRICT", duration: 120, phase: "Morning", optional: false, score: 14 },
+        { label: "PRACTICE", focus: `${blockA} problems`, time: "09:30-11:00", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 90, phase: "Core Study", optional: false, score: 10 },
+        { label: "LUNCH", focus: "Lunch", time: "12:00-12:40", intensity: "LOW", mode: "FLEXIBLE", duration: 40, phase: "Breaks", optional: true, score: 1 },
+        { label: "BUILD", focus: blockD, time: "12:45-14:15", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 90, phase: "Core Study", optional: false, score: 9 },
+        { label: "REVISION", focus: blockC, time: "14:30-15:30", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: false, score: 6 },
+        { label: "WEAK AREA", focus: `${blockA} weak-area review`, time: "16:00-17:00", intensity: "LOW", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: true, score: 4 },
+        { label: "TRAINING", focus: "Training", time: "20:00-21:00", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: true, score: 3 },
+        { label: "FINAL RECAP", focus: `${blockA} recap`, time: "21:00-22:00", intensity: "MEDIUM", mode: "FLEXIBLE", duration: 60, phase: "Evening", optional: false, score: 3 },
+        { label: "REST", focus: "Sleep", time: "23:00-04:30", intensity: "HIGH", mode: "STRICT", duration: 330, phase: "Night", optional: true, score: 2 },
+      ],
+    };
+  }
+
+  generateAIRoadmap() {
     const topicEl = this.app.elements["ai-roadmap-topic"];
-    const keyEl = this.app.elements["gemini-api-key"];
-    const statusEl = this.app.elements["ai-roadmap-status"];
-
     const topic = topicEl?.value.trim();
-    const apiKey = keyEl?.value.trim();
 
-    if (!topic || !apiKey) {
-      alert("Please provide both a topic and a Gemini API key.");
+    if (!topic) {
+      this.setGeneratorStatus(
+        "ai-roadmap-status",
+        "Enter a roadmap topic first.",
+        "error",
+      );
       return;
     }
 
-    localStorage.setItem("gemini_api_key_saved", apiKey);
-
-    if (statusEl) {
-      statusEl.style.display = "block";
-      statusEl.textContent = `Generating AI roadmap for "${topic}"... Please wait.`;
-      statusEl.style.color = "var(--text-secondary)";
-    }
-
-    try {
-      const prompt = `Create a learning roadmap for the topic: "${topic}". 
-            Return ONLY valid JSON using this exact structure, with no markdown formatting around it:
-            {"modules":[{"module":"MODULE 1 NAME","days":[{"day":1,"topic":"Topic name","status":"active"},{"day":2,"topic":"Topic name","status":"locked"}]}]}
-            Requirements: multiple modules, multiple learning steps per module (each step is one day), day numbers MUST continue sequentially across all modules (1, 2, 3, 4...). Only day 1 status is active, rest locked.`;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-
-      if (!response.ok) throw new Error("API request failed. Check your key.");
-
-      const data = await response.json();
-      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!textResponse) throw new Error("Invalid response from AI");
-
-      let jsonStr = textResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
-      const roadmapJson = JSON.parse(jsonStr);
-      console.log("Parsed AI Roadmap:", roadmapJson);
-
-      if (!roadmapJson.modules || !Array.isArray(roadmapJson.modules)) throw new Error("Missing modules array in JSON");
-
-      const internalRoadmap = {
-        modules: roadmapJson.modules.map(m => ({
-          name: m.module,
-          days: m.days.map(d => ({
-            day: `Day ${d.day}`,
-            text: d.topic,
-            completed: false
-          }))
+    const roadmapJson = this.buildGeneratedRoadmap(topic);
+    this.state.roadmap = {
+      modules: roadmapJson.modules.map((module) => ({
+        name: module.module,
+        days: module.days.map((day) => ({
+          day: `Day ${day.day}`,
+          text: day.topic,
+          completed: false,
         })),
-        editMode: false
-      };
+      })),
+      timetable: this.state.roadmap?.timetable || null,
+      editMode: false,
+      startedAt: Date.now(),
+      sourceTopic: topic,
+    };
 
-      if (internalRoadmap.modules.length > 0) {
-        this.state.roadmap = internalRoadmap;
-        this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
-        this.refresh();
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.ROADMAP_STATE,
+      this.state.roadmap,
+    );
+    this.refresh();
+    this.setGeneratorStatus(
+      "ai-roadmap-status",
+      `Roadmap generated for "${topic}".`,
+      "success",
+    );
+  }
 
-        if (statusEl) {
-          statusEl.textContent = "Roadmap generated successfully!";
-          statusEl.style.color = "var(--success)";
-        }
-        if (topicEl) topicEl.value = "";
-      } else {
-        throw new Error("Generated roadmap was empty");
-      }
-    } catch (e) {
-      console.error(e);
-      if (statusEl) {
-        statusEl.textContent = "Error: " + e.message;
-        statusEl.style.color = "var(--danger)";
-      }
+  generateAITimetable() {
+    const topicEl = this.app.elements["ai-timetable-topic"];
+    const topic = topicEl?.value.trim();
+
+    if (!topic) {
+      this.setGeneratorStatus(
+        "ai-timetable-status",
+        "Enter a timetable topic first.",
+        "error",
+      );
+      return;
     }
+
+    const timetable = this.buildGeneratedTimetable(topic);
+    this.ensureRoadmap();
+    this.state.roadmap.timetable = timetable;
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.ROADMAP_STATE,
+      this.state.roadmap,
+    );
+    this.renderRoadmap();
+    this.setGeneratorStatus(
+      "ai-timetable-status",
+      `Timetable generated for "${topic}".`,
+      "success",
+    );
   }
 
   renderRoadmap() {
@@ -5755,7 +5848,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       content.innerHTML = `
                <div style="text-align: center; padding: 40px 20px;">
                  <h3 style="color: var(--text-accent); margin-bottom: 12px;">Roadmap not generated yet</h3>
-                 <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">Enter a topic and your Gemini API key above to generate your private AI roadmap.</p>
+                 <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem;">Use the structured generator above to create a roadmap and timetable for this account.</p>
                </div>
              `;
       return;
@@ -5773,6 +5866,15 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         `;
 
     let html = "";
+    if (this.state.roadmap.timetable?.schedule?.length) {
+      html += `<section class="trainer-section"><div class="trainer-section-title">Daily Timetable</div><div class="trainer-subsection-title">${this.escapeHtml(this.state.roadmap.timetable.title || "Structured schedule")}</div>`;
+      this.state.roadmap.timetable.schedule.forEach((entry) => {
+        const optionalLabel = entry.optional ? "Optional" : "Required";
+        html += `<div class="trainer-row timetable-row"><div class="trainer-key">${this.escapeHtml(entry.time || "")}<div class="timetable-meta">${this.escapeHtml(entry.phase || "")}</div></div><div class="trainer-val">${this.escapeHtml(entry.label || "")}<div class="timetable-meta">${this.escapeHtml(entry.focus || "")}</div></div><div class="timetable-meta">${this.escapeHtml(entry.intensity || "")} • ${this.escapeHtml(entry.mode || "")}<br>${this.app.formatDuration(Number(entry.duration || 0))} • ${optionalLabel}</div></div>`;
+      });
+      html += `</section>`;
+    }
+
     this.state.roadmap.modules.forEach((mod, mi) => {
       const unlocked = mi <= moduleIndex;
       const done = mod.days.every((d) => d.completed);
@@ -7089,15 +7191,14 @@ class EventManager {
     );
     this.app.elements["open-trainer"].addEventListener("click", () => {
       this.app.trainerEngine.showWindow();
-      const keyInput = this.app.elements["gemini-api-key"];
-      if (keyInput && !keyInput.value) {
-        const savedKey = localStorage.getItem("gemini_api_key_saved");
-        if (savedKey) keyInput.value = savedKey;
-      }
     });
     const genBtn = this.app.elements["generate-roadmap-btn"];
     if (genBtn) {
       genBtn.addEventListener("click", () => this.app.trainerEngine.generateAIRoadmap());
+    }
+    const timeBtn = this.app.elements["generate-timetable-btn"];
+    if (timeBtn) {
+      timeBtn.addEventListener("click", () => this.app.trainerEngine.generateAITimetable());
     }
     this.app.elements["export-data"].addEventListener("click", () =>
       (this.app.uiManager.exportData(), this.app.cloudManager.closeProfileMenu()),

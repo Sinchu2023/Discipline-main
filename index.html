@@ -492,17 +492,42 @@
             <div class="trainer-overview" id="trainer-overview"></div>
             <div id="trainer-content"></div>
 
-            <!-- AI Roadmap Generator -->
-            <form class="ai-roadmap-generator" style="margin-top: 20px; padding: 15px; border: 1px solid var(--border); border-radius: 8px;" onsubmit="return false;">
-              <h3 style="margin-top:0; margin-bottom: 10px; font-size: 1.1em; color: var(--text-primary);"><i class="fas fa-magic"></i> AI Roadmap Generator</h3>
-              <p style="font-size: 0.9em; color: var(--text-secondary); margin-bottom: 10px;">Enter a topic and your Gemini API key to auto-generate a structured learning roadmap.</p>
-              <input type="password" id="gemini-api-key" placeholder="Enter Gemini API Key..." autocomplete="off" style="width: 100%; margin-bottom: 10px; padding: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px;" />
-              <div style="display: flex; gap: 10px;">
-                <input type="text" id="ai-roadmap-topic" placeholder="e.g. Analog IC Design" style="flex: 1; padding: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px;" />
-                <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Generate Roadmap</button>
+            <section class="generator-panel" aria-label="Structured generators">
+              <div class="generator-panel-head">
+                <h3 class="generator-panel-title"><i class="fas fa-magic"></i> Structured Generators</h3>
+                <p class="generator-panel-subtitle">Generate roadmap and timetable data directly into the Roadmap Console using local structured templates.</p>
               </div>
-              <div id="ai-roadmap-status" style="margin-top: 10px; font-size: 0.9em; color: var(--text-secondary); display: none;"></div>
-            </form>
+              <div class="generator-grid">
+                <form class="generator-card" onsubmit="return false;">
+                  <div class="generator-card-head">
+                    <h4><i class="fas fa-route"></i> Generate Roadmap</h4>
+                    <p>Creates module and day progression JSON-style data for the active account.</p>
+                  </div>
+                  <input type="text" id="ai-roadmap-topic" class="generator-input" placeholder="e.g. Analog IC Design" />
+                  <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Generate Roadmap</button>
+                  <pre class="generator-example">{
+  "modules": [
+    { "module": "FOUNDATIONS", "days": [{ "day": 1, "topic": "Core concepts" }] }
+  ]
+}</pre>
+                  <div id="ai-roadmap-status" class="generator-status"></div>
+                </form>
+                <form class="generator-card" onsubmit="return false;">
+                  <div class="generator-card-head">
+                    <h4><i class="fas fa-calendar-day"></i> Generate Timetable</h4>
+                    <p>Builds a daily execution schedule and shows it in the Roadmap Console.</p>
+                  </div>
+                  <input type="text" id="ai-timetable-topic" class="generator-input" placeholder="e.g. IB + Analog IC + Project Work" />
+                  <button class="btn btn-primary" id="generate-timetable-btn" type="button"><i class="fas fa-table"></i> Generate Timetable</button>
+                  <pre class="generator-example">{
+  "schedule": [
+    { "label": "CORE BLOCK", "focus": "Deep work", "time": "05:00-07:00" }
+  ]
+}</pre>
+                  <div id="ai-timetable-status" class="generator-status"></div>
+                </form>
+              </div>
+            </section>
 
             <section class="sleep-journal-panel" id="sleep-journal-panel">
               <div class="sleep-journal-head">
