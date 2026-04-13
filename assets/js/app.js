@@ -75,29 +75,6 @@ const CONFIG = {
     MAX_TEXT_LEN: 180,
     MIN_MISSION_UPDATE_INTERVAL_MS: 2500,
   },
-  DAILY_GOALS: [
-    {
-      id: "nptel",
-      label: "NPTEL",
-      minutesTarget: 120,
-      sessionsTarget: 2,
-      keywords: ["nptel"],
-    },
-    {
-      id: "yt",
-      label: "YouTube Learning",
-      minutesTarget: 120,
-      sessionsTarget: 2,
-      keywords: ["youtube", "yt"],
-    },
-    {
-      id: "project",
-      label: "Project Work",
-      minutesTarget: 180,
-      sessionsTarget: 0,
-      keywords: ["project"],
-    },
-  ],
 };
 
 const ANALOG_IC_ROADMAP_TEMPLATE = [
@@ -3670,85 +3647,46 @@ class ShadowEngine {
   }
 
   getTodayGoalProgress(dateStr = this.app.getDateString(new Date())) {
-    const goals = CONFIG.DAILY_GOALS || [];
-    const progress = {};
+    const missionTasks =
+      this.app.trainerEngine?.getDailyMissionTasks?.() || [];
 
-    goals.forEach((goal) => {
-      progress[goal.id] = {
-        minutes: 0,
-        sessions: 0,
-        minutesTarget: goal.minutesTarget || 0,
-        sessionsTarget: goal.sessionsTarget || 0,
+    return missionTasks.map((item, index) => {
+      const topic = item?.topic || item?.label || `mission-${index + 1}`;
+      const tracked =
+        this.app.trainerEngine?.getTopicProgress?.(topic, dateStr) || {
+          minutes: 0,
+          sessions: 0,
+        };
+      const minutesTarget = Math.max(0, Number(item?.target_minutes || 0));
+      const scoreWeight = Math.max(0, Number(item?.score_weight || 0));
+
+      return {
+        id: String(item?.label || item?.topic || `mission-${index + 1}`),
+        label: item?.label || topic,
+        topic,
+        minutes: Number(tracked.minutes || 0),
+        sessions: Number(tracked.sessions || 0),
+        minutesTarget,
+        scoreWeight,
+        done: minutesTarget > 0 && Number(tracked.minutes || 0) >= minutesTarget,
+        secondary: !!item?.secondary,
       };
     });
-
-    this.app.state.tasks.forEach((task) => {
-      if (
-        !task ||
-        task.date !== dateStr ||
-        !Number.isFinite(task.duration) ||
-        task.duration <= 0
-      )
-        return;
-      const haystack =
-        `${task.description || ""} ${task.subcategory || ""} ${task.category || ""}`.toLowerCase();
-      goals.forEach((goal) => {
-        if (!goal.keywords?.some((word) => haystack.includes(word)))
-          return;
-        progress[goal.id].minutes += task.duration;
-        progress[goal.id].sessions += 1;
-      });
-    });
-
-    return progress;
   }
 
   calculateMissionScore(progress) {
-    const nptel = progress.nptel || {
-      minutes: 0,
-      sessions: 0,
-      minutesTarget: 120,
-      sessionsTarget: 2,
-    };
-    const yt = progress.yt || {
-      minutes: 0,
-      sessions: 0,
-      minutesTarget: 120,
-      sessionsTarget: 2,
-    };
-    const project = progress.project || {
-      minutes: 0,
-      sessions: 0,
-      minutesTarget: 180,
-      sessionsTarget: 0,
-    };
+    const items = Array.isArray(progress) ? progress : Object.values(progress || {});
+    let totalWeight = 0;
+    let completedWeight = 0;
 
-    const nptelMinutesRatio = Math.min(
-      1,
-      nptel.minutes / Math.max(1, nptel.minutesTarget),
-    );
-    const nptelSessionsRatio = Math.min(
-      1,
-      nptel.sessions / Math.max(1, nptel.sessionsTarget),
-    );
-    const ytMinutesRatio = Math.min(
-      1,
-      yt.minutes / Math.max(1, yt.minutesTarget),
-    );
-    const ytSessionsRatio = Math.min(
-      1,
-      yt.sessions / Math.max(1, yt.sessionsTarget),
-    );
-    const projectRatio = Math.min(
-      1,
-      project.minutes / Math.max(1, project.minutesTarget),
-    );
+    items.forEach((item) => {
+      const weight = Math.max(0, Number(item?.scoreWeight || 0));
+      totalWeight += weight;
+      if (item?.done) completedWeight += weight;
+    });
 
-    const nptelScore =
-      (nptelMinutesRatio * 0.5 + nptelSessionsRatio * 0.5) * 30;
-    const ytScore = (ytMinutesRatio * 0.5 + ytSessionsRatio * 0.5) * 30;
-    const projectScore = projectRatio * 40;
-    return Math.round(Math.min(100, nptelScore + ytScore + projectScore));
+    if (totalWeight <= 0) return 0;
+    return Math.round((completedWeight / totalWeight) * 100);
   }
 
   getTodayDistractionMinutes(
