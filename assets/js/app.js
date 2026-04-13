@@ -5991,13 +5991,49 @@ Reference example:
 ${JSON.stringify(roadmapJson, null, 2)}`;
   }
 
+  buildTaskPromptRoadmapContext() {
+    this.ensureRoadmap();
+    const modules = this.state.roadmap?.modules || [];
+    const active = this.getActiveRoadmapDay();
+    const roadmapLines = [];
+
+    modules.forEach((module, moduleIndex) => {
+      const pendingDays = (module.days || [])
+        .filter((day) => !day.completed)
+        .slice(0, 4)
+        .map((day) => `- ${String(day.text || "").split("\n")[0].trim()}`)
+        .join("\n");
+      if (!pendingDays) return;
+      roadmapLines.push(
+        `${moduleIndex + 1}. ${module.name}\n${pendingDays}`,
+      );
+    });
+
+    const activeLine = active?.day?.text
+      ? String(active.day.text).split("\n")[0].trim()
+      : "No active roadmap day";
+
+    return `Roadmap alignment is mandatory.
+
+Current active roadmap day:
+- ${activeLine}
+
+Pending roadmap topics:
+${roadmapLines.join("\n\n") || "- No pending roadmap topics found"}`;
+  }
+
   buildTaskPromptSpec(topic) {
-    return `You are helping me create a daily scheduler code block for "${topic}".
+    const roadmapContext = this.buildTaskPromptRoadmapContext();
+    return `You are helping me create a daily scheduler code block.
 
 Return ONLY code.
 Do not use markdown.
 Do not explain anything.
 Do not add comments.
+
+The generated task plan MUST follow the roadmap topics below.
+Do not invent an unrelated schedule.
+Use the roadmap as the primary source of task focus.
 
 You must return the final answer in this exact shape:
 return [
@@ -6016,6 +6052,9 @@ Rules:
 8. Optional flag must be true or false.
 9. Score must be an integer.
 10. Output only the code block, nothing else.
+11. Use real quoted strings for topics. Do not use placeholder variables like analog1Topic.
+12. The task focus values must be derived from the roadmap topics.
+13. If extra user context exists, use it only as secondary guidance after the roadmap.
 
 Use this exact style reference:
 return [
@@ -6037,8 +6076,10 @@ return [
   makeTask("REST", "Sleep", [23, 28], "HIGH", "STRICT", 300, "Evening", true, 2),
 ];
 
-Now create a new schedule for this topic set:
-${topic}`;
+${roadmapContext}
+
+Additional user context:
+${topic || "No extra context provided"}`;
   }
 
   generateAIRoadmap() {
@@ -6067,12 +6108,12 @@ ${topic}`;
 
   generateTaskPrompt() {
     const topicEl = this.app.elements["ai-task-topic"];
-    const topic = topicEl?.value.trim();
-
-    if (!topic) {
+    const topic = topicEl?.value.trim() || "";
+    this.ensureRoadmap();
+    if (!this.state.roadmap?.modules?.length) {
       this.setGeneratorStatus(
         "ai-task-status",
-        "Enter your task/topic set first.",
+        "Apply a roadmap first.",
         "error",
       );
       return;
