@@ -45,7 +45,7 @@ const CONFIG = {
   },
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  STORAGE_KEYS: {
+    STORAGE_KEYS: {
     TASKS: "discipline_tracker_tasks",
     FAVORITES: "discipline_tracker_favorites",
     STREAK: "discipline_tracker_streak",
@@ -59,12 +59,16 @@ const CONFIG = {
     TRAINER_STATE: "discipline_tracker_trainer_state",
     FLOW_PROTOCOL: "discipline_tracker_flow_protocol",
     ROADMAP_STATE: "discipline_tracker_roadmap_state",
-    JOURNAL_ENTRIES: "discipline_tracker_journal_entries",
-    FIREBASE_USER: "discipline_tracker_firebase_user",
-    CLIENT_VERSION: "discipline_tracker_client_version",
-    TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
-    SHADOW_ENGINE_STATE: "discipline_tracker_shadow_engine_state",
-  },
+      JOURNAL_ENTRIES: "discipline_tracker_journal_entries",
+      FIREBASE_USER: "discipline_tracker_firebase_user",
+      CLIENT_VERSION: "discipline_tracker_client_version",
+      TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
+      SHADOW_ENGINE_STATE: "discipline_tracker_shadow_engine_state",
+      ROADMAP_PROMPT_DRAFT: "discipline_tracker_roadmap_prompt_draft",
+      ROADMAP_RESPONSE_DRAFT: "discipline_tracker_roadmap_response_draft",
+      TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
+      TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
+    },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
   FIREBASE_PROTECTION: {
@@ -1256,11 +1260,15 @@ class DisciplineTracker {
       "generate-roadmap-btn",
       "copy-roadmap-prompt-btn",
       "ai-roadmap-output",
+      "ai-roadmap-response",
+      "apply-roadmap-response-btn",
       "ai-roadmap-status",
       "ai-task-topic",
       "generate-task-prompt-btn",
       "copy-task-prompt-btn",
       "ai-task-output",
+      "ai-task-response",
+      "save-task-response-btn",
       "ai-task-status",
       "trainer-overview",
       "trainer-content",
@@ -5745,6 +5753,14 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const el = this.app.elements[key];
     if (!el) return;
     el.value = value || "";
+    const storageMap = {
+      "ai-roadmap-output": CONFIG.STORAGE_KEYS.ROADMAP_PROMPT_DRAFT,
+      "ai-roadmap-response": CONFIG.STORAGE_KEYS.ROADMAP_RESPONSE_DRAFT,
+      "ai-task-output": CONFIG.STORAGE_KEYS.TASK_PROMPT_DRAFT,
+      "ai-task-response": CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT,
+    };
+    const storageKey = storageMap[key];
+    if (storageKey) this.app.saveToStorage(storageKey, el.value);
   }
 
   copyGeneratorOutput(outputKey, statusKey, emptyMessage, successMessage) {
@@ -5766,6 +5782,82 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           "error",
         );
       });
+  }
+
+  hydrateGeneratorDrafts() {
+    [
+      ["ai-roadmap-output", CONFIG.STORAGE_KEYS.ROADMAP_PROMPT_DRAFT],
+      ["ai-roadmap-response", CONFIG.STORAGE_KEYS.ROADMAP_RESPONSE_DRAFT],
+      ["ai-task-output", CONFIG.STORAGE_KEYS.TASK_PROMPT_DRAFT],
+      ["ai-task-response", CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT],
+    ].forEach(([elementKey, storageKey]) => {
+      const value = this.app.loadFromStorage(storageKey);
+      const el = this.app.elements[elementKey];
+      if (el && typeof value === "string") el.value = value;
+    });
+  }
+
+  normalizeExternalText(raw = "") {
+    return String(raw)
+      .replace(/```json/gi, "")
+      .replace(/```javascript/gi, "")
+      .replace(/```js/gi, "")
+      .replace(/```/g, "")
+      .trim();
+  }
+
+  applyRoadmapResponse() {
+    const responseEl = this.app.elements["ai-roadmap-response"];
+    const raw = responseEl?.value?.trim();
+    if (!raw) {
+      this.setGeneratorStatus("ai-roadmap-status", "Paste roadmap JSON first.", "error");
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(this.normalizeExternalText(raw));
+      if (!Array.isArray(parsed.modules) || !parsed.modules.length) {
+        throw new Error("Missing modules array.");
+      }
+
+      const roadmap = {
+        modules: parsed.modules.map((module) => ({
+          name: String(module.module || module.name || "MODULE").trim(),
+          days: Array.isArray(module.days)
+            ? module.days.map((day, index) => ({
+                day: `Day ${Number(day.day || index + 1)}`,
+                text: String(day.topic || day.text || "").trim() || `Step ${index + 1}`,
+                completed: false,
+              }))
+            : [],
+        })).filter((module) => module.days.length),
+        editMode: false,
+        startedAt: Date.now(),
+      };
+
+      if (!roadmap.modules.length) {
+        throw new Error("No valid roadmap modules found.");
+      }
+
+      this.state.roadmap = roadmap;
+      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+      this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_RESPONSE_DRAFT, raw);
+      this.refresh();
+      this.setGeneratorStatus("ai-roadmap-status", "Roadmap applied.", "success");
+    } catch (error) {
+      this.setGeneratorStatus("ai-roadmap-status", `Invalid roadmap JSON. ${error.message}`, "error");
+    }
+  }
+
+  saveTaskResponse() {
+    const responseEl = this.app.elements["ai-task-response"];
+    const raw = responseEl?.value?.trim();
+    if (!raw) {
+      this.setGeneratorStatus("ai-task-status", "Paste makeTask code first.", "error");
+      return;
+    }
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT, raw);
+    this.setGeneratorStatus("ai-task-status", "Code saved.", "success");
   }
 
   buildRoadmapPromptSpec(topic) {
@@ -5872,7 +5964,7 @@ ${topic}`;
     );
     this.setGeneratorStatus(
       "ai-roadmap-status",
-      `Roadmap prompt generated for "${topic}". Copy it and send it to another AI.`,
+      "Prompt ready.",
       "success",
     );
   }
@@ -5896,7 +5988,7 @@ ${topic}`;
     );
     this.setGeneratorStatus(
       "ai-task-status",
-      `Task-format prompt generated for "${topic}". Copy it and send it to another AI.`,
+      "Prompt ready.",
       "success",
     );
   }
@@ -6139,6 +6231,7 @@ ${topic}`;
   }
 
   showWindow() {
+    this.hydrateGeneratorDrafts();
     this.refresh();
     this.app.uiManager?.renderSleepJournal?.();
     this.app.elements["trainer-modal"].style.display = "flex";
@@ -7258,8 +7351,14 @@ class EventManager {
           "ai-roadmap-output",
           "ai-roadmap-status",
           "Generate a roadmap prompt first.",
-          "Roadmap prompt copied.",
+          "Copied.",
         ),
+      );
+    }
+    const applyRoadmapBtn = this.app.elements["apply-roadmap-response-btn"];
+    if (applyRoadmapBtn) {
+      applyRoadmapBtn.addEventListener("click", () =>
+        this.app.trainerEngine.applyRoadmapResponse(),
       );
     }
     const taskBtn = this.app.elements["generate-task-prompt-btn"];
@@ -7273,8 +7372,14 @@ class EventManager {
           "ai-task-output",
           "ai-task-status",
           "Generate a task prompt first.",
-          "Task-format prompt copied.",
+          "Copied.",
         ),
+      );
+    }
+    const saveTaskBtn = this.app.elements["save-task-response-btn"];
+    if (saveTaskBtn) {
+      saveTaskBtn.addEventListener("click", () =>
+        this.app.trainerEngine.saveTaskResponse(),
       );
     }
     this.app.elements["export-data"].addEventListener("click", () =>

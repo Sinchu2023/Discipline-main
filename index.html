@@ -495,33 +495,39 @@
             <section class="generator-panel" aria-label="Structured generators">
               <div class="generator-panel-head">
                 <h3 class="generator-panel-title"><i class="fas fa-magic"></i> Structured Generators</h3>
-                <p class="generator-panel-subtitle">Generate copy-ready prompt blocks you can send to another AI to get roadmap JSON or exact `makeTask(...)` lines back.</p>
+                <p class="generator-panel-subtitle">Paste it into any other AI.</p>
               </div>
               <div class="generator-grid">
                 <form class="generator-card" onsubmit="return false;">
                   <div class="generator-card-head">
-                    <h4><i class="fas fa-route"></i> Generate Roadmap</h4>
-                    <p>Builds a strict prompt that asks another AI to return roadmap JSON in the exact structure you need.</p>
+                    <h4><i class="fas fa-route"></i> Roadmap</h4>
                   </div>
                   <input type="text" id="ai-roadmap-topic" class="generator-input" placeholder="e.g. Analog IC Design" />
                   <div class="generator-actions">
-                    <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Generate Roadmap Prompt</button>
+                    <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Prompt</button>
                     <button class="btn" id="copy-roadmap-prompt-btn" type="button"><i class="fas fa-copy"></i> Copy</button>
                   </div>
-                  <textarea id="ai-roadmap-output" class="generator-output" readonly placeholder="Generated roadmap prompt will appear here."></textarea>
+                  <textarea id="ai-roadmap-output" class="generator-output" readonly placeholder="Prompt"></textarea>
+                  <textarea id="ai-roadmap-response" class="generator-output generator-response" placeholder="Paste roadmap JSON here"></textarea>
+                  <div class="generator-actions">
+                    <button class="btn" id="apply-roadmap-response-btn" type="button"><i class="fas fa-download"></i> Apply</button>
+                  </div>
                   <div id="ai-roadmap-status" class="generator-status"></div>
                 </form>
                 <form class="generator-card" onsubmit="return false;">
                   <div class="generator-card-head">
-                    <h4><i class="fas fa-code"></i> Generate Task Format</h4>
-                    <p>Builds a strict prompt that asks another AI to return only `makeTask(...)` lines in your exact scheduler format.</p>
+                    <h4><i class="fas fa-code"></i> Task Format</h4>
                   </div>
                   <input type="text" id="ai-task-topic" class="generator-input" placeholder="e.g. IB + Analog IC + Project Work" />
                   <div class="generator-actions">
-                    <button class="btn btn-primary" id="generate-task-prompt-btn" type="button"><i class="fas fa-code"></i> Generate Task Prompt</button>
+                    <button class="btn btn-primary" id="generate-task-prompt-btn" type="button"><i class="fas fa-code"></i> Prompt</button>
                     <button class="btn" id="copy-task-prompt-btn" type="button"><i class="fas fa-copy"></i> Copy</button>
                   </div>
-                  <textarea id="ai-task-output" class="generator-output" readonly placeholder="Generated task-format prompt will appear here."></textarea>
+                  <textarea id="ai-task-output" class="generator-output" readonly placeholder="Prompt"></textarea>
+                  <textarea id="ai-task-response" class="generator-output generator-response" placeholder="Paste makeTask(...) code here"></textarea>
+                  <div class="generator-actions">
+                    <button class="btn" id="save-task-response-btn" type="button"><i class="fas fa-save"></i> Save</button>
+                  </div>
                   <div id="ai-task-status" class="generator-status"></div>
                 </form>
               </div>
