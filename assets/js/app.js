@@ -6079,7 +6079,10 @@ Rules:
 5. Create 3 days per module.
 6. Keep module names uppercase and concise.
 7. Keep each topic practical and specific.
-8. Output JSON only.
+8. Make the roadmap fit the user's actual domain and goal, whatever it is.
+9. Do not assume Analog, IB, bodybuilding, or any other fixed domain unless the topic explicitly says so.
+10. Write topics that can later be used directly in task blocks.
+11. Output JSON only.
 
 Reference example:
 ${JSON.stringify(roadmapJson, null, 2)}`;
