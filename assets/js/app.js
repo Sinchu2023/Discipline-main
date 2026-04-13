@@ -5869,8 +5869,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     if (this.state.roadmap.timetable?.schedule?.length) {
       html += `<section class="trainer-section"><div class="trainer-section-title">Daily Timetable</div><div class="trainer-subsection-title">${this.escapeHtml(this.state.roadmap.timetable.title || "Structured schedule")}</div>`;
       this.state.roadmap.timetable.schedule.forEach((entry) => {
-        const optionalLabel = entry.optional ? "Optional" : "Required";
-        html += `<div class="trainer-row timetable-row"><div class="trainer-key">${this.escapeHtml(entry.time || "")}<div class="timetable-meta">${this.escapeHtml(entry.phase || "")}</div></div><div class="trainer-val">${this.escapeHtml(entry.label || "")}<div class="timetable-meta">${this.escapeHtml(entry.focus || "")}</div></div><div class="timetable-meta">${this.escapeHtml(entry.intensity || "")} • ${this.escapeHtml(entry.mode || "")}<br>${this.app.formatDuration(Number(entry.duration || 0))} • ${optionalLabel}</div></div>`;
+        html += `<div class="trainer-row timetable-row"><div class="trainer-key">${this.escapeHtml(entry.time || "")}<div class="timetable-meta">${this.escapeHtml(entry.phase || "")}</div></div><div class="trainer-val">${this.escapeHtml(entry.label || "")}<div class="timetable-meta">${this.escapeHtml(entry.focus || "")}</div></div><div class="timetable-meta">${this.escapeHtml(entry.intensity || "")} � ${this.escapeHtml(entry.mode || "")}<br>${this.app.formatDuration(Number(entry.duration || 0))}</div></div>`;
       });
       html += `</section>`;
     }
@@ -7327,5 +7326,6 @@ window.addEventListener("beforeunload", () => {
   if (window.app?.stopwatch?.tickIntervalId)
     clearInterval(window.app.stopwatch.tickIntervalId);
 });
+
 
 
