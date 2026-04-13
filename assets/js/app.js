@@ -5147,6 +5147,30 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     this.saveTrainerState();
   }
 
+  getDailyRoadmapTopicSlots(limit = 4) {
+    this.ensureRoadmap();
+    const today = this.getCurrentMissionDateKey();
+    const rolloverArmedDate = this.state.roadmapAdvanceAfterDate || null;
+    const canAdvanceToday = !!rolloverArmedDate && rolloverArmedDate !== today;
+
+    let learningSlots = null;
+    if (this.state.roadmapSlotsDate === today) {
+      learningSlots = this.state.roadmapSlots;
+    } else if (this.state.roadmapSlots && !canAdvanceToday) {
+      learningSlots = this.state.roadmapSlots;
+    }
+
+    if (!learningSlots) {
+      learningSlots = this.getPendingRoadmapTopics(limit);
+      this.state.roadmapSlotsDate = today;
+      this.state.roadmapSlots = learningSlots;
+      if (canAdvanceToday) this.state.roadmapAdvanceAfterDate = null;
+      this.saveTrainerState();
+    }
+
+    return (learningSlots || []).slice(0, limit);
+  }
+
   getTodayManualMissionChecks() {
     const today = this.app.getDateString(new Date());
     if (!this.state.manualMissionChecks) {
@@ -5392,16 +5416,16 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       return null;
     }
 
-    const pendingTopics = this.getPendingRoadmapTopics();
-    if (!pendingTopics.length) return null;
+    const dailySlots = this.getDailyRoadmapTopicSlots();
+    if (!dailySlots.length) return null;
 
     const numberMatch = normalized.match(/(\d+)/);
     let topicIndex = Number.isInteger(placeholderIndex) ? placeholderIndex : 0;
     if (numberMatch) topicIndex = Math.max(0, Number(numberMatch[1]) - 1);
 
     const selectedTopic =
-      pendingTopics[Math.min(topicIndex, pendingTopics.length - 1)] ||
-      pendingTopics[0];
+      dailySlots[Math.min(topicIndex, dailySlots.length - 1)] ||
+      dailySlots[0];
 
     if (/(review|revision|recap)/.test(normalized)) {
       return `Review: ${selectedTopic}`;
@@ -5477,26 +5501,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     }
 
     const active = this.getActiveRoadmapDay();
-    const today = this.app.getDateString(new Date());
-    const rolloverArmedDate = this.state.roadmapAdvanceAfterDate || null;
-    const canAdvanceToday = !!rolloverArmedDate && rolloverArmedDate !== today;
-    let learningSlots = null;
-
-    if (this.state.roadmapSlotsDate === today) {
-      learningSlots = this.state.roadmapSlots;
-    } else if (this.state.roadmapSlots && !canAdvanceToday) {
-      learningSlots = this.state.roadmapSlots;
-    }
-
-    if (!learningSlots && active) {
-      const uncompleted = active.module.days.filter(d => !d.completed);
-      learningSlots = uncompleted
-        .slice(0, 4)
-        .map(d => (d.text || "").split("\n")[0].trim());
-      this.state.roadmapSlotsDate = today;
-      this.state.roadmapSlots = learningSlots;
-      if (canAdvanceToday) this.state.roadmapAdvanceAfterDate = null;
-      this.saveTrainerState();
+    let learningSlots = this.getDailyRoadmapTopicSlots(4);
+    if ((!learningSlots || !learningSlots.length) && active) {
+      learningSlots = [(active.day.text || "").split("\n")[0].trim()].filter(Boolean);
     }
 
     const getTopic = (idx, fallback) => {
@@ -5710,8 +5717,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       this.updateMissionChecklistScore();
 
       if (this.syncRoadmapDayFromMissionTopic(cached?.item?.topic, !!e.target.checked)) {
+        this.armRoadmapSlotRollover();
         this.renderRoadmap();
-        this.syncMissionFromRoadmap();
+        this.syncMissionFromRoadmap({ rebuild: false });
         this.app.shadowEngine?.refresh(false);
       }
     }, { passive: true });
@@ -5815,9 +5823,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       if (!active.day.completed && progress.minutes >= this.getThresholdForTopic(topic)) {
         active.day.completed = true;
         this.app.saveToStorage(CONFIG.STORAGE_KEYS.ROADMAP_STATE, this.state.roadmap);
+        this.armRoadmapSlotRollover();
         this.normalizeRoadmapDays();
         this.renderRoadmap();
-        this.syncMissionFromRoadmap({ rebuild: true });
+        this.syncMissionFromRoadmap({ rebuild: false });
         this.app.shadowEngine?.refresh(false);
       }
     }
