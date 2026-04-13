@@ -1221,6 +1221,7 @@
         border-radius: 14px;
         background: rgba(5, 6, 8, 0.85);
         overflow: hidden;
+        min-height: 78vh;
       }
 
       .trainer-terminal-head {
@@ -1293,7 +1294,7 @@
         padding: 16px;
         line-height: 1.5;
         color: #dfe4ea;
-        max-height: 58vh;
+        max-height: 70vh;
         overflow-y: auto;
         font-size: 0.9rem;
         display: grid;
@@ -1491,17 +1492,6 @@
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--text-secondary);
-      }
-
-      .timetable-row {
-        grid-template-columns: 148px minmax(0, 1fr) 126px;
-        align-items: start;
-      }
-
-      .timetable-meta {
-        font-size: 0.76rem;
-        color: var(--text-secondary);
-        line-height: 1.45;
       }
 
       .sleep-journal-head {
@@ -1788,9 +1778,6 @@
         .task-history-label {
           width: 100%;
           margin-left: 0;
-        }
-        .timetable-row {
-          grid-template-columns: 1fr;
         }
       }
       @media (max-width: 480px) {
