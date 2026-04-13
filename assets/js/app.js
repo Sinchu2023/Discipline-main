@@ -68,7 +68,6 @@ const CONFIG = {
       ROADMAP_RESPONSE_DRAFT: "discipline_tracker_roadmap_response_draft",
       TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
       TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
-      GENERATOR_PANEL_OPEN: "discipline_tracker_generator_panel_open",
     },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
@@ -1291,7 +1290,6 @@ class DisciplineTracker {
       "trainer-modal",
       "generator-panel",
       "generator-panel-toggle",
-      "generator-panel-body",
       "ai-roadmap-topic",
       "generate-roadmap-btn",
       "copy-roadmap-prompt-btn",
@@ -5896,28 +5894,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     this.setGeneratorStatus("ai-task-status", "Code saved.", "success");
   }
 
-  setGeneratorPanelOpen(isOpen) {
-    const panel = this.app.elements["generator-panel"];
-    const toggle = this.app.elements["generator-panel-toggle"];
-    const body = this.app.elements["generator-panel-body"];
-    if (!panel || !toggle || !body) return;
-    panel.dataset.open = isOpen ? "true" : "false";
-    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    body.hidden = !isOpen;
-    this.app.saveToStorage(CONFIG.STORAGE_KEYS.GENERATOR_PANEL_OPEN, !!isOpen);
-  }
-
-  toggleGeneratorPanel() {
-    const panel = this.app.elements["generator-panel"];
-    const current = panel?.dataset.open === "true";
-    this.setGeneratorPanelOpen(!current);
-  }
-
-  hydrateGeneratorPanelState() {
-    const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.GENERATOR_PANEL_OPEN);
-    this.setGeneratorPanelOpen(!!stored);
-  }
-
   buildRoadmapPromptSpec(topic) {
     const roadmapJson = this.buildGeneratedRoadmap(topic);
     return `You are helping me create a study roadmap for "${topic}".
@@ -6290,7 +6266,6 @@ ${topic}`;
 
   showWindow() {
     this.hydrateGeneratorDrafts();
-    this.hydrateGeneratorPanelState();
     this.refresh();
     this.app.uiManager?.renderSleepJournal?.();
     this.app.elements["trainer-modal"].style.display = "flex";
@@ -7399,12 +7374,6 @@ class EventManager {
     this.app.elements["open-trainer"].addEventListener("click", () => {
       this.app.trainerEngine.showWindow();
     });
-    const generatorToggle = this.app.elements["generator-panel-toggle"];
-    if (generatorToggle) {
-      generatorToggle.addEventListener("click", () =>
-        this.app.trainerEngine.toggleGeneratorPanel(),
-      );
-    }
     const genBtn = this.app.elements["generate-roadmap-btn"];
     if (genBtn) {
       genBtn.addEventListener("click", () => this.app.trainerEngine.generateAIRoadmap());

@@ -1377,18 +1377,22 @@
         background: rgba(255, 255, 255, 0.02);
       }
 
+      .generator-panel[open] {
+        padding-bottom: 10px;
+      }
+
       .generator-panel-head {
-        width: 100%;
-        margin-bottom: 0;
-        padding: 0;
-        border: 0;
-        background: transparent;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
         cursor: pointer;
         text-align: left;
+        list-style: none;
+      }
+
+      .generator-panel-head::-webkit-details-marker {
+        display: none;
       }
 
       .generator-panel-head-copy {
@@ -1417,7 +1421,7 @@
         transition: transform 160ms ease;
       }
 
-      .generator-panel[data-open="true"] .generator-panel-caret {
+      .generator-panel[open] .generator-panel-caret {
         transform: rotate(180deg);
       }
 
