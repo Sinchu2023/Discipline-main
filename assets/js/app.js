@@ -45,7 +45,7 @@ const CONFIG = {
   },
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    STORAGE_KEYS: {
+  STORAGE_KEYS: {
     TASKS: "discipline_tracker_tasks",
     FAVORITES: "discipline_tracker_favorites",
     STREAK: "discipline_tracker_streak",
@@ -59,16 +59,16 @@ const CONFIG = {
     TRAINER_STATE: "discipline_tracker_trainer_state",
     FLOW_PROTOCOL: "discipline_tracker_flow_protocol",
     ROADMAP_STATE: "discipline_tracker_roadmap_state",
-      JOURNAL_ENTRIES: "discipline_tracker_journal_entries",
-      FIREBASE_USER: "discipline_tracker_firebase_user",
-      CLIENT_VERSION: "discipline_tracker_client_version",
-      TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
-      SHADOW_ENGINE_STATE: "discipline_tracker_shadow_engine_state",
-      ROADMAP_PROMPT_DRAFT: "discipline_tracker_roadmap_prompt_draft",
-      ROADMAP_RESPONSE_DRAFT: "discipline_tracker_roadmap_response_draft",
-      TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
-      TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
-    },
+    JOURNAL_ENTRIES: "discipline_tracker_journal_entries",
+    FIREBASE_USER: "discipline_tracker_firebase_user",
+    CLIENT_VERSION: "discipline_tracker_client_version",
+    TIMER_CLOUD_STATE: "discipline_tracker_timer_cloud_state",
+    SHADOW_ENGINE_STATE: "discipline_tracker_shadow_engine_state",
+    ROADMAP_PROMPT_DRAFT: "discipline_tracker_roadmap_prompt_draft",
+    ROADMAP_RESPONSE_DRAFT: "discipline_tracker_roadmap_response_draft",
+    TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
+    TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
+  },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
   FIREBASE_PROTECTION: {
@@ -1719,50 +1719,50 @@ class StopwatchManager {
         );
         return;
       }
-    const rawName = (taskName || this.getTaskInputValue() || "").trim();
-    if (!meta && !rawName) {
-      alert("Task name cannot be empty.");
-      return;
-    }
-    const name = rawName;
-    const resolvedMeta = meta || this.collectEntryMetadata(name, null);
-    if (!resolvedMeta) return;
-    this.startTime = Date.now();
-    this.isRunning = true;
-    this.elapsedBeforePause = 0;
-    this.elapsedTime = 0;
-    this.app.state.activeTask = {
-      name: name || resolvedMeta.subcategory,
-      startTime: this.startTime,
-      ...resolvedMeta,
-    };
-    this.app.saveToStorage(
-      CONFIG.STORAGE_KEYS.ACTIVE_TASK,
-      this.app.state.activeTask,
-    );
-    this.app.elements["start-btn"].disabled = true;
-    this.app.elements["stop-btn"].disabled = false;
-    this.app.elements["task-input"].disabled = true;
-    this.app.elements["active-task-name"].textContent =
-      `${this.app.state.activeTask.category} - ${this.app.state.activeTask.subcategory}`;
-    this.app.elements["active-task-start"].textContent =
-      this.app.formatTime(this.startTime);
-    this.app.elements["active-task-indicator"].style.display = "block";
-    // Fire-and-forget to avoid blocking UI on network
-    if (this.app.cloudManager?.setTimerState) {
-      setTimeout(() => {
-        this.app.cloudManager.setTimerState({
-          status: "running",
-          startTime: this.startTime,
-          elapsedBeforePause: 0,
-          activeTask: this.app.state.activeTask,
-        }).catch(e => console.warn("Timer start cloud sync delayed", e));
-      }, 0);
-    }
-    if (this.app.trainerEngine?.syncMissionFromRoadmap) {
-      this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
-    }
-    this.startTicking();
+      const rawName = (taskName || this.getTaskInputValue() || "").trim();
+      if (!meta && !rawName) {
+        alert("Task name cannot be empty.");
+        return;
+      }
+      const name = rawName;
+      const resolvedMeta = meta || this.collectEntryMetadata(name, null);
+      if (!resolvedMeta) return;
+      this.startTime = Date.now();
+      this.isRunning = true;
+      this.elapsedBeforePause = 0;
+      this.elapsedTime = 0;
+      this.app.state.activeTask = {
+        name: name || resolvedMeta.subcategory,
+        startTime: this.startTime,
+        ...resolvedMeta,
+      };
+      this.app.saveToStorage(
+        CONFIG.STORAGE_KEYS.ACTIVE_TASK,
+        this.app.state.activeTask,
+      );
+      this.app.elements["start-btn"].disabled = true;
+      this.app.elements["stop-btn"].disabled = false;
+      this.app.elements["task-input"].disabled = true;
+      this.app.elements["active-task-name"].textContent =
+        `${this.app.state.activeTask.category} - ${this.app.state.activeTask.subcategory}`;
+      this.app.elements["active-task-start"].textContent =
+        this.app.formatTime(this.startTime);
+      this.app.elements["active-task-indicator"].style.display = "block";
+      // Fire-and-forget to avoid blocking UI on network
+      if (this.app.cloudManager?.setTimerState) {
+        setTimeout(() => {
+          this.app.cloudManager.setTimerState({
+            status: "running",
+            startTime: this.startTime,
+            elapsedBeforePause: 0,
+            activeTask: this.app.state.activeTask,
+          }).catch(e => console.warn("Timer start cloud sync delayed", e));
+        }, 0);
+      }
+      if (this.app.trainerEngine?.syncMissionFromRoadmap) {
+        this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+      }
+      this.startTicking();
     } finally {
       this.startGuardInFlight = false;
     }
@@ -3411,14 +3411,14 @@ class ShadowEngine {
 
       const pendingDates = trainingCamp.lastEvaluatedDate
         ? this.getDateStringsBetween(
-            this.app.getDateString(
-              new Date(
-                new Date(`${trainingCamp.lastEvaluatedDate}T12:00:00`).getTime() +
-                  86400000,
-              ),
+          this.app.getDateString(
+            new Date(
+              new Date(`${trainingCamp.lastEvaluatedDate}T12:00:00`).getTime() +
+              86400000,
             ),
-            today,
-          )
+          ),
+          today,
+        )
         : this.getDateStringsBetween(trainingCamp.startDate, today);
 
       for (const date of pendingDates) {
@@ -6004,10 +6004,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
           name: String(module.module || module.name || "MODULE").trim(),
           days: Array.isArray(module.days)
             ? module.days.map((day, index) => ({
-                day: `Day ${Number(day.day || index + 1)}`,
-                text: String(day.topic || day.text || "").trim() || `Step ${index + 1}`,
-                completed: false,
-              }))
+              day: `Day ${Number(day.day || index + 1)}`,
+              text: String(day.topic || day.text || "").trim() || `Step ${index + 1}`,
+              completed: false,
+            }))
             : [],
         })).filter((module) => module.days.length),
         editMode: false,
@@ -6179,7 +6179,7 @@ Rules:
 
 Use this exact style reference:
 return [
-  makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
+  makeTask("CORE ", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
   makeTask("FOCUS BLOCK 1", roadmapTopic1, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
   makeTask("BREAK", "Break + Hydration", [8.25, 8.5], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
   makeTask("FOCUS BLOCK 2", roadmapTopic2, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
@@ -7502,16 +7502,16 @@ class GraphManager {
     const hasBrokenBestStreak =
       bestStreak > 0 && bestEndIndex >= 0 && bestEndIndex < days.length - 1;
 
-          const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
-          const todayDate = this.app.getDateString(today);
-          const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
-          const todayWeek = todayIndex >= 0 ? Math.floor(todayIndex / 7) : 52;
+    const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
+    const todayDate = this.app.getDateString(today);
+    const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
+    const todayWeek = todayIndex >= 0 ? Math.floor(todayIndex / 7) : 52;
 
-          const wrapper = document.createElement("div");
-          wrapper.className = "github-heatmap-wrapper";
+    const wrapper = document.createElement("div");
+    wrapper.className = "github-heatmap-wrapper";
 
-          const inner = document.createElement("div");
-          inner.className = "github-heatmap-inner";
+    const inner = document.createElement("div");
+    inner.className = "github-heatmap-inner";
 
     const grid = document.createElement("div");
     grid.className = "github-heatmap-grid";
@@ -7538,16 +7538,16 @@ class GraphManager {
       grid.appendChild(cell);
     });
 
-          inner.appendChild(grid);
-          wrapper.appendChild(inner);
-          container.appendChild(wrapper);
+    inner.appendChild(grid);
+    wrapper.appendChild(inner);
+    container.appendChild(wrapper);
 
-          requestAnimationFrame(() => {
-            const cellWidth = 12;
-            const targetScroll = Math.max(0, (todayWeek * cellWidth) - container.clientWidth + 36);
-            container.scrollLeft = targetScroll;
-          });
-        }
+    requestAnimationFrame(() => {
+      const cellWidth = 12;
+      const targetScroll = Math.max(0, (todayWeek * cellWidth) - container.clientWidth + 36);
+      container.scrollLeft = targetScroll;
+    });
+  }
 }
 class EventManager {
   constructor(app) {
