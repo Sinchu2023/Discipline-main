@@ -1744,7 +1744,7 @@ class StopwatchManager {
     this.app.elements["stop-btn"].disabled = false;
     this.app.elements["task-input"].disabled = true;
     this.app.elements["active-task-name"].textContent =
-      `${this.app.state.activeTask.category} â€¢ ${this.app.state.activeTask.subcategory}`;
+      `${this.app.state.activeTask.category} - ${this.app.state.activeTask.subcategory}`;
     this.app.elements["active-task-start"].textContent =
       this.app.formatTime(this.startTime);
     this.app.elements["active-task-indicator"].style.display = "block";
@@ -1842,7 +1842,7 @@ class StopwatchManager {
     this.app.elements["stop-btn"].disabled = false;
     this.app.elements["task-input"].disabled = true;
     this.app.elements["active-task-name"].textContent =
-      `${activeTask.category || "Productive Work"} â€¢ ${activeTask.subcategory || "General"}`;
+      `${activeTask.category || "Productive Work"} - ${activeTask.subcategory || "General"}`;
     this.app.elements["active-task-start"].textContent =
       this.app.formatTime(activeTask.startTime);
     this.app.elements["active-task-indicator"].style.display = "block";
@@ -4468,7 +4468,7 @@ class ShadowEngine {
     );
     const pressureEl = this.app.elements["shadow-pressure"];
     pressureEl.textContent = pressure.reasons.length
-      ? `${pressure.label} â€¢ ${pressure.reasons.slice(0, 2).join(", ")}`
+      ? `${pressure.label} | ${pressure.reasons.slice(0, 2).join(", ")}`
       : pressure.label;
     pressureEl.className = `shadow-mini-sub ${pressure.cls}`;
 
@@ -4496,7 +4496,7 @@ class ShadowEngine {
       this.app.elements["shadow-next-rank-sub"].textContent = nextRank
         ? shadowRating.gate.met
           ? `Need ${srGap} SR`
-          : `Need ${srGap} SR â€¢ ${shadowRating.gate.reason}`
+          : `Need ${srGap} SR | ${shadowRating.gate.reason}`
         : "BrahMos ceiling held";
 
     if (this.app.elements["shadow-next-rank-sub"] && nextRank)
@@ -5266,7 +5266,135 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     return labels[phase] || phase;
   }
 
+  splitTaskFunctionArgs(argsText = "") {
+    const parts = [];
+    let current = "";
+    let quote = null;
+    let bracketDepth = 0;
+
+    for (let i = 0; i < argsText.length; i += 1) {
+      const ch = argsText[i];
+      const prev = i > 0 ? argsText[i - 1] : "";
+
+      if (quote) {
+        current += ch;
+        if (ch === quote && prev !== "\\") quote = null;
+        continue;
+      }
+
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        current += ch;
+        continue;
+      }
+
+      if (ch === "[") {
+        bracketDepth += 1;
+        current += ch;
+        continue;
+      }
+
+      if (ch === "]") {
+        bracketDepth = Math.max(0, bracketDepth - 1);
+        current += ch;
+        continue;
+      }
+
+      if (ch === "," && bracketDepth === 0) {
+        parts.push(current.trim());
+        current = "";
+        continue;
+      }
+
+      current += ch;
+    }
+
+    if (current.trim()) parts.push(current.trim());
+    return parts;
+  }
+
+  parseTaskValueToken(token = "") {
+    const trimmed = String(token).trim();
+    if (!trimmed) return "";
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      return trimmed.slice(1, -1);
+    }
+    if (trimmed === "true") return true;
+    if (trimmed === "false") return false;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+    return trimmed;
+  }
+
+  parseTaskWinToken(token = "") {
+    const match = String(token).trim().match(/^\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]$/);
+    if (!match) return null;
+    return [Number(match[1]), Number(match[2])];
+  }
+
+  parseTaskPlanCode(raw = "") {
+    const source = this.normalizeExternalText(raw);
+    if (!source) return [];
+
+    const matches = [...source.matchAll(/makeTask\s*\(([\s\S]*?)\)/g)];
+    if (!matches.length) return [];
+
+    const parsedTasks = matches.map((match) => {
+      const args = this.splitTaskFunctionArgs(match[1] || "");
+      if (args.length < 9) return null;
+
+      const labelPrefix = this.parseTaskValueToken(args[0]);
+      const topicValue = this.parseTaskValueToken(args[1]);
+      const win = this.parseTaskWinToken(args[2]);
+      const priority = this.parseTaskValueToken(args[3]);
+      const disciplineType = this.parseTaskValueToken(args[4]);
+      const targetMinutes = Number(this.parseTaskValueToken(args[5]) || 0);
+      const phase = this.parseTaskValueToken(args[6]);
+      const secondary = !!this.parseTaskValueToken(args[7]);
+      const scoreWeight = Number(this.parseTaskValueToken(args[8]) || 0);
+
+      if (!win || !Number.isFinite(targetMinutes)) return null;
+
+      const topic = String(topicValue || "").trim() || "Task";
+      let label = String(labelPrefix || "").trim() || topic;
+      if (label && topic && label !== topic) {
+        label = `${label}: ${topic}`;
+      }
+
+      const progress = this.getTopicProgress(topic);
+      return {
+        type: "custom",
+        topic,
+        label,
+        progress,
+        done: progress.minutes >= targetMinutes,
+        win,
+        priority: String(priority || "MEDIUM"),
+        discipline_type: String(disciplineType || "FLEXIBLE"),
+        phase: String(phase || "Core Study"),
+        secondary,
+        score_weight: scoreWeight,
+        target_minutes: targetMinutes,
+        estimated_minutes:
+          String(disciplineType || "").toUpperCase() === "FLEXIBLE"
+            ? Math.round(targetMinutes * (this.state.antiMisuseMult || CONFIG.FLEXIBLE_TASK_MULTIPLIER))
+            : targetMinutes,
+      };
+    }).filter(Boolean);
+
+    return parsedTasks;
+  }
+
   getDailyMissionTasks() {
+    const savedTaskPlan = this.parseTaskPlanCode(
+      this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT) || "",
+    );
+    if (savedTaskPlan.length) {
+      return savedTaskPlan;
+    }
+
     const active = this.getActiveRoadmapDay();
     const today = this.app.getDateString(new Date());
     const rolloverArmedDate = this.state.roadmapAdvanceAfterDate || null;
@@ -5360,7 +5488,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const hour12 = hour % 12 === 0 ? 12 : hour % 12;
       return `${hour12}:${mins.toString().padStart(2, "0")} ${period}`;
     };
-    return `${fmt(startH)}â€“${fmt(endH)}`;
+    return `${fmt(startH)} - ${fmt(endH)}`;
   }
 
   // â”€â”€ Phase 0.2: local mission state cache (Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -5817,8 +5945,15 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       this.setGeneratorStatus("ai-task-status", "Paste makeTask code first.", "error");
       return;
     }
+    const parsedTasks = this.parseTaskPlanCode(raw);
+    if (!parsedTasks.length) {
+      this.setGeneratorStatus("ai-task-status", "Invalid makeTask code.", "error");
+      return;
+    }
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT, raw);
-    this.setGeneratorStatus("ai-task-status", "Code saved.", "success");
+    this.syncMissionFromRoadmap();
+    this.app.shadowEngine?.refresh(false);
+    this.setGeneratorStatus("ai-task-status", "Code applied.", "success");
   }
 
   buildRoadmapPromptSpec(topic) {
