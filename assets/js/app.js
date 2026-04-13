@@ -5380,10 +5380,21 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const placeholder = String(token || "").trim();
     if (!placeholder) return null;
 
+    const normalized = placeholder.toLowerCase();
+    const isGenericRoadmapPlaceholder =
+      /^roadmaptopic\d+$/.test(normalized) ||
+      normalized === "roadmapreviewtopic";
+    const isLegacyAnalogPlaceholder =
+      /^analog\d+topic$/.test(normalized) ||
+      normalized === "analogrevisiontopic";
+
+    if (!isGenericRoadmapPlaceholder && !isLegacyAnalogPlaceholder) {
+      return null;
+    }
+
     const pendingTopics = this.getPendingRoadmapTopics();
     if (!pendingTopics.length) return null;
 
-    const normalized = placeholder.toLowerCase();
     const numberMatch = normalized.match(/(\d+)/);
     let topicIndex = Number.isInteger(placeholderIndex) ? placeholderIndex : 0;
     if (numberMatch) topicIndex = Math.max(0, Number(numberMatch[1]) - 1);
@@ -6151,7 +6162,8 @@ Rules:
 12. You may use real quoted roadmap strings OR these generic placeholder tokens only: roadmapTopic1, roadmapTopic2, roadmapTopic3, roadmapTopic4, roadmapReviewTopic.
 13. Do not invent custom variable names like analog1Topic or bodybuildingTopic1.
 14. If you use a placeholder token, leave it unquoted in the second makeTask argument and the app will resolve it from the current user's roadmap.
-15. If extra user context exists, use it only as secondary guidance after the roadmap.
+15. Use roadmap placeholders only for roadmap-driven study blocks. Keep unrelated blocks like IB, breaks, lunch, dinner, training, and generic revision as normal quoted strings unless they truly come from the roadmap.
+16. If extra user context exists, use it only as secondary guidance after the roadmap.
 
 Use this exact style reference:
 return [
