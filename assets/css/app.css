@@ -1441,18 +1441,6 @@
         box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.12);
       }
 
-      .generator-example {
-        margin: 0;
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        background: rgba(255, 255, 255, 0.03);
-        color: #b8d7ff;
-        font-size: 0.78rem;
-        line-height: 1.45;
-        white-space: pre-wrap;
-      }
-
       .generator-output {
         width: 100%;
         min-height: 220px;

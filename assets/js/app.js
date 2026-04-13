@@ -2098,7 +2098,7 @@ class TaskManager {
       const editLabel = isSleep ? "Edit Sleep" : "Edit Task";
       const editClass = isSleep ? "edit-sleep-btn" : "edit-task-btn";
       el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
-      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "ðŸ’¤" : "âš¡"} ${this.app.escapeHtml(task.category)} â€¢ ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions"><button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
+      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "[SLEEP]" : "[TASK]"} ${this.app.escapeHtml(task.category)} - ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions"><button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
       c.appendChild(el);
     });
     document
@@ -5014,10 +5014,10 @@ Next Level Milestone: ${shadowMilestone}
 
 === USER STATUS ===
 Level: ${d.userLevel.current.name} | L${d.userMicroLevel}/100
-Active Penalties: ${this.app.formatDuration(d.penaltyMinutes)} (${d.penaltyPoints}pt) | ${d.penaltyReasons.length ? d.penaltyReasons.join(" â€¢ ") : "No active penalty triggers"}
+Active Penalties: ${this.app.formatDuration(d.penaltyMinutes)} (${d.penaltyPoints}pt) | ${d.penaltyReasons.length ? d.penaltyReasons.join(" | ") : "No active penalty triggers"}
 Mission Score: ${d.missionScore}/100
 Distraction Budget: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (+${this.app.formatDuration(d.distractionOverBudget)} over)` : ""}
-Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " âœ“" : ""} â€¢ 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " âœ“" : ""}
+Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " [CLEAR]" : ""} | 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " [CLEAR]" : ""}
 Mode: ${d.mode}
 Gap: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
 Minutes to Tie: ${this.app.formatDuration(d.minutesToTie)}
@@ -5936,13 +5936,13 @@ ${topic}`;
       const moduleTitle = this.state.roadmap.editMode
         ? `<input class="roadmap-module-edit" data-module="${mi}" value="${this.escapeHtml(mod.name)}"/>`
         : this.escapeHtml(mod.name);
-      html += `<section class="trainer-section"><div class="trainer-section-title">${moduleTitle} ${done ? "âœ”" : ""}</div>`;
+      html += `<section class="trainer-section"><div class="trainer-section-title">${moduleTitle}${done ? " [DONE]" : ""}</div>`;
       mod.days.forEach((day, di) => {
         const dayUnlocked =
           unlocked && (di === 0 || mod.days[di - 1].completed);
         const disabled = dayUnlocked ? "" : "disabled";
         const checked = day.completed ? "checked" : "";
-        const stateIcon = day.completed ? "âœ”" : dayUnlocked ? "â—" : "ðŸ”’";
+        const stateIcon = day.completed ? "[DONE]" : dayUnlocked ? "[OPEN]" : "[LOCKED]";
         const stateLabel = day.completed
           ? "Completed"
           : dayUnlocked
