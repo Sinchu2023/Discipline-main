@@ -492,12 +492,15 @@
             <div class="trainer-overview" id="trainer-overview"></div>
             <div id="trainer-content"></div>
 
-            <section class="generator-panel" aria-label="Structured generators">
-              <div class="generator-panel-head">
-                <h3 class="generator-panel-title"><i class="fas fa-magic"></i> Structured Generators</h3>
-                <p class="generator-panel-subtitle">Paste it into any other AI.</p>
-              </div>
-              <div class="generator-grid">
+            <section class="generator-panel" id="generator-panel" aria-label="Structured generators" data-open="false">
+              <button class="generator-panel-head" id="generator-panel-toggle" type="button" aria-expanded="false" aria-controls="generator-panel-body">
+                <span class="generator-panel-head-copy">
+                  <h3 class="generator-panel-title"><i class="fas fa-magic"></i> Structured Generators</h3>
+                  <p class="generator-panel-subtitle">Paste it into any other AI.</p>
+                </span>
+                <span class="generator-panel-caret" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+              </button>
+              <div class="generator-grid" id="generator-panel-body" hidden>
                 <form class="generator-card" onsubmit="return false;">
                   <div class="generator-card-head">
                     <h4><i class="fas fa-route"></i> Roadmap</h4>

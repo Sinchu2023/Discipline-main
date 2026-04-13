@@ -68,6 +68,7 @@ const CONFIG = {
       ROADMAP_RESPONSE_DRAFT: "discipline_tracker_roadmap_response_draft",
       TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
       TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
+      GENERATOR_PANEL_OPEN: "discipline_tracker_generator_panel_open",
     },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
@@ -866,6 +867,14 @@ class FirebaseCloudManager {
           flowProtocol: this.app.flowEngine?.state || { byDate: {} },
           trainerState: this.app.trainerEngine?.state || {},
           shadowAvg: this.app.shadowEngine?.shadowSevenDayAverage || 0,
+          roadmapPromptDraft:
+            this.app.loadFromStorage(CONFIG.STORAGE_KEYS.ROADMAP_PROMPT_DRAFT) || "",
+          roadmapResponseDraft:
+            this.app.loadFromStorage(CONFIG.STORAGE_KEYS.ROADMAP_RESPONSE_DRAFT) || "",
+          taskPromptDraft:
+            this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TASK_PROMPT_DRAFT) || "",
+          taskResponseDraft:
+            this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT) || "",
           updatedAt: Date.now(),
         },
         { merge: true },
@@ -898,6 +907,22 @@ class FirebaseCloudManager {
     }
     if (Number.isFinite(data.shadowAvg))
       this.app.shadowEngine.shadowSevenDayAverage = data.shadowAvg;
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.ROADMAP_PROMPT_DRAFT,
+      typeof data.roadmapPromptDraft === "string" ? data.roadmapPromptDraft : "",
+    );
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.ROADMAP_RESPONSE_DRAFT,
+      typeof data.roadmapResponseDraft === "string" ? data.roadmapResponseDraft : "",
+    );
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.TASK_PROMPT_DRAFT,
+      typeof data.taskPromptDraft === "string" ? data.taskPromptDraft : "",
+    );
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT,
+      typeof data.taskResponseDraft === "string" ? data.taskResponseDraft : "",
+    );
 
     await this.hydrateTasksFromCloudIfNeeded();
     await this.hydrateFavoritesFromCloudIfNeeded();
@@ -988,6 +1013,14 @@ class FirebaseCloudManager {
       patch.trainerState = value || {};
     if (key === CONFIG.STORAGE_KEYS.SHADOW_AVG)
       patch.shadowAvg = Number(value) || 0;
+    if (key === CONFIG.STORAGE_KEYS.ROADMAP_PROMPT_DRAFT)
+      patch.roadmapPromptDraft = String(value || "");
+    if (key === CONFIG.STORAGE_KEYS.ROADMAP_RESPONSE_DRAFT)
+      patch.roadmapResponseDraft = String(value || "");
+    if (key === CONFIG.STORAGE_KEYS.TASK_PROMPT_DRAFT)
+      patch.taskPromptDraft = String(value || "");
+    if (key === CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT)
+      patch.taskResponseDraft = String(value || "");
     if (key === CONFIG.STORAGE_KEYS.ACTIVE_TASK) {
       const mission =
         value?.missionTopic ||
@@ -1256,6 +1289,9 @@ class DisciplineTracker {
       "close-shadow-ranks-modal",
       "open-trainer",
       "trainer-modal",
+      "generator-panel",
+      "generator-panel-toggle",
+      "generator-panel-body",
       "ai-roadmap-topic",
       "generate-roadmap-btn",
       "copy-roadmap-prompt-btn",
@@ -5860,6 +5896,28 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     this.setGeneratorStatus("ai-task-status", "Code saved.", "success");
   }
 
+  setGeneratorPanelOpen(isOpen) {
+    const panel = this.app.elements["generator-panel"];
+    const toggle = this.app.elements["generator-panel-toggle"];
+    const body = this.app.elements["generator-panel-body"];
+    if (!panel || !toggle || !body) return;
+    panel.dataset.open = isOpen ? "true" : "false";
+    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    body.hidden = !isOpen;
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.GENERATOR_PANEL_OPEN, !!isOpen);
+  }
+
+  toggleGeneratorPanel() {
+    const panel = this.app.elements["generator-panel"];
+    const current = panel?.dataset.open === "true";
+    this.setGeneratorPanelOpen(!current);
+  }
+
+  hydrateGeneratorPanelState() {
+    const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.GENERATOR_PANEL_OPEN);
+    this.setGeneratorPanelOpen(!!stored);
+  }
+
   buildRoadmapPromptSpec(topic) {
     const roadmapJson = this.buildGeneratedRoadmap(topic);
     return `You are helping me create a study roadmap for "${topic}".
@@ -6232,6 +6290,7 @@ ${topic}`;
 
   showWindow() {
     this.hydrateGeneratorDrafts();
+    this.hydrateGeneratorPanelState();
     this.refresh();
     this.app.uiManager?.renderSleepJournal?.();
     this.app.elements["trainer-modal"].style.display = "flex";
@@ -7340,6 +7399,12 @@ class EventManager {
     this.app.elements["open-trainer"].addEventListener("click", () => {
       this.app.trainerEngine.showWindow();
     });
+    const generatorToggle = this.app.elements["generator-panel-toggle"];
+    if (generatorToggle) {
+      generatorToggle.addEventListener("click", () =>
+        this.app.trainerEngine.toggleGeneratorPanel(),
+      );
+    }
     const genBtn = this.app.elements["generate-roadmap-btn"];
     if (genBtn) {
       genBtn.addEventListener("click", () => this.app.trainerEngine.generateAIRoadmap());
