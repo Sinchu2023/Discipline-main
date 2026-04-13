@@ -5334,6 +5334,71 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     return [Number(match[1]), Number(match[2])];
   }
 
+  isQuotedTaskStringToken(token = "") {
+    const trimmed = String(token).trim();
+    return (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    );
+  }
+
+  findTaskPlanPlaceholderTokens(raw = "") {
+    const source = this.normalizeExternalText(raw);
+    if (!source) return [];
+
+    const placeholderTokens = [];
+    const matches = [...source.matchAll(/makeTask\s*\(([\s\S]*?)\)/g)];
+    matches.forEach((match) => {
+      const args = this.splitTaskFunctionArgs(match[1] || "");
+      if (args.length < 2) return;
+      const topicToken = String(args[1] || "").trim();
+      if (!topicToken || this.isQuotedTaskStringToken(topicToken)) return;
+      if (topicToken === "true" || topicToken === "false") return;
+      if (/^-?\d+(\.\d+)?$/.test(topicToken)) return;
+      placeholderTokens.push(topicToken);
+    });
+
+    return [...new Set(placeholderTokens)];
+  }
+
+  getPendingRoadmapTopics(limit = Infinity) {
+    this.ensureRoadmap();
+    const topics = [];
+    const modules = this.state.roadmap?.modules || [];
+    modules.forEach((module) => {
+      (module.days || []).forEach((day) => {
+        if (day?.completed) return;
+        const topic = String(day.text || "").split("\n")[0].trim();
+        if (!topic) return;
+        topics.push(topic);
+      });
+    });
+    return topics.slice(0, limit);
+  }
+
+  resolveTaskPlaceholderTopic(token = "", placeholderIndex = 0) {
+    const placeholder = String(token || "").trim();
+    if (!placeholder) return null;
+
+    const pendingTopics = this.getPendingRoadmapTopics();
+    if (!pendingTopics.length) return null;
+
+    const normalized = placeholder.toLowerCase();
+    const numberMatch = normalized.match(/(\d+)/);
+    let topicIndex = Number.isInteger(placeholderIndex) ? placeholderIndex : 0;
+    if (numberMatch) topicIndex = Math.max(0, Number(numberMatch[1]) - 1);
+
+    const selectedTopic =
+      pendingTopics[Math.min(topicIndex, pendingTopics.length - 1)] ||
+      pendingTopics[0];
+
+    if (/(review|revision|recap)/.test(normalized)) {
+      return `Review: ${selectedTopic}`;
+    }
+
+    return selectedTopic;
+  }
+
   parseTaskPlanCode(raw = "") {
     const source = this.normalizeExternalText(raw);
     if (!source) return [];
@@ -5341,12 +5406,16 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const matches = [...source.matchAll(/makeTask\s*\(([\s\S]*?)\)/g)];
     if (!matches.length) return [];
 
+    let placeholderIndex = 0;
     const parsedTasks = matches.map((match) => {
       const args = this.splitTaskFunctionArgs(match[1] || "");
       if (args.length < 9) return null;
 
       const labelPrefix = this.parseTaskValueToken(args[0]);
-      const topicValue = this.parseTaskValueToken(args[1]);
+      const rawTopicToken = String(args[1] || "").trim();
+      const topicValue = this.isQuotedTaskStringToken(rawTopicToken)
+        ? this.parseTaskValueToken(rawTopicToken)
+        : this.resolveTaskPlaceholderTopic(rawTopicToken, placeholderIndex++);
       const win = this.parseTaskWinToken(args[2]);
       const priority = this.parseTaskValueToken(args[3]);
       const disciplineType = this.parseTaskValueToken(args[4]);
@@ -5356,6 +5425,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const scoreWeight = Number(this.parseTaskValueToken(args[8]) || 0);
 
       if (!win || !Number.isFinite(targetMinutes)) return null;
+      if (typeof topicValue !== "string" || !topicValue.trim()) return null;
 
       const topic = String(topicValue || "").trim() || "Task";
       let label = String(labelPrefix || "").trim() || topic;
@@ -5945,15 +6015,28 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       this.setGeneratorStatus("ai-task-status", "Paste makeTask code first.", "error");
       return;
     }
+    const placeholderTokens = this.findTaskPlanPlaceholderTokens(raw);
     const parsedTasks = this.parseTaskPlanCode(raw);
     if (!parsedTasks.length) {
-      this.setGeneratorStatus("ai-task-status", "Invalid makeTask code.", "error");
+      this.setGeneratorStatus(
+        "ai-task-status",
+        placeholderTokens.length
+          ? "Apply a roadmap first so placeholder topics can resolve."
+          : "Invalid makeTask code.",
+        "error",
+      );
       return;
     }
     this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT, raw);
     this.syncMissionFromRoadmap();
     this.app.shadowEngine?.refresh(false);
-    this.setGeneratorStatus("ai-task-status", "Code applied.", "success");
+    this.setGeneratorStatus(
+      "ai-task-status",
+      placeholderTokens.length
+        ? "Code applied. Roadmap topic placeholders resolved."
+        : "Code applied.",
+      "success",
+    );
   }
 
   buildRoadmapPromptSpec(topic) {
@@ -5996,6 +6079,7 @@ ${JSON.stringify(roadmapJson, null, 2)}`;
     const modules = this.state.roadmap?.modules || [];
     const active = this.getActiveRoadmapDay();
     const roadmapLines = [];
+    const placeholderTopics = this.getPendingRoadmapTopics(4);
 
     modules.forEach((module, moduleIndex) => {
       const pendingDays = (module.days || [])
@@ -6013,13 +6097,24 @@ ${JSON.stringify(roadmapJson, null, 2)}`;
       ? String(active.day.text).split("\n")[0].trim()
       : "No active roadmap day";
 
+    const placeholderGuide = [
+      `- roadmapTopic1 -> ${placeholderTopics[0] || activeLine}`,
+      `- roadmapTopic2 -> ${placeholderTopics[1] || placeholderTopics[0] || activeLine}`,
+      `- roadmapTopic3 -> ${placeholderTopics[2] || placeholderTopics[1] || placeholderTopics[0] || activeLine}`,
+      `- roadmapTopic4 -> ${placeholderTopics[3] || placeholderTopics[2] || placeholderTopics[1] || placeholderTopics[0] || activeLine}`,
+      `- roadmapReviewTopic -> Review: ${activeLine}`,
+    ].join("\n");
+
     return `Roadmap alignment is mandatory.
 
 Current active roadmap day:
 - ${activeLine}
 
 Pending roadmap topics:
-${roadmapLines.join("\n\n") || "- No pending roadmap topics found"}`;
+${roadmapLines.join("\n\n") || "- No pending roadmap topics found"}
+
+Placeholder slots for this user roadmap:
+${placeholderGuide}`;
   }
 
   buildTaskPromptSpec(topic) {
@@ -6052,22 +6147,23 @@ Rules:
 8. Optional flag must be true or false.
 9. Score must be an integer.
 10. Output only the code block, nothing else.
-11. Use real quoted strings for topics. Do not use placeholder variables like analog1Topic.
-12. The task focus values must be derived from the roadmap topics.
-13. If extra user context exists, use it only as secondary guidance after the roadmap.
+11. The second makeTask argument must come from the roadmap topics.
+12. You may use real quoted roadmap strings OR these generic placeholder tokens only: roadmapTopic1, roadmapTopic2, roadmapTopic3, roadmapTopic4, roadmapReviewTopic.
+13. Do not invent custom variable names like analog1Topic or bodybuildingTopic1.
+14. If you use a placeholder token, leave it unquoted in the second makeTask argument and the app will resolve it from the current user's roadmap.
+15. If extra user context exists, use it only as secondary guidance after the roadmap.
 
 Use this exact style reference:
 return [
   makeTask("IB CORE", "CA + Reasoning + Quant", [4, 6.25], "HIGH", "STRICT", 135, "Morning", false, 17),
-  makeTask("ANALOG SET 1", analog1Topic, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("FOCUS BLOCK 1", roadmapTopic1, [6.25, 8.25], "HIGH", "STRICT", 120, "Core Study", false, 11),
   makeTask("BREAK", "Break + Hydration", [8.25, 8.5], "LOW", "FLEXIBLE", 15, "Breaks", true, 1),
-  makeTask("ANALOG SET 2", analog2Topic, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
-  makeTask("IB PRACTICE", "IB Practice", [10.5, 12], "MEDIUM", "FLEXIBLE", 90, "Morning", false, 14),
+  makeTask("FOCUS BLOCK 2", roadmapTopic2, [8.5, 10.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("PRACTICE", "Practice session", [10.5, 12], "MEDIUM", "FLEXIBLE", 90, "Morning", false, 14),
   makeTask("LUNCH", "Lunch", [12, 12.5], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
   makeTask("BUILD", "Project / Circuits", [12.5, 14.5], "MEDIUM", "FLEXIBLE", 120, "Core Study", false, 10),
-  makeTask("ANALOG SET 3", analog3Topic, [14.5, 16.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
-  makeTask("IB REVISION", "IB Revision", [16.5, 17.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
-  makeTask("ANALOG REVISION", analogRevisionTopic, [17.5, 18.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
+  makeTask("FOCUS BLOCK 3", roadmapTopic3, [14.5, 16.5], "HIGH", "STRICT", 120, "Core Study", false, 11),
+  makeTask("REVISION", roadmapReviewTopic, [17.5, 18.5], "MEDIUM", "FLEXIBLE", 60, "Evening", false, 5),
   makeTask("DINNER", "Dinner", [18.5, 19], "LOW", "FLEXIBLE", 30, "Breaks", true, 1),
   makeTask("WEAK AREA REVIEW", "Weak-area review", [19, 20], "LOW", "FLEXIBLE", 60, "Evening", true, 4),
   makeTask("TRAINING", "Training", [20, 21], "MEDIUM", "FLEXIBLE", 60, "Evening", true, 3),
