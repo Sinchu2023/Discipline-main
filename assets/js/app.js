@@ -4243,6 +4243,24 @@ class ShadowEngine {
     };
   }
 
+  getDefenseTarget(shadowAvg, penaltyMinutes, weeklyGap, todayMinutes = 0) {
+    const baseShadow = Math.max(0, Math.round(shadowAvg || 0));
+    if (baseShadow <= 0) return 0;
+
+    const penaltyCarry = Math.min(
+      20,
+      Math.ceil(Math.max(0, penaltyMinutes || 0) * 0.2),
+    );
+    const weeklyGapCarry = weeklyGap > 15 ? 5 : 0;
+    const lowOutputCarry = todayMinutes < baseShadow * 0.5 ? 5 : 0;
+    const totalCarry = Math.min(
+      20,
+      penaltyCarry + weeklyGapCarry + lowOutputCarry,
+    );
+
+    return baseShadow + totalCarry;
+  }
+
   render({
     todayMinutes,
     shadowAvg,
@@ -4278,9 +4296,11 @@ class ShadowEngine {
       missionScore,
     );
     const ladder = this.getWinLadder(dailyMap, shadowAvg);
-    const defenseTarget = Math.max(
-      0,
-      Math.ceil(shadowAvg + penalty.minutes),
+    const defenseTarget = this.getDefenseTarget(
+      shadowAvg,
+      penalty.minutes,
+      weeklyGap,
+      todayMinutes,
     );
     const totalDuel = Math.max(
       1,
