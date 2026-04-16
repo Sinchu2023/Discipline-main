@@ -1193,8 +1193,11 @@ class DisciplineTracker {
       "prod-range",
       "prod-filter",
       "prod-filter-total",
+      "graph-productivity-label",
       "graph-productivity-total",
+      "graph-total-distraction-label",
       "graph-total-distraction",
+      "graph-logged-distraction-label",
       "graph-logged-distraction",
       "sleep-range",
       "productivity-chart",
@@ -1451,8 +1454,17 @@ class DisciplineTracker {
       classification.confidence = Math.max(60, classification.confidence);
     }
 
-    const graphTag = task.graph_tag || classification.graph_tag;
-    const wasteLevel = task.waste_level || classification.waste_level;
+    let graphTag = task.graph_tag || classification.graph_tag;
+    let wasteLevel = task.waste_level || classification.waste_level;
+    if (PRODUCTIVE_CATEGORIES.has(category)) {
+      graphTag = "productivity";
+      wasteLevel = "NONE";
+    } else if (category === "Time Waste / Distraction") {
+      graphTag = "distraction";
+    } else if (category === "Sleep" || category === "Miscellaneous") {
+      graphTag = "neutral";
+      wasteLevel = "NONE";
+    }
     const growthCategory =
       task.growth_category || classification.category;
     const confidence = Number(
@@ -1495,11 +1507,14 @@ class DisciplineTracker {
     if (d.getHours() < 5) d.setDate(d.getDate() - 1); // Bind 12AM-5AM metrics natively to previous active day
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
-  getInferredWasteMinutesForDate(
+  isDistractionCategory(category) {
+    return category === "Time Waste / Distraction";
+  }
+  getTrackedMinutesForDate(
     dateStr,
     sourceTasks = this.state.tasks,
   ) {
-    const trackedMinutes = sourceTasks
+    return sourceTasks
       .filter(
         (task) =>
           task.date === dateStr &&
@@ -1507,6 +1522,49 @@ class DisciplineTracker {
           task.duration > 0,
       )
       .reduce((sum, task) => sum + task.duration, 0);
+  }
+  getProductiveMinutesForDate(
+    dateStr,
+    sourceTasks = this.state.tasks,
+  ) {
+    return sourceTasks
+      .filter(
+        (task) =>
+          task.date === dateStr &&
+          this.isProductiveCategory(task.category),
+      )
+      .reduce((sum, task) => sum + task.duration, 0);
+  }
+  getSleepMinutesForDate(
+    dateStr,
+    sourceTasks = this.state.tasks,
+  ) {
+    return sourceTasks
+      .filter(
+        (task) => task.date === dateStr && task.category === "Sleep",
+      )
+      .reduce((sum, task) => sum + task.duration, 0);
+  }
+  getLoggedDistractionMinutesForDate(
+    dateStr,
+    sourceTasks = this.state.tasks,
+  ) {
+    return sourceTasks
+      .filter(
+        (task) =>
+          task.date === dateStr &&
+          this.isDistractionCategory(task.category),
+      )
+      .reduce((sum, task) => sum + task.duration, 0);
+  }
+  getInferredWasteMinutesForDate(
+    dateStr,
+    sourceTasks = this.state.tasks,
+  ) {
+    const trackedMinutes = this.getTrackedMinutesForDate(
+      dateStr,
+      sourceTasks,
+    );
     return Math.max(0, 1440 - Math.min(1440, trackedMinutes));
   }
   formatDuration(minutes) {
@@ -2040,19 +2098,9 @@ class TaskManager {
   }
   updateStats() {
     const today = this.app.getDateString();
-    const todayTasks = this.app.state.tasks.filter(
-      (task) => task.date === today,
-    );
-    const productiveTime = todayTasks
-      .filter((task) => this.app.isProductiveCategory(task.category))
-      .reduce((t, task) => t + task.duration, 0);
-    const sleepTime = todayTasks
-      .filter((task) => task.category === "Sleep")
-      .reduce((t, task) => t + task.duration, 0);
-    const totalTime = todayTasks.reduce(
-      (t, task) => t + task.duration,
-      0,
-    );
+    const productiveTime = this.app.getProductiveMinutesForDate(today);
+    const sleepTime = this.app.getSleepMinutesForDate(today);
+    const totalTime = this.app.getTrackedMinutesForDate(today);
     this.app.elements["productive-time"].textContent =
       this.app.formatDuration(productiveTime);
     this.app.elements["sleep-time"].textContent =
@@ -3739,14 +3787,10 @@ class ShadowEngine {
   getTodayDistractionMinutes(
     dateStr = this.app.getDateString(new Date()),
   ) {
-    return this.app.state.tasks
-      .filter(
-        (task) =>
-          task.date === dateStr &&
-          (task.category === "Time Waste / Distraction" ||
-            task.graph_tag === "distraction"),
-      )
-      .reduce((sum, task) => sum + task.duration, 0);
+    return this.app.getLoggedDistractionMinutesForDate(
+      dateStr,
+      this.app.state.tasks,
+    );
   }
 
   getHistoricalShadowThresholdMap(
@@ -6865,7 +6909,15 @@ class GraphManager {
     );
     this.setupChartControls();
     this.lastFilteredTotalMinutes = this.getCurrentFilteredTotalMinutes();
-    this.animateFilteredTotal(0, this.lastFilteredTotalMinutes);
+    this.animateFilteredTotal(
+      0,
+      this.lastFilteredTotalMinutes,
+      this.rangeUsesAverageSummaries(
+        this.app.elements["prod-range"]?.value || "7d",
+      )
+        ? "average"
+        : "total",
+    );
     this.updateGraphKpis();
     this.renderGithubHeatmap();
   }
@@ -6907,78 +6959,183 @@ class GraphManager {
     return dates;
   }
 
-  updateGraphKpis() {
-    const range = this.app.elements["prod-range"].value;
-    const filter = this.getCurrentFilter();
-    const rangeDates = this.getRangeDates(range);
-    const dateSet = new Set(rangeDates);
+  getCurrentFilter() {
+    return this.app.elements["prod-filter"]?.value || "productivity";
+  }
 
-    const productivity = this.app.state.tasks
-      .filter(
-        (t) =>
-          dateSet.has(t.date) &&
-          this.passesProductivityFilter(t, filter),
-      )
-      .reduce((sum, t) => sum + t.duration, 0);
+  rangeUsesAverageSummaries(range) {
+    return (
+      range === "weekly" ||
+      range === "15davg" ||
+      range === "monthlyavg"
+    );
+  }
 
-    const loggedDistraction = this.app.state.tasks
-      .filter(
-        (t) =>
-          dateSet.has(t.date) &&
-          (t.category === "Time Waste / Distraction" ||
-            t.graph_tag === "distraction"),
-      )
-      .reduce((sum, t) => sum + t.duration, 0);
+  getProductivityPointCount(range = "7d") {
+    if (this.rangeUsesAverageSummaries(range)) return 12;
+    return CONFIG.CHART_RANGES[range] || 7;
+  }
 
-    const untrackedDistraction = rangeDates.reduce((sum, dateStr) => {
+  getFilteredMinutesForDate(dateStr, filter = "productivity") {
+    if (filter === "logged_distraction") {
+      return this.app.getLoggedDistractionMinutesForDate(
+        dateStr,
+        this.app.state.tasks,
+      );
+    }
+    if (filter === "total_distraction") {
       return (
-        sum +
+        this.app.getLoggedDistractionMinutesForDate(
+          dateStr,
+          this.app.state.tasks,
+        ) +
         this.app.getInferredWasteMinutesForDate(
           dateStr,
           this.app.state.tasks,
         )
       );
-    }, 0);
+    }
+    return this.app.getProductiveMinutesForDate(
+      dateStr,
+      this.app.state.tasks,
+    );
+  }
 
-    const totalDistraction = loggedDistraction + untrackedDistraction;
+  buildProductivitySummary(
+    range = this.app.elements["prod-range"]?.value || "7d",
+    filter = this.getCurrentFilter(),
+  ) {
+    const rangeDates = this.getRangeDates(range);
+    const dateCount = Math.max(rangeDates.length, 1);
+    const productivityMinutes = rangeDates.reduce(
+      (sum, dateStr) => sum + this.getFilteredMinutesForDate(dateStr, filter),
+      0,
+    );
+    const loggedDistractionMinutes = rangeDates.reduce(
+      (sum, dateStr) =>
+        sum +
+        this.app.getLoggedDistractionMinutesForDate(
+          dateStr,
+          this.app.state.tasks,
+        ),
+      0,
+    );
+    const inferredDistractionMinutes = rangeDates.reduce(
+      (sum, dateStr) =>
+        sum +
+        this.app.getInferredWasteMinutesForDate(
+          dateStr,
+          this.app.state.tasks,
+        ),
+      0,
+    );
+    const totalDistractionMinutes =
+      loggedDistractionMinutes + inferredDistractionMinutes;
+    const displayMode = this.rangeUsesAverageSummaries(range)
+      ? "average"
+      : "total";
+    const divisor = displayMode === "average" ? dateCount : 1;
+
+    return {
+      rangeDates,
+      displayMode,
+      productivityMinutes,
+      loggedDistractionMinutes,
+      inferredDistractionMinutes,
+      totalDistractionMinutes,
+      productivityDisplayMinutes: productivityMinutes / divisor,
+      loggedDistractionDisplayMinutes:
+        loggedDistractionMinutes / divisor,
+      totalDistractionDisplayMinutes:
+        totalDistractionMinutes / divisor,
+    };
+  }
+
+  formatSummaryMinutes(minutes, displayMode = "total") {
+    const roundedMinutes = Math.max(0, Math.round(Number(minutes) || 0));
+    const formatted = this.app.formatDuration(roundedMinutes);
+    return displayMode === "average"
+      ? `Avg ${formatted}/day`
+      : formatted;
+  }
+
+  getGraphKpiLabels(displayMode = "total") {
+    if (displayMode === "average") {
+      return {
+        productivity: "Avg Productivity / Day",
+        totalDistraction: "Avg Total Distraction / Day",
+        loggedDistraction: "Avg Logged Distractions / Day",
+      };
+    }
+    return {
+      productivity: "Total Productivity",
+      totalDistraction: "Total Distraction",
+      loggedDistraction: "Logged Distractions",
+    };
+  }
+
+  updateGraphKpis() {
+    const range = this.app.elements["prod-range"].value;
+    const filter = this.getCurrentFilter();
+    const summary = this.buildProductivitySummary(range, filter);
+    const labels = this.getGraphKpiLabels(summary.displayMode);
+
+    if (this.app.elements["graph-productivity-label"]) {
+      this.app.elements["graph-productivity-label"].textContent =
+        labels.productivity;
+    }
+    if (this.app.elements["graph-total-distraction-label"]) {
+      this.app.elements["graph-total-distraction-label"].textContent =
+        labels.totalDistraction;
+    }
+    if (this.app.elements["graph-logged-distraction-label"]) {
+      this.app.elements["graph-logged-distraction-label"].textContent =
+        labels.loggedDistraction;
+    }
 
     this.app.elements["graph-productivity-total"].textContent =
-      this.app.formatDuration(productivity);
+      this.formatSummaryMinutes(
+        summary.productivityDisplayMinutes,
+        summary.displayMode,
+      );
     this.app.elements["graph-total-distraction"].textContent =
-      this.app.formatDuration(totalDistraction);
+      this.formatSummaryMinutes(
+        summary.totalDistractionDisplayMinutes,
+        summary.displayMode,
+      );
     this.app.elements["graph-logged-distraction"].textContent =
-      this.app.formatDuration(loggedDistraction);
-  }
-
-  getCurrentFilter() {
-    return this.app.elements["prod-filter"]?.value || "productivity";
-  }
-
-  passesProductivityFilter(task, filter) {
-    if (task.category === "Sleep") return false;
-    const tag = task.graph_tag || "neutral";
-    if (filter === "productivity") return tag === "productivity";
-    if (filter === "logged_distraction")
-      return (
-        tag === "distraction" ||
-        task.category === "Time Waste / Distraction"
+      this.formatSummaryMinutes(
+        summary.loggedDistractionDisplayMinutes,
+        summary.displayMode,
       );
-    if (filter === "total_distraction")
-      return (
-        tag === "distraction" ||
-        task.category === "Time Waste / Distraction"
-      );
-    return true;
   }
 
-  getFilteredMinutesForDate(dateStr, filter = "productivity") {
-    return this.app.state.tasks
-      .filter(
-        (t) =>
-          t.date === dateStr &&
-          this.passesProductivityFilter(t, filter),
-      )
-      .reduce((sum, t) => sum + t.duration, 0);
+  buildRollingShadowAverageMap(startDateStr, endDateStr) {
+    if (!startDateStr || !endDateStr) return new Map();
+    const startDate = new Date(`${startDateStr}T12:00:00`);
+    const endDate = new Date(`${endDateStr}T12:00:00`);
+    if (
+      Number.isNaN(startDate.getTime()) ||
+      Number.isNaN(endDate.getTime()) ||
+      startDate > endDate
+    )
+      return new Map();
+
+    const dailyMap = this.app.shadowEngine?.getDailyProductiveMap?.() || new Map();
+    const rollingMap = new Map();
+
+    for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
+      const pointDate = new Date(cursor);
+      let total = 0;
+      for (let i = 0; i < 7; i += 1) {
+        const historyDate = new Date(pointDate);
+        historyDate.setDate(pointDate.getDate() - i);
+        total += dailyMap.get(this.app.getDateString(historyDate)) || 0;
+      }
+      rollingMap.set(this.app.getDateString(pointDate), total / 7);
+    }
+
+    return rollingMap;
   }
 
   getColorScheme() {
@@ -6986,6 +7143,18 @@ class GraphManager {
       border: "rgb(40, 180, 99)",
       fill: "rgba(40, 180, 99, 0.16)",
     };
+  }
+
+  getProductivityDatasetLabel(range = "7d") {
+    return this.rangeUsesAverageSummaries(range)
+      ? "Avg Productivity / Day"
+      : "Productivity";
+  }
+
+  getShadowDatasetLabel(range = "7d") {
+    return this.rangeUsesAverageSummaries(range)
+      ? "Shadow Avg / Day"
+      : "Shadow";
   }
 
   createCharts() {
@@ -7133,7 +7302,7 @@ class GraphManager {
       labels,
       datasets: [
         {
-          label: "Productivity",
+          label: this.getProductivityDatasetLabel(range),
           data,
           borderColor: colors.border,
           backgroundColor: colors.fill,
@@ -7146,7 +7315,7 @@ class GraphManager {
           fill: true,
         },
         {
-          label: "Shadow",
+          label: this.getShadowDatasetLabel(range),
           data: shadowData,
           borderColor: "rgb(0, 140, 255)",
           backgroundColor: "rgba(0, 140, 255, 0.14)",
@@ -7172,9 +7341,10 @@ class GraphManager {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const ds = this.app.getDateString(d);
-      const mins = this.app.state.tasks
-        .filter((t) => t.date === ds && t.category === "Sleep")
-        .reduce((a, t) => a + t.duration, 0);
+      const mins = this.app.getSleepMinutesForDate(
+        ds,
+        this.app.state.tasks,
+      );
       labels.push(
         d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       );
@@ -7212,14 +7382,9 @@ class GraphManager {
     const today = new Date();
     const firstBucketStart = new Date(today);
     firstBucketStart.setDate(today.getDate() - (bucketCount * bucketDays - 1));
-    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
+    const rollingShadowMap = this.buildRollingShadowAverageMap(
       this.app.getDateString(firstBucketStart),
       this.app.getDateString(today),
-    );
-    const firstProductiveDate = this.getFirstProductiveDate();
-    const fallbackShadowMinutes = Math.max(
-      0,
-      Number(this.app.shadowEngine?.shadowSevenDayAverage || 0),
     );
 
     const buckets = [];
@@ -7232,9 +7397,7 @@ class GraphManager {
       const average = this.buildAverageBucketMetrics(
         dates,
         filter,
-        thresholdMap,
-        firstProductiveDate,
-        fallbackShadowMinutes,
+        rollingShadowMap,
       );
 
       let label = this.formatDateLabel(endDate);
@@ -7254,14 +7417,9 @@ class GraphManager {
   buildMonthlyAverageBuckets(monthCount = 12, filter = "productivity") {
     const today = new Date();
     const start = new Date(today.getFullYear(), today.getMonth() - (monthCount - 1), 1);
-    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
+    const rollingShadowMap = this.buildRollingShadowAverageMap(
       this.app.getDateString(start),
       this.app.getDateString(today),
-    );
-    const firstProductiveDate = this.getFirstProductiveDate();
-    const fallbackShadowMinutes = Math.max(
-      0,
-      Number(this.app.shadowEngine?.shadowSevenDayAverage || 0),
     );
 
     const buckets = [];
@@ -7275,9 +7433,7 @@ class GraphManager {
       const average = this.buildAverageBucketMetrics(
         dates,
         filter,
-        thresholdMap,
-        firstProductiveDate,
-        fallbackShadowMinutes,
+        rollingShadowMap,
       );
       buckets.push({
         label: monthEnd.toLocaleDateString("en-US", {
@@ -7294,9 +7450,7 @@ class GraphManager {
   buildAverageBucketMetrics(
     dates,
     filter,
-    thresholdMap,
-    firstProductiveDate,
-    fallbackShadowMinutes = 0,
+    rollingShadowMap,
   ) {
     if (!dates.length) return { value: 0, shadow: 0 };
 
@@ -7304,31 +7458,15 @@ class GraphManager {
       (sum, dateStr) => sum + this.getFilteredMinutesForDate(dateStr, filter),
       0,
     );
-    const hasAnyShadowHistory = dates.some(
-      (dateStr) =>
-        !this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate),
-    );
     const shadowTotal = dates.reduce(
-      (sum, dateStr) =>
-        sum +
-        (this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate)
-          ? 0
-          : (thresholdMap?.get(dateStr) || 0)),
+      (sum, dateStr) => sum + (rollingShadowMap?.get(dateStr) || 0),
       0,
     );
 
     return {
       value: parseFloat((minutesTotal / dates.length / 60).toFixed(2)),
       shadow: parseFloat(
-        (
-          (
-            hasAnyShadowHistory
-              ? (shadowTotal > 0 ? shadowTotal : fallbackShadowMinutes * dates.length)
-              : 0
-          ) /
-          dates.length /
-          60
-        ).toFixed(2),
+        (shadowTotal / dates.length / 60).toFixed(2),
       ),
     };
   }
@@ -7357,7 +7495,7 @@ class GraphManager {
 
     const isLongRange = range === "1y";
     const baseWidth = Math.max(container.clientWidth || 0, 320);
-    const pointCount = range === "weekly" ? 12 : (CONFIG.CHART_RANGES[range] || 7);
+    const pointCount = this.getProductivityPointCount(range);
     const visiblePointCount = range === "1y" ? 31 : pointCount;
     const pixelsPerPoint = isLongRange
       ? Math.max(10, Math.round(baseWidth / visiblePointCount))
@@ -7379,51 +7517,13 @@ class GraphManager {
 
   buildShadowSeries(rangeDates, range = "7d") {
     if (!rangeDates.length) return [];
-    const firstProductiveDate = this.getFirstProductiveDate();
-    if (!firstProductiveDate) {
-      return Array.from({ length: rangeDates.length }, () => 0);
-    }
-
-    const firstDate = new Date(`${rangeDates[0]}T12:00:00`);
-    const thresholdStartDate = new Date(firstDate);
-    if (range === "weekly") {
-      thresholdStartDate.setDate(thresholdStartDate.getDate() - 6);
-    }
-
-    const thresholdMap = this.app.shadowEngine?.getHistoricalShadowThresholdMap(
-      this.app.getDateString(thresholdStartDate),
+    const rollingShadowMap = this.buildRollingShadowAverageMap(
+      rangeDates[0],
       rangeDates[rangeDates.length - 1],
     );
-
-    const fallback = parseFloat(
-      (
-        Math.max(0, Number(this.app.shadowEngine?.shadowSevenDayAverage || 0)) /
-        60
-      ).toFixed(2),
+    const shadowHours = rangeDates.map((dateStr) =>
+      parseFloat((((rollingShadowMap.get(dateStr) || 0) / 60)).toFixed(2)),
     );
-
-    const shadowHours = rangeDates.map((dateStr) => {
-      if (this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate)) {
-        return 0;
-      }
-      if (!thresholdMap) return fallback;
-
-      if (range === "weekly") {
-        const date = new Date(`${dateStr}T12:00:00`);
-        let total = 0;
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(date);
-          d.setDate(date.getDate() - i);
-          const key = this.app.getDateString(d);
-          total += this.isBeforeFirstProductiveDate(key, firstProductiveDate)
-            ? 0
-            : (thresholdMap.get(key) || 0);
-        }
-        return parseFloat((total / 7 / 60).toFixed(2));
-      }
-
-      return parseFloat((((thresholdMap.get(dateStr) || 0) / 60)).toFixed(2));
-    });
 
     return shadowHours;
   }
@@ -7439,27 +7539,25 @@ class GraphManager {
 
   getCurrentFilteredTotalMinutes() {
     const range = this.app.elements["prod-range"].value;
-    const rangeDates = this.getRangeDates(range);
-    const dateSet = new Set(rangeDates);
-    return this.app.state.tasks
-      .filter(
-        (t) =>
-          dateSet.has(t.date) &&
-          this.passesProductivityFilter(t, "productivity"),
-      )
-      .reduce((sum, t) => sum + t.duration, 0);
+    const filter = this.getCurrentFilter();
+    const summary = this.buildProductivitySummary(range, filter);
+    return summary.productivityDisplayMinutes;
   }
 
-  animateFilteredTotal(fromMinutes, toMinutes) {
+  animateFilteredTotal(fromMinutes, toMinutes, displayMode = "total") {
     if (!this.app.elements["prod-filter-total"]) return;
     const el = this.app.elements["prod-filter-total"];
+    el.title =
+      displayMode === "average"
+        ? "Average productivity per day across the displayed range"
+        : "Total productivity across the displayed range";
     const start = performance.now();
     const duration = 450;
     const tick = (now) => {
       const progress = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = fromMinutes + (toMinutes - fromMinutes) * eased;
-      el.textContent = this.app.formatDuration(current);
+      el.textContent = this.formatSummaryMinutes(current, displayMode);
       if (progress < 1)
         this.totalCounterAnimation = requestAnimationFrame(tick);
     };
@@ -7480,6 +7578,9 @@ class GraphManager {
     if (prodContainer) prodContainer.classList.add("filter-updating");
 
     const fromMinutes = this.lastFilteredTotalMinutes;
+    const displayMode = this.rangeUsesAverageSummaries(prodRange)
+      ? "average"
+      : "total";
     this.charts.productivity.data = this.getProductivityData(
       prodRange,
       filter,
@@ -7491,7 +7592,7 @@ class GraphManager {
 
     const toMinutes = this.getCurrentFilteredTotalMinutes();
     this.lastFilteredTotalMinutes = toMinutes;
-    this.animateFilteredTotal(fromMinutes, toMinutes);
+    this.animateFilteredTotal(fromMinutes, toMinutes, displayMode);
     this.updateGraphKpis();
     this.renderGithubHeatmap();
     setTimeout(() => {
@@ -7502,6 +7603,9 @@ class GraphManager {
 
   setupChartControls() {
     this.app.elements["prod-range"].addEventListener("change", () =>
+      this.updateCharts(),
+    );
+    this.app.elements["prod-filter"]?.addEventListener("change", () =>
       this.updateCharts(),
     );
     this.app.elements["sleep-range"].addEventListener("change", () =>
