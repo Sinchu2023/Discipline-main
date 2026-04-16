@@ -1160,6 +1160,8 @@ class DisciplineTracker {
     this.flowEngine = new FlowProtocolEngine(this);
     this.graphManager = new GraphManager(this);
     this.eventManager = new EventManager(this);
+    this.dayBoundaryIntervalId = null;
+    this.lastComputedDate = this.getDateString();
     this.migrateSchema();
   }
   initializeElements() {
@@ -1548,12 +1550,26 @@ class DisciplineTracker {
     this.flowEngine.initialize();
     this.graphManager.initialize();
     this.eventManager.initialize();
+    this.startDayBoundaryWatcher();
     this.updateStreak();
     if (this.state.activeTask)
       this.stopwatch.resumeActiveTask(this.state.activeTask);
     window.addEventListener("online", () => this.syncManager.syncNow());
     await this.syncManager.syncNow();
     await this.cloudManager.initialize();
+  }
+  startDayBoundaryWatcher() {
+    if (this.dayBoundaryIntervalId) clearInterval(this.dayBoundaryIntervalId);
+    const checkForDayBoundary = () => {
+      const currentDate = this.getDateString();
+      if (currentDate === this.lastComputedDate) return;
+      this.lastComputedDate = currentDate;
+      this.taskManager?.refreshViews?.();
+      this.taskManager?.syncTaskDateControls?.();
+      this.trainerEngine?.syncMissionFromRoadmap?.({ rebuild: true });
+      this.flowEngine?.refresh?.();
+    };
+    this.dayBoundaryIntervalId = setInterval(checkForDayBoundary, 60000);
   }
   loadChartJS() {
     return new Promise((resolve, reject) => {
@@ -3811,8 +3827,8 @@ class ShadowEngine {
     if (dailyMap.size === 0) return [];
 
     const sorted = [...dailyMap.keys()].sort();
-    const start = new Date(sorted[0]);
-    const end = new Date(this.app.getDateString());
+    const start = new Date(`${sorted[0]}T12:00:00`);
+    const end = new Date(`${this.app.getDateString()}T12:00:00`);
     const series = [];
 
     for (
@@ -4432,7 +4448,7 @@ class ShadowEngine {
       : 0;
     const campActive = rankProgress.trainingCamp.active;
     const camp = rankProgress.trainingCamp;
-    const todayCampMinutes = campActive ? dailyMap.get(today) || 0 : 0;
+    const todayCampMinutes = campActive ? dailyMap.get(todayDate) || 0 : 0;
     const activeRankLabel = campActive
       ? `${activeRank.title} Provisional`
       : `${activeRank.title} Confirmed`;
@@ -4667,7 +4683,7 @@ class ShadowEngine {
     this.app.elements["shadow-duel-shadow-fill"].style.width =
       `${shadowShare}%`;
     this.app.elements["shadow-note"].textContent =
-      "Real data";
+      "Rolling 7-day average";
 
     const fill = this.app.elements["shadow-progress-fill"];
     const cappedWidth = Math.min(130, Math.max(0, percentage));
@@ -4686,11 +4702,7 @@ class ShadowEngine {
 
   refresh(allowAnimation = true) {
     const metrics = this.computeRollingMetrics();
-    const historicalBest = metrics.bestAvg;
-    const resolvedShadow = Math.max(
-      this.shadowSevenDayAverage,
-      historicalBest,
-    );
+    const resolvedShadow = Math.max(0, Math.round(metrics.currentAvg || 0));
     const isNewStandard = resolvedShadow > this.shadowSevenDayAverage;
 
     if (resolvedShadow !== this.shadowSevenDayAverage) {

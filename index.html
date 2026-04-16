@@ -12,7 +12,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-        <link rel="stylesheet" href="assets/css/app.css?v=2026-04-03-restructure" />
+        <link rel="stylesheet" href="assets/css/app.css?v=2026-04-16-shadow-fix" />
   </head>
   <body>
     <!-- Login Gate (shown by default until auth resolves) -->
@@ -232,7 +232,7 @@
                 <div class="shadow-mini-label">Shadow Standard</div>
                 <div class="shadow-mini-value" id="shadow-standard-metric">0h 00m</div>
                 <div class="shadow-mini-sub">Avg: <strong id="shadow-weekly-average">0h 00m</strong></div>
-                <div class="shadow-note-inline" id="shadow-note">Real data</div>
+                <div class="shadow-note-inline" id="shadow-note">Rolling 7-day average</div>
               </div>
               <div class="shadow-mini-card">
                 <div class="shadow-mini-label">Momentum</div>
@@ -660,7 +660,7 @@
     <script src="update-check.js"></script>
     <script type="module" src="firebase-service.js?v=2026-03-15-phase4"></script>
     <script type="module" src="google-auth.js?v=2026-03-15-phase4"></script>
-    <script type="module" src="assets/js/app.js?v=2026-04-03-entrypoint"></script>
+    <script type="module" src="assets/js/app.js?v=2026-04-16-shadow-fix"></script>
   </body>
 </html>
 
