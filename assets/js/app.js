@@ -1507,6 +1507,28 @@ class DisciplineTracker {
     if (d.getHours() < 5) d.setDate(d.getDate() - 1); // Bind 12AM-5AM metrics natively to previous active day
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
+  parseDateKey(dateStr) {
+    const [year, month, day] = String(dateStr || "")
+      .split("-")
+      .map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+  getActiveDate(date = new Date()) {
+    const key = this.getDateString(date);
+    return this.parseDateKey(key) || new Date(date);
+  }
+  getActiveDayEnd(date = new Date()) {
+    const now = new Date(date);
+    const end = new Date(now);
+    if (now.getHours() < 5) {
+      end.setHours(5, 0, 0, 0);
+    } else {
+      end.setDate(end.getDate() + 1);
+      end.setHours(5, 0, 0, 0);
+    }
+    return end;
+  }
   isDistractionCategory(category) {
     return category === "Time Waste / Distraction";
   }
@@ -2377,22 +2399,36 @@ class TaskManager {
   }
 }
 class AnalyticsService {
+  static getDateKey(date = new Date()) {
+    const d = new Date(date);
+    if (d.getHours() < 5) d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  static parseDateKey(dateStr) {
+    const [year, month, day] = String(dateStr || "")
+      .split("-")
+      .map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+
   static buildMonthlyReport(
     tasks,
     year,
     month,
     thresholdMinutes = CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES,
   ) {
-    const monthTasks = tasks.filter((t) => {
-      const d = new Date(t.startTime);
-      return d.getFullYear() === year && d.getMonth() === month;
-    });
+    const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+    const monthTasks = tasks.filter((t) =>
+      String(t.date || "").startsWith(monthKey),
+    );
     const pm = month === 0 ? 11 : month - 1;
     const py = month === 0 ? year - 1 : year;
-    const prevTasks = tasks.filter((t) => {
-      const d = new Date(t.startTime);
-      return d.getFullYear() === py && d.getMonth() === pm;
-    });
+    const prevMonthKey = `${py}-${String(pm + 1).padStart(2, "0")}`;
+    const prevTasks = tasks.filter((t) =>
+      String(t.date || "").startsWith(prevMonthKey),
+    );
     const totals = Object.fromEntries(
       Object.keys(CATEGORY_DEFINITIONS).map((c) => [c, 0]),
     );
@@ -2574,15 +2610,13 @@ class AnalyticsService {
   }
 
   static buildSleepInsights(tasks) {
-    const today = new Date();
+    const todayKey = AnalyticsService.getDateKey();
+    const today = AnalyticsService.parseDateKey(todayKey) || new Date();
     const daily = new Map();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      daily.set(
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
-        0,
-      );
+      daily.set(AnalyticsService.getDateKey(d), 0);
     }
     tasks.forEach((t) => {
       if (t.category !== "Sleep") return;
@@ -2669,7 +2703,7 @@ class UIManager {
     this.app.elements["streak-popup"].style.display = "none";
   }
   showReport() {
-    const now = new Date();
+    const now = this.app.getActiveDate();
     const r = AnalyticsService.buildMonthlyReport(
       this.app.state.tasks,
       now.getFullYear(),
@@ -2680,7 +2714,8 @@ class UIManager {
       .sort()
       .map((date) => {
         const d = r.daily[date];
-        return `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(d.productive)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(d.sleep)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(d.waste)}</td></tr>`;
+        const labelDate = this.app.parseDateKey(date) || new Date();
+        return `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${labelDate.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(d.productive)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(d.sleep)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.formatDuration(d.waste)}</td></tr>`;
       })
       .join("");
     const catRows = Object.entries(r.totals)
@@ -2952,7 +2987,7 @@ class UIManager {
     this.setSleepJournalStatus("Journal downloaded.", "is-success");
   }
   exportData() {
-    const now = new Date();
+    const now = this.app.getActiveDate();
     const report = AnalyticsService.buildMonthlyReport(
       this.app.state.tasks,
       now.getFullYear(),
@@ -3845,7 +3880,7 @@ class ShadowEngine {
       this.app.getDateString(new Date(Date.now() - 6 * 86400000)),
     );
     const days = [];
-    const today = new Date(this.app.getDateString());
+    const today = this.app.getActiveDate();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -3893,7 +3928,7 @@ class ShadowEngine {
   detectBehavioralState() {
     const series7 = [];
     const dailyMap = this.getDailyProductiveMap();
-    const today = new Date(this.app.getDateString());
+    const today = this.app.getActiveDate();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -3963,7 +3998,7 @@ class ShadowEngine {
   // Â§10  Phase 4 â€” Sleep Compromise Tracker
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   getSleepCompromiseData() {
-    const today = new Date(this.app.getDateString());
+    const today = this.app.getActiveDate();
     const results = [];
     // Target matches behavioral state logic
     const target = Math.max(1, this.shadowSevenDayAverage || 120);
@@ -4268,7 +4303,7 @@ class ShadowEngine {
         activeDays: 0,
         recentWinRate: 0,
       };
-    const now = new Date();
+    const now = this.app.getActiveDate();
     const month = now.getMonth();
     const year = now.getFullYear();
     const monthDays = [];
@@ -4278,7 +4313,7 @@ class ShadowEngine {
     const thresholdMap = this.getHistoricalShadowThresholdMap(monthStart);
 
     for (let day = 1; day <= activeDays; day++) {
-      const d = new Date(year, month, day);
+      const d = new Date(year, month, day, 12, 0, 0, 0);
       const date = this.app.getDateString(d);
       const minutes = dailyMap.get(date) || 0;
       const threshold = thresholdMap.get(date) || shadowAvg;
@@ -4550,8 +4585,7 @@ class ShadowEngine {
     const expiryEl = this.app.elements["shadow-penalty-expiry"];
     const updateCountdown = () => {
       const now = new Date();
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
+      const end = this.app.getActiveDayEnd(now);
       const ms = Math.max(0, end - now);
       const h = String(Math.floor(ms / 3600000)).padStart(2, "0");
       const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, "0");
@@ -4833,7 +4867,7 @@ class TrainerEngine {
   getDailySeries(days = 14) {
     const map = this.getDailyProductiveMap();
     const series = [];
-    const today = new Date(this.app.getDateString());
+    const today = this.app.getActiveDate();
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -4902,8 +4936,9 @@ class TrainerEngine {
 
   getDaysSince(dateStr) {
     if (!dateStr) return Infinity;
-    const d = new Date(dateStr);
-    const t = new Date(this.app.getDateString());
+    const d = this.app.parseDateKey(dateStr);
+    const t = this.app.getActiveDate();
+    if (!d || !t) return Infinity;
     d.setHours(0, 0, 0, 0);
     t.setHours(0, 0, 0, 0);
     return Math.round((t - d) / 86400000);
@@ -4973,8 +5008,7 @@ class TrainerEngine {
       shadow7DayAverage,
     );
     const now = new Date();
-    const dayEnd = new Date(now);
-    dayEnd.setHours(23, 59, 59, 999);
+    const dayEnd = this.app.getActiveDayEnd(now);
     const timeRemainingToday = Math.max(
       0,
       Math.round((dayEnd - now) / 60000),
@@ -6923,7 +6957,7 @@ class GraphManager {
   }
 
   getRangeDates(range) {
-    const today = new Date();
+    const today = this.app.getActiveDate();
     if (range === "weekly") {
       return this.buildTrailingDateRange(84, today);
     }
@@ -6949,9 +6983,13 @@ class GraphManager {
 
   buildDateRange(startDate, endDate) {
     const dates = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    start.setHours(12, 0, 0, 0);
+    end.setHours(12, 0, 0, 0);
     for (
-      const cursor = new Date(startDate);
-      cursor <= endDate;
+      const cursor = new Date(start);
+      cursor <= end;
       cursor.setDate(cursor.getDate() + 1)
     ) {
       dates.push(this.app.getDateString(cursor));
@@ -7279,7 +7317,7 @@ class GraphManager {
         shadowData.push(bucket.shadow);
       });
     } else {
-      const today = new Date();
+      const today = this.app.getActiveDate();
       const rangeDates = [];
       const days = CONFIG.CHART_RANGES[range] || 7;
       for (let i = days - 1; i >= 0; i--) {
@@ -7288,7 +7326,7 @@ class GraphManager {
         const ds = this.app.getDateString(d);
         const mins = this.getFilteredMinutesForDate(ds, activeFilter);
         labels.push(
-          d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          this.formatDateLabel(this.app.parseDateKey(ds) || d),
         );
         rangeDates.push(ds);
         data.push(parseFloat((mins / 60).toFixed(2)));
@@ -7336,7 +7374,7 @@ class GraphManager {
     const days = CONFIG.CHART_RANGES[range] || 7,
       data = [],
       labels = [],
-      today = new Date();
+      today = this.app.getActiveDate();
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -7346,7 +7384,7 @@ class GraphManager {
         this.app.state.tasks,
       );
       labels.push(
-        d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        this.formatDateLabel(this.app.parseDateKey(ds) || d),
       );
       data.push(parseFloat((mins / 60).toFixed(1)));
     }
@@ -7379,7 +7417,7 @@ class GraphManager {
     filter = "productivity",
     labelMode = "range",
   }) {
-    const today = new Date();
+    const today = this.app.getActiveDate();
     const firstBucketStart = new Date(today);
     firstBucketStart.setDate(today.getDate() - (bucketCount * bucketDays - 1));
     const rollingShadowMap = this.buildRollingShadowAverageMap(
@@ -7415,8 +7453,16 @@ class GraphManager {
   }
 
   buildMonthlyAverageBuckets(monthCount = 12, filter = "productivity") {
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth() - (monthCount - 1), 1);
+    const today = this.app.getActiveDate();
+    const start = new Date(
+      today.getFullYear(),
+      today.getMonth() - (monthCount - 1),
+      1,
+      12,
+      0,
+      0,
+      0,
+    );
     const rollingShadowMap = this.buildRollingShadowAverageMap(
       this.app.getDateString(start),
       this.app.getDateString(today),
@@ -7424,11 +7470,27 @@ class GraphManager {
 
     const buckets = [];
     for (let i = monthCount - 1; i >= 0; i--) {
-      const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthStart = new Date(
+        today.getFullYear(),
+        today.getMonth() - i,
+        1,
+        12,
+        0,
+        0,
+        0,
+      );
       const monthEnd =
         i === 0
           ? new Date(today)
-          : new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
+          : new Date(
+            today.getFullYear(),
+            today.getMonth() - i + 1,
+            0,
+            12,
+            0,
+            0,
+            0,
+          );
       const dates = this.buildDateRange(monthStart, monthEnd);
       const average = this.buildAverageBucketMetrics(
         dates,
