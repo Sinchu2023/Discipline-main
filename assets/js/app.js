@@ -4449,6 +4449,24 @@ class ShadowEngine {
     const campActive = rankProgress.trainingCamp.active;
     const camp = rankProgress.trainingCamp;
     const todayCampMinutes = campActive ? dailyMap.get(todayDate) || 0 : 0;
+    const campCanPreviewToday =
+      campActive &&
+      Boolean(camp.startDate) &&
+      todayDate >= camp.startDate &&
+      camp.lastEvaluatedDate !== todayDate &&
+      camp.daysCompleted < this.getTrainingCampLength();
+    const campTodayClearPending =
+      campCanPreviewToday && todayCampMinutes >= camp.targetMinutes;
+    const campDisplaySuccessDays =
+      camp.successDays + (campTodayClearPending ? 1 : 0);
+    const campDisplayCounters = campTodayClearPending
+      ? `${campDisplaySuccessDays}/${this.getTrainingCampSuccessRequirement()} clears* | ${camp.failDays}/3 misses`
+      : `${camp.successDays}/${this.getTrainingCampSuccessRequirement()} clears | ${camp.failDays}/3 misses`;
+    const campLiveStatus = campCanPreviewToday
+      ? campTodayClearPending
+        ? `Today clear pending lock`
+        : `Today ${this.app.formatDuration(todayCampMinutes)} / ${this.app.formatDuration(camp.targetMinutes)}`
+      : "";
     const activeRankLabel = campActive
       ? `${activeRank.title} Provisional`
       : `${activeRank.title} Confirmed`;
@@ -4593,7 +4611,9 @@ class ShadowEngine {
           : "Top rank secured";
     if (this.app.elements["shadow-next-rank-sub"])
       this.app.elements["shadow-next-rank-sub"].textContent = campActive
-        ? `${camp.successDays}/${this.getTrainingCampSuccessRequirement()} clears | ${camp.failDays}/3 misses`
+        ? campLiveStatus
+          ? `${campDisplayCounters} | ${campLiveStatus}`
+          : campDisplayCounters
         : nextRank
           ? rankProgress.reasons.length
             ? rankProgress.reasons.join(" | ")
@@ -4647,10 +4667,10 @@ class ShadowEngine {
           `Day ${camp.daysCompleted}/${this.getTrainingCampLength()}`;
       if (this.app.elements["shadow-promotion-requirements"])
         this.app.elements["shadow-promotion-requirements"].textContent =
-          `${camp.successDays}/${this.getTrainingCampSuccessRequirement()} success | ${camp.failDays}/3 total misses | Streak ${camp.consecutiveFails}/2 | Floor ${this.app.formatDuration(camp.targetMinutes)}`;
+          `${campDisplayCounters}${campLiveStatus ? ` | ${campLiveStatus}` : ""} | Streak ${camp.consecutiveFails}/2 | Floor ${this.app.formatDuration(camp.targetMinutes)}`;
       if (this.app.elements["shadow-rank-note-sub"])
         this.app.elements["shadow-rank-note-sub"].textContent =
-          `Shadow Buddy says ${activeRank.title} training camp day ${camp.daysCompleted}/${this.getTrainingCampLength()}. Today ${this.app.formatDuration(todayCampMinutes)} / ${this.app.formatDuration(camp.targetMinutes)}. Trial days lock after the day closes. Demotion on 2 consecutive or 3 total misses.`;
+          `Shadow Buddy says ${activeRank.title} training camp day ${camp.daysCompleted}/${this.getTrainingCampLength()}. Today ${this.app.formatDuration(todayCampMinutes)} / ${this.app.formatDuration(camp.targetMinutes)}.${campTodayClearPending ? " Clear preview is live and locks after day close." : " Trial days lock after the day closes."} Demotion on 2 consecutive or 3 total misses.`;
     } else {
       if (this.app.elements["shadow-rank-state"])
         this.app.elements["shadow-rank-state"].textContent = activeRankLabel;
