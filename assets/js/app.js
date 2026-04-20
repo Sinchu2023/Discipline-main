@@ -6964,7 +6964,7 @@ class GraphManager {
         : "total",
     );
     this.updateGraphKpis();
-    this.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
+    this.renderGithubHeatmap();
   }
 
   getRangeDates(range) {
@@ -7880,7 +7880,7 @@ class GraphManager {
     this.lastFilteredTotalMinutes = toMinutes;
     this.animateFilteredTotal(fromMinutes, toMinutes, displayMode);
     this.updateGraphKpis();
-    this.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
+    this.renderGithubHeatmap();
     setTimeout(() => {
       if (prodContainer)
         prodContainer.classList.remove("filter-updating");
@@ -7941,8 +7941,7 @@ renderGithubHeatmap(year = null) {
     });
 
     const yearsWithData = Array.from(yearDataMap.keys()).sort((a, b) => a - b);
-    const fallbackYear = this.app.uiManager.currentHeatmapYear || new Date().getFullYear();
-    const currentYear = year ?? fallbackYear;
+    const currentYear = year || new Date().getFullYear();
     this.app.uiManager.currentHeatmapYear = currentYear;
 
     const prevBtn = document.getElementById("heatmap-prev-year");
