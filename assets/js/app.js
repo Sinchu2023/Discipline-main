@@ -7941,17 +7941,16 @@ renderGithubHeatmap(year = null) {
     });
 
     const yearsWithData = Array.from(yearDataMap.keys()).sort((a, b) => a - b);
-    const minYear = yearsWithData.length > 0 ? Math.min(...yearsWithData) : new Date().getFullYear();
-    const maxYear = yearsWithData.length > 0 ? Math.max(...yearsWithData) : new Date().getFullYear();
-    const defaultYear = maxYear;
-    const currentYear = year || defaultYear;
+    const currentYear = year || new Date().getFullYear();
     this.app.uiManager.currentHeatmapYear = currentYear;
 
     const prevBtn = document.getElementById("heatmap-prev-year");
     const nextBtn = document.getElementById("heatmap-next-year");
     const yearLabel = document.getElementById("heatmap-year-label");
     if (yearLabel) yearLabel.textContent = currentYear;
-    
+
+    const minYear = yearsWithData.length > 0 ? Math.min(...yearsWithData) : currentYear - 1;
+    const maxYear = yearsWithData.length > 0 ? Math.max(...yearsWithData) : currentYear;
     const canNavigate = minYear < maxYear;
     if (prevBtn) prevBtn.style.display = canNavigate && currentYear > minYear ? "" : "none";
     if (nextBtn) nextBtn.style.display = canNavigate && currentYear < maxYear ? "" : "none";
