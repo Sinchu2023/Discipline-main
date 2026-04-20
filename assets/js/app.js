@@ -7014,6 +7014,16 @@ class GraphManager {
     return CONFIG.CHART_RANGES[range] || 7;
   }
 
+  isScrollableProductivityRange(range = "7d") {
+    return range === "1y" || range === "7d";
+  }
+
+  getVisibleProductivityPointCount(range = "7d") {
+    if (range === "1y") return 31;
+    if (range === "7d") return 5;
+    return this.getProductivityPointCount(range);
+  }
+
   getFilteredMinutesForDate(dateStr, filter = "productivity") {
     if (filter === "logged_distraction") {
       return this.app.getLoggedDistractionMinutesForDate(
@@ -7555,23 +7565,23 @@ class GraphManager {
     const track = document.getElementById("productivity-chart-track");
     if (!container || !track) return;
 
-    const isLongRange = range === "1y";
+    const isScrollableRange = this.isScrollableProductivityRange(range);
     const baseWidth = Math.max(container.clientWidth || 0, 320);
     const pointCount = this.getProductivityPointCount(range);
-    const visiblePointCount = range === "1y" ? 31 : pointCount;
-    const pixelsPerPoint = isLongRange
+    const visiblePointCount = this.getVisibleProductivityPointCount(range);
+    const pixelsPerPoint = isScrollableRange
       ? Math.max(10, Math.round(baseWidth / visiblePointCount))
       : 0;
-    const targetWidth = isLongRange
+    const targetWidth = isScrollableRange
       ? Math.max(baseWidth, Math.round(pointCount * pixelsPerPoint))
       : baseWidth;
 
-    container.dataset.scrollable = isLongRange ? "true" : "false";
+    container.dataset.scrollable = isScrollableRange ? "true" : "false";
     track.style.width = `${targetWidth}px`;
 
     requestAnimationFrame(() => {
       this.charts.productivity?.resize();
-      container.scrollLeft = isLongRange
+      container.scrollLeft = isScrollableRange
         ? Math.max(0, container.scrollWidth - container.clientWidth)
         : 0;
     });
