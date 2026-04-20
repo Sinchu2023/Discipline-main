@@ -1,4 +1,4 @@
-﻿window.AppModule = {
+window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
     if (!services?.auth || typeof services.onAuthStateChanged !== "function") {
@@ -2643,6 +2643,7 @@ class UIManager {
     this.app = app;
     this.currentMotivationIndex = 0;
     this.pendingSleepAfterJournal = false;
+    this.currentHeatmapYear = new Date().getFullYear();
   }
   initialize() {
     this.updateDateTime();
@@ -6934,10 +6935,20 @@ class GraphManager {
     this.charts = { productivity: null, sleep: null };
     this.totalCounterAnimation = null;
     this.lastFilteredTotalMinutes = 0;
+    this.productivityScrollState = {
+      isBound: false,
+      isSyncing: false,
+      scrollRaf: null,
+      windowEndDateKey: null,
+      maxWeekOffset: 0,
+      pageWidth: 0,
+      highlightTimeout: null,
+    };
   }
   initialize() {
     if (!window.Chart) return;
     this.createCharts();
+    this.setupProductivityChartScroll();
     this.applyProductivityChartViewport(
       this.app.elements["prod-range"]?.value || "7d",
     );
@@ -6957,7 +6968,7 @@ class GraphManager {
   }
 
   getRangeDates(range) {
-    const today = this.app.getActiveDate();
+    const today = this.getProductivityRangeEndDate(range);
     if (range === "weekly") {
       return this.buildTrailingDateRange(84, today);
     }
@@ -7015,13 +7026,202 @@ class GraphManager {
   }
 
   isScrollableProductivityRange(range = "7d") {
-    return range === "1y" || range === "7d";
+    return range === "1y";
   }
 
   getVisibleProductivityPointCount(range = "7d") {
     if (range === "1y") return 31;
-    if (range === "7d") return 5;
     return this.getProductivityPointCount(range);
+  }
+
+  getFirstTrackedTaskDate() {
+    const taskDates = this.app.state.tasks
+      .map((task) => task?.date)
+      .filter(Boolean)
+      .sort();
+    return taskDates[0] || this.app.getDateString(this.app.getActiveDate());
+  }
+
+  getDayDifference(laterDate, earlierDate) {
+    const later =
+      this.app.parseDateKey(this.app.getDateString(laterDate)) ||
+      new Date(laterDate);
+    const earlier =
+      this.app.parseDateKey(this.app.getDateString(earlierDate)) ||
+      new Date(earlierDate);
+    return Math.max(
+      0,
+      Math.round((later.getTime() - earlier.getTime()) / 86400000),
+    );
+  }
+
+  getSevenDayWindowMeta() {
+    const latestEndDate = this.app.getActiveDate();
+    const firstTrackedDate =
+      this.app.parseDateKey(this.getFirstTrackedTaskDate()) || latestEndDate;
+    const oldestEndDate = new Date(firstTrackedDate);
+    oldestEndDate.setDate(oldestEndDate.getDate() + 6);
+    if (oldestEndDate > latestEndDate) {
+      oldestEndDate.setTime(latestEndDate.getTime());
+    }
+    return {
+      latestEndDate,
+      oldestEndDate,
+      maxWeekOffset: Math.floor(
+        this.getDayDifference(latestEndDate, oldestEndDate) / 7,
+      ),
+    };
+  }
+
+  clampSevenDayWindowWeeksBack(weeksBack = 0) {
+    const safeWeeksBack = Math.round(Number(weeksBack) || 0);
+    return Math.max(
+      0,
+      Math.min(this.getSevenDayWindowMeta().maxWeekOffset, safeWeeksBack),
+    );
+  }
+
+  getSevenDayWindowEndDateFromWeeksBack(weeksBack = 0) {
+    const { latestEndDate } = this.getSevenDayWindowMeta();
+    const safeWeeksBack = this.clampSevenDayWindowWeeksBack(weeksBack);
+    const endDate = new Date(latestEndDate);
+    endDate.setDate(latestEndDate.getDate() - safeWeeksBack * 7);
+    return endDate;
+  }
+
+  getSelectedSevenDayWindowWeeksBack() {
+    const storedDate = this.app.parseDateKey(
+      this.productivityScrollState.windowEndDateKey,
+    );
+    if (!storedDate) return 0;
+    const { latestEndDate } = this.getSevenDayWindowMeta();
+    return this.clampSevenDayWindowWeeksBack(
+      this.getDayDifference(latestEndDate, storedDate) / 7,
+    );
+  }
+
+  setSelectedSevenDayWindowWeeksBack(weeksBack = 0) {
+    const safeWeeksBack = this.clampSevenDayWindowWeeksBack(weeksBack);
+    const nextKey = this.app.getDateString(
+      this.getSevenDayWindowEndDateFromWeeksBack(safeWeeksBack),
+    );
+    const didChange =
+      this.productivityScrollState.windowEndDateKey !== nextKey;
+    this.productivityScrollState.windowEndDateKey = nextKey;
+    return didChange;
+  }
+
+  getProductivityRangeEndDate(range = "7d") {
+    if (range !== "7d") return this.app.getActiveDate();
+    return this.getSevenDayWindowEndDateFromWeeksBack(
+      this.getSelectedSevenDayWindowWeeksBack(),
+    );
+  }
+
+  ensureProductivityScrollSpacer(container) {
+    let spacer = container.querySelector(".graph-scroll-spacer");
+    if (!spacer) {
+      spacer = document.createElement("div");
+      spacer.className = "graph-scroll-spacer";
+      container.appendChild(spacer);
+    }
+    return spacer;
+  }
+
+  teardownProductivityScrollSpacer(container, track) {
+    const spacer = container.querySelector(".graph-scroll-spacer");
+    if (spacer) spacer.remove();
+    delete container.dataset.scrollMode;
+    track.style.minWidth = "100%";
+  }
+
+  syncSevenDayProductivityViewport(container, track) {
+    const spacer = this.ensureProductivityScrollSpacer(container);
+    const baseWidth = Math.max(container.clientWidth || 0, 320);
+    const { maxWeekOffset } = this.getSevenDayWindowMeta();
+    const weeksBack = this.getSelectedSevenDayWindowWeeksBack();
+    const safeWeeksBack = this.clampSevenDayWindowWeeksBack(weeksBack);
+    if (safeWeeksBack !== weeksBack) {
+      this.setSelectedSevenDayWindowWeeksBack(safeWeeksBack);
+    }
+
+    this.productivityScrollState.maxWeekOffset = maxWeekOffset;
+    this.productivityScrollState.pageWidth = baseWidth;
+
+    container.dataset.scrollMode = "window";
+    container.dataset.scrollable = maxWeekOffset > 0 ? "true" : "false";
+    track.style.width = `${baseWidth}px`;
+    track.style.minWidth = `${baseWidth}px`;
+    spacer.style.width = `${Math.max(0, maxWeekOffset * baseWidth)}px`;
+    spacer.hidden = maxWeekOffset <= 0;
+
+    requestAnimationFrame(() => {
+      this.charts.productivity?.resize();
+      const targetScroll = (maxWeekOffset - safeWeeksBack) * baseWidth;
+      this.productivityScrollState.isSyncing = true;
+      container.scrollLeft = targetScroll;
+      requestAnimationFrame(() => {
+        this.productivityScrollState.isSyncing = false;
+      });
+    });
+  }
+
+  refreshVisibleProductivityWindow() {
+    if (!this.charts.productivity) return;
+    const range = this.app.elements["prod-range"]?.value || "7d";
+    const filter = this.getCurrentFilter();
+    const container = document.getElementById("productivity-chart-container");
+    if (container) container.classList.add("filter-updating");
+
+    const fromMinutes = this.lastFilteredTotalMinutes;
+    const displayMode = this.rangeUsesAverageSummaries(range)
+      ? "average"
+      : "total";
+    this.charts.productivity.data = this.getProductivityData(range, filter);
+    this.charts.productivity.update("none");
+
+    const toMinutes = this.getCurrentFilteredTotalMinutes();
+    this.lastFilteredTotalMinutes = toMinutes;
+    this.animateFilteredTotal(fromMinutes, toMinutes, displayMode);
+    this.updateGraphKpis();
+
+    clearTimeout(this.productivityScrollState.highlightTimeout);
+    this.productivityScrollState.highlightTimeout = setTimeout(() => {
+      if (container) container.classList.remove("filter-updating");
+    }, 180);
+  }
+
+  updateSevenDayWindowFromScroll(container) {
+    const { pageWidth, maxWeekOffset } = this.productivityScrollState;
+    if (!pageWidth) return;
+    const snappedPage = Math.max(
+      0,
+      Math.min(maxWeekOffset, Math.round(container.scrollLeft / pageWidth)),
+    );
+    const weeksBack = maxWeekOffset - snappedPage;
+    if (!this.setSelectedSevenDayWindowWeeksBack(weeksBack)) return;
+    this.refreshVisibleProductivityWindow();
+  }
+
+  setupProductivityChartScroll() {
+    const container = document.getElementById("productivity-chart-container");
+    if (!container || this.productivityScrollState.isBound) return;
+    container.addEventListener(
+      "scroll",
+      () => {
+        if (this.app.elements["prod-range"]?.value !== "7d") return;
+        if (this.productivityScrollState.isSyncing) return;
+        if (this.productivityScrollState.scrollRaf) {
+          cancelAnimationFrame(this.productivityScrollState.scrollRaf);
+        }
+        this.productivityScrollState.scrollRaf = requestAnimationFrame(() => {
+          this.productivityScrollState.scrollRaf = null;
+          this.updateSevenDayWindowFromScroll(container);
+        });
+      },
+      { passive: true },
+    );
+    this.productivityScrollState.isBound = true;
   }
 
   getFilteredMinutesForDate(dateStr, filter = "productivity") {
@@ -7327,7 +7527,7 @@ class GraphManager {
         shadowData.push(bucket.shadow);
       });
     } else {
-      const today = this.app.getActiveDate();
+      const today = this.getProductivityRangeEndDate(range);
       const rangeDates = [];
       const days = CONFIG.CHART_RANGES[range] || 7;
       for (let i = days - 1; i >= 0; i--) {
@@ -7565,6 +7765,15 @@ class GraphManager {
     const track = document.getElementById("productivity-chart-track");
     if (!container || !track) return;
 
+    if (range === "7d") {
+      this.setSelectedSevenDayWindowWeeksBack(
+        this.getSelectedSevenDayWindowWeeksBack(),
+      );
+      this.syncSevenDayProductivityViewport(container, track);
+      return;
+    }
+
+    this.teardownProductivityScrollSpacer(container, track);
     const isScrollableRange = this.isScrollableProductivityRange(range);
     const baseWidth = Math.max(container.clientWidth || 0, 320);
     const pointCount = this.getProductivityPointCount(range);
@@ -7653,6 +7862,11 @@ class GraphManager {
     const displayMode = this.rangeUsesAverageSummaries(prodRange)
       ? "average"
       : "total";
+    if (prodRange === "7d") {
+      this.setSelectedSevenDayWindowWeeksBack(
+        this.getSelectedSevenDayWindowWeeksBack(),
+      );
+    }
     this.charts.productivity.data = this.getProductivityData(
       prodRange,
       filter,
@@ -7704,19 +7918,43 @@ class GraphManager {
     return `${day}${months[(month || 1) - 1] || "jan"}${String(year || "").slice(-2)}`;
   }
 
-  renderGithubHeatmap() {
+renderGithubHeatmap(year = null) {
     const container = document.getElementById("github-heatmap-container");
     if (!container) return;
     container.innerHTML = "";
 
     const productiveMap = new Map();
     const trackedMap = new Map();
+    const yearDataMap = new Map();
     this.app.state.tasks.forEach((task) => {
       const duration = Math.max(0, Number(task.duration || 0));
       trackedMap.set(task.date, (trackedMap.get(task.date) || 0) + duration);
+      const taskYear = Number(task.date?.split("-")[0] || 0);
+      if (taskYear > 0) {
+        yearDataMap.set(taskYear, (yearDataMap.get(taskYear) || 0) + duration);
+      }
       if (!this.app.isProductiveCategory(task.category)) return;
-      productiveMap.set(task.date, (productiveMap.get(task.date) || 0) + duration);
+      productiveMap.set(
+        task.date,
+        (productiveMap.get(task.date) || 0) + duration,
+      );
     });
+
+    const yearsWithData = Array.from(yearDataMap.keys()).sort((a, b) => a - b);
+    const minYear = yearsWithData.length > 0 ? Math.min(...yearsWithData) : new Date().getFullYear();
+    const maxYear = yearsWithData.length > 0 ? Math.max(...yearsWithData) : new Date().getFullYear();
+    const defaultYear = maxYear;
+    const currentYear = year || defaultYear;
+    this.app.uiManager.currentHeatmapYear = currentYear;
+
+    const prevBtn = document.getElementById("heatmap-prev-year");
+    const nextBtn = document.getElementById("heatmap-next-year");
+    const yearLabel = document.getElementById("heatmap-year-label");
+    if (yearLabel) yearLabel.textContent = currentYear;
+    
+    const canNavigate = minYear < maxYear;
+    if (prevBtn) prevBtn.style.display = canNavigate && currentYear > minYear ? "" : "none";
+    if (nextBtn) nextBtn.style.display = canNavigate && currentYear < maxYear ? "" : "none";
 
     const target = Math.max(
       1,
@@ -7725,12 +7963,12 @@ class GraphManager {
         Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
       ),
     );
-    const today = new Date();
+
     const dates = [];
-    for (let i = 364; i >= 0; i -= 1) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      dates.push(this.app.getDateString(d));
+    const startDate = new Date(currentYear, 0, 1);
+    const endDate = new Date(currentYear, 11, 31);
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+      dates.push(this.app.getDateString(new Date(d)));
     }
     const thresholdMap = this.app.shadowEngine.getHistoricalShadowThresholdMap(
       dates[0],
@@ -7780,7 +8018,7 @@ class GraphManager {
       bestStreak > 0 && bestEndIndex >= 0 && bestEndIndex < days.length - 1;
 
     const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
-    const todayDate = this.app.getDateString(today);
+    const todayDate = this.app.getDateString(new Date());
     const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
     const todayWeek = todayIndex >= 0 ? Math.floor(todayIndex / 7) : 52;
 
@@ -7819,11 +8057,14 @@ class GraphManager {
     wrapper.appendChild(inner);
     container.appendChild(wrapper);
 
-    requestAnimationFrame(() => {
-      const cellWidth = 12;
-      const targetScroll = Math.max(0, (todayWeek * cellWidth) - container.clientWidth + 36);
-      container.scrollLeft = targetScroll;
-    });
+    const isCurrentYear = currentYear === new Date().getFullYear();
+    if (isCurrentYear) {
+      requestAnimationFrame(() => {
+        const cellWidth = 12;
+        const targetScroll = Math.max(0, (todayWeek * cellWidth) - container.clientWidth + 36);
+        container.scrollLeft = targetScroll;
+      });
+    }
   }
 }
 class EventManager {
@@ -7874,6 +8115,18 @@ class EventManager {
     this.app.elements["open-trainer"].addEventListener("click", () => {
       this.app.trainerEngine.showWindow();
     });
+    if (this.app.elements["heatmap-prev-year"]) {
+      this.app.elements["heatmap-prev-year"].addEventListener("click", () => {
+        this.app.uiManager.currentHeatmapYear -= 1;
+        this.app.uiManager.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
+      });
+    }
+    if (this.app.elements["heatmap-next-year"]) {
+      this.app.elements["heatmap-next-year"].addEventListener("click", () => {
+        this.app.uiManager.currentHeatmapYear += 1;
+        this.app.uiManager.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
+      });
+    }
     const genBtn = this.app.elements["generate-roadmap-btn"];
     if (genBtn) {
       genBtn.addEventListener("click", () => this.app.trainerEngine.generateAIRoadmap());
