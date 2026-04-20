@@ -7964,10 +7964,10 @@ renderGithubHeatmap(year = null) {
     );
 
     const dates = [];
-    const startDate = new Date(currentYear, 0, 1);
-    const endDate = new Date(currentYear, 11, 31);
+    const startDate = new Date(currentYear, 0, 1, 12, 0, 0, 0);
+    const endDate = new Date(currentYear, 11, 31, 12, 0, 0, 0);
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      dates.push(this.app.getDateString(new Date(d)));
+      dates.push(this.app.getDateString(d));
     }
     const thresholdMap = this.app.shadowEngine.getHistoricalShadowThresholdMap(
       dates[0],
