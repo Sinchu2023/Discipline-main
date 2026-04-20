@@ -7969,6 +7969,8 @@ renderGithubHeatmap(year = null) {
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       dates.push(this.app.getDateString(d));
     }
+    const firstDayOffset = startDate.getDay();
+    const totalWeeks = Math.ceil((firstDayOffset + dates.length) / 7);
     const thresholdMap = this.app.shadowEngine.getHistoricalShadowThresholdMap(
       dates[0],
       dates[dates.length - 1],
@@ -8024,7 +8026,10 @@ renderGithubHeatmap(year = null) {
 
     const currentStreakStartIndex =
       currentStreak > 0 ? (streakAnchorIndex - currentStreak + 1) : -1;
-    const todayWeek = todayIndex >= 0 ? Math.floor(todayIndex / 7) : 52;
+    const todayWeek =
+      todayIndex >= 0
+        ? Math.floor((firstDayOffset + todayIndex) / 7)
+        : Math.max(0, totalWeeks - 1);
 
     const wrapper = document.createElement("div");
     wrapper.className = "github-heatmap-wrapper";
@@ -8034,10 +8039,12 @@ renderGithubHeatmap(year = null) {
 
     const grid = document.createElement("div");
     grid.className = "github-heatmap-grid";
+    grid.style.gridTemplateColumns = `repeat(${totalWeeks}, 10px)`;
 
     days.forEach((day, index) => {
-      const week = Math.floor(index / 7);
-      const row = index % 7;
+      const dayDate = this.app.parseDateKey(day.dateStr);
+      const week = Math.floor((firstDayOffset + index) / 7);
+      const row = dayDate ? dayDate.getDay() : ((firstDayOffset + index) % 7);
       const cell = document.createElement("div");
       cell.className = "github-cell";
       cell.style.gridColumn = String(week + 1);
