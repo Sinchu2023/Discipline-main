@@ -19,6 +19,7 @@ const CONFIG = {
   DB_SCHEMA_VERSION: 2,
   CLIENT_VERSION: "2026.03.12.3",
   DAILY_PRODUCTIVITY_THRESHOLD_MINUTES: 240,
+  SHADOW_DAY_CUTOFF_HOUR: 4,
   DISTRACTION_BUDGET_MINUTES: 90,
 
   // â”€â”€ Shadow Engine 2.0 constants (Â§6 of improve.md) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1162,6 +1163,7 @@ class DisciplineTracker {
     this.eventManager = new EventManager(this);
     this.dayBoundaryIntervalId = null;
     this.lastComputedDate = this.getDateString();
+    this.lastComputedShadowDate = this.shadowEngine.getShadowDayDate();
     this.migrateSchema();
   }
   initializeElements() {
@@ -1641,6 +1643,13 @@ class DisciplineTracker {
   startDayBoundaryWatcher() {
     if (this.dayBoundaryIntervalId) clearInterval(this.dayBoundaryIntervalId);
     const checkForDayBoundary = () => {
+      const currentShadowDate =
+        this.shadowEngine?.getShadowDayDate?.() || this.getDateString();
+      if (currentShadowDate !== this.lastComputedShadowDate) {
+        this.lastComputedShadowDate = currentShadowDate;
+        this.shadowEngine?.refresh?.(false);
+        this.graphManager?.updateCharts?.();
+      }
       const currentDate = this.getDateString();
       if (currentDate === this.lastComputedDate) return;
       this.lastComputedDate = currentDate;
@@ -1869,6 +1878,7 @@ class StopwatchManager {
     if (this.app.trainerEngine?.armRoadmapSlotRollover) {
       this.app.trainerEngine.armRoadmapSlotRollover();
     }
+    this.app.shadowEngine?.lockShadowAverageForToday?.();
     this.start("Sleep", {
       category: "Sleep",
       subcategory: "Night Sleep",
@@ -3297,6 +3307,50 @@ class ShadowEngine {
     ];
   }
 
+  getShadowDayCutoffHour() {
+    return Number(CONFIG.SHADOW_DAY_CUTOFF_HOUR || 4);
+  }
+
+  formatCalendarDate(date) {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  parseCalendarDate(dateStr) {
+    if (!dateStr) return null;
+    const parsed = new Date(`${dateStr}T12:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  getShadowDayDate(date = new Date()) {
+    const d = new Date(date);
+    if (d.getHours() < this.getShadowDayCutoffHour()) d.setDate(d.getDate() - 1);
+    d.setHours(12, 0, 0, 0);
+    return this.formatCalendarDate(d);
+  }
+
+  getShadowActiveDate(date = new Date()) {
+    return this.parseCalendarDate(this.getShadowDayDate(date)) || new Date(date);
+  }
+
+  getShadowLockMeta() {
+    const stored =
+      this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+    return {
+      lastLockedDate: stored.shadowLastLockedDate || null,
+      lastAutoBoundaryKey: stored.shadowLastAutoBoundaryKey || null,
+    };
+  }
+
+  saveShadowLockMeta(partial = {}) {
+    const stored =
+      this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE, {
+      ...stored,
+      ...partial,
+    });
+  }
+
   initialize() {
     const stored = parseFloat(
       this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_AVG),
@@ -3395,17 +3449,14 @@ class ShadowEngine {
 
   shiftDateString(dateStr, offsetDays) {
     if (!dateStr) return null;
-    const shiftedDate = new Date(`${dateStr}T12:00:00`);
+    const shiftedDate = this.parseCalendarDate(dateStr);
     if (Number.isNaN(shiftedDate.getTime())) return null;
     shiftedDate.setDate(shiftedDate.getDate() + offsetDays);
-    return this.app.getDateString(shiftedDate);
+    return this.formatCalendarDate(shiftedDate);
   }
 
   getLatestClosedShadowDate() {
-    const latestClosed = new Date();
-    latestClosed.setHours(12, 0, 0, 0);
-    latestClosed.setDate(latestClosed.getDate() - 1);
-    return this.app.getDateString(latestClosed);
+    return this.shiftDateString(this.getShadowDayDate(new Date()), -1);
   }
 
   getPromotionTargetMinutes(shadowStandard, shadowAvg, nextRank) {
@@ -3419,10 +3470,9 @@ class ShadowEngine {
 
   getConsecutiveDaysOverMinutes(dailyMap, targetMinutes, lookback = 7) {
     let streak = 0;
+    const anchorDate = this.getShadowDayDate(new Date());
     for (let i = 0; i < lookback; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const date = this.app.getDateString(d);
+      const date = this.shiftDateString(anchorDate, -i);
       const minutes = dailyMap.get(date) || 0;
       if (minutes >= targetMinutes) streak++;
       else break;
@@ -3433,8 +3483,8 @@ class ShadowEngine {
   getDateStringsBetween(startDateStr, endDateStr) {
     if (!startDateStr || !endDateStr) return [];
 
-    const start = new Date(`${startDateStr}T12:00:00`);
-    const end = new Date(`${endDateStr}T12:00:00`);
+    const start = this.parseCalendarDate(startDateStr);
+    const end = this.parseCalendarDate(endDateStr);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end)
       return [];
 
@@ -3458,7 +3508,7 @@ class ShadowEngine {
     shadowStandard,
     shadowAvg,
   }) {
-    const today = this.app.getDateString(new Date());
+    const today = this.getShadowDayDate(new Date());
     const latestClosedDate = this.getLatestClosedShadowDate();
     const rawRankIndex = this.getRankIndexByTitle(rawRank.title);
     const progress = this.getRankProgressState();
@@ -3769,9 +3819,13 @@ class ShadowEngine {
     const dailyMap = new Map();
     this.app.state.tasks.forEach((task) => {
       if (!this.app.isProductiveCategory(task.category)) return;
+      const dateKey = Number.isFinite(Number(task.startTime))
+        ? this.getShadowDayDate(new Date(Number(task.startTime)))
+        : String(task.date || "").trim();
+      if (!dateKey) return;
       dailyMap.set(
-        task.date,
-        (dailyMap.get(task.date) || 0) + task.duration,
+        dateKey,
+        (dailyMap.get(dateKey) || 0) + task.duration,
       );
     });
     return dailyMap;
@@ -3831,7 +3885,7 @@ class ShadowEngine {
 
   getHistoricalShadowThresholdMap(
     startDateStr = null,
-    endDateStr = this.app.getDateString(new Date()),
+    endDateStr = this.getShadowDayDate(new Date()),
   ) {
     const dailyMap = this.getDailyProductiveMap();
     const baseline = Math.max(
@@ -3839,12 +3893,12 @@ class ShadowEngine {
       Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
     );
     const firstTrackedDate = [...dailyMap.keys()].sort()[0] || endDateStr;
-    const startDate = new Date(
-      `${(startDateStr && startDateStr < firstTrackedDate)
+    const startDate = this.parseCalendarDate(
+      (startDateStr && startDateStr < firstTrackedDate)
         ? startDateStr
-        : firstTrackedDate}T12:00:00`,
+        : firstTrackedDate,
     );
-    const endDate = new Date(`${endDateStr}T12:00:00`);
+    const endDate = this.parseCalendarDate(endDateStr);
     const days = [];
     const thresholdMap = new Map();
 
@@ -3853,7 +3907,7 @@ class ShadowEngine {
       cursor <= endDate;
       cursor.setDate(cursor.getDate() + 1)
     ) {
-      days.push(this.app.getDateString(cursor));
+      days.push(this.formatCalendarDate(cursor));
     }
 
     const prefix = new Array(days.length + 1).fill(0);
@@ -3878,14 +3932,14 @@ class ShadowEngine {
 
   getWinLadder(dailyMap, shadowAvg) {
     const thresholdMap = this.getHistoricalShadowThresholdMap(
-      this.app.getDateString(new Date(Date.now() - 6 * 86400000)),
+      this.shiftDateString(this.getShadowDayDate(new Date()), -6),
     );
     const days = [];
-    const today = this.app.getActiveDate();
+    const today = this.getShadowActiveDate();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const ds = this.app.getDateString(d);
+      const ds = this.formatCalendarDate(d);
       const minutes = dailyMap.get(ds) || 0;
       const threshold = thresholdMap.get(ds) || shadowAvg;
       days.push({ date: ds, win: minutes >= threshold, threshold });
@@ -3902,13 +3956,14 @@ class ShadowEngine {
     };
   }
 
-  buildDailyProductiveSeries() {
+  buildDailyProductiveSeries(endDateStr = this.getShadowDayDate(new Date())) {
     const dailyMap = this.getDailyProductiveMap();
     if (dailyMap.size === 0) return [];
 
     const sorted = [...dailyMap.keys()].sort();
-    const start = new Date(`${sorted[0]}T12:00:00`);
-    const end = new Date(`${this.app.getDateString()}T12:00:00`);
+    const start = this.parseCalendarDate(sorted[0]);
+    const end = this.parseCalendarDate(endDateStr);
+    if (!start || !end || start > end) return [];
     const series = [];
 
     for (
@@ -3916,7 +3971,7 @@ class ShadowEngine {
       cursor <= end;
       cursor.setDate(cursor.getDate() + 1)
     ) {
-      const key = this.app.getDateString(cursor);
+      const key = this.formatCalendarDate(cursor);
       series.push(dailyMap.get(key) || 0);
     }
     return series;
@@ -3929,11 +3984,11 @@ class ShadowEngine {
   detectBehavioralState() {
     const series7 = [];
     const dailyMap = this.getDailyProductiveMap();
-    const today = this.app.getActiveDate();
+    const today = this.getShadowActiveDate();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      series7.push(dailyMap.get(this.app.getDateString(d)) || 0);
+      series7.push(dailyMap.get(this.formatCalendarDate(d)) || 0);
     }
     const target = Math.max(1, this.shadowSevenDayAverage || 120);
     // ratio = how many minutes completed vs target, average over 7 days
@@ -4050,8 +4105,8 @@ class ShadowEngine {
     return count < CONFIG.MAX_SLEEP_COMPROMISES_PER_7_DAYS;
   }
 
-  computeRollingMetrics() {
-    const series = this.buildDailyProductiveSeries();
+  computeRollingMetrics(endDateStr = this.getShadowDayDate(new Date())) {
+    const series = this.buildDailyProductiveSeries(endDateStr);
     if (!series.length)
       return {
         bestAvg: 0,
@@ -4304,7 +4359,7 @@ class ShadowEngine {
         activeDays: 0,
         recentWinRate: 0,
       };
-    const now = this.app.getActiveDate();
+    const now = this.getShadowActiveDate();
     const month = now.getMonth();
     const year = now.getFullYear();
     const monthDays = [];
@@ -4315,7 +4370,7 @@ class ShadowEngine {
 
     for (let day = 1; day <= activeDays; day++) {
       const d = new Date(year, month, day, 12, 0, 0, 0);
-      const date = this.app.getDateString(d);
+      const date = this.formatCalendarDate(d);
       const minutes = dailyMap.get(date) || 0;
       const threshold = thresholdMap.get(date) || shadowAvg;
       const isWin = minutes >= threshold;
@@ -4411,6 +4466,71 @@ class ShadowEngine {
     return baseShadow + totalCarry;
   }
 
+  commitLockedShadowAverage(dateStr, { autoBoundaryKey = null } = {}) {
+    if (!dateStr) return { locked: false, isNewStandard: false };
+
+    const previousShadow = Math.max(
+      0,
+      Math.round(Number(this.shadowSevenDayAverage || 0)),
+    );
+    const metrics = this.computeRollingMetrics(dateStr);
+    const resolvedShadow = Math.max(
+      0,
+      Math.round(Number(metrics.currentAvg || 0)),
+    );
+
+    this.shadowSevenDayAverage = resolvedShadow;
+    this.app.saveToStorage(
+      CONFIG.STORAGE_KEYS.SHADOW_AVG,
+      resolvedShadow,
+    );
+
+    const lockMeta = {
+      shadowLastLockedDate: dateStr,
+    };
+    if (autoBoundaryKey) {
+      lockMeta.shadowLastAutoBoundaryKey = autoBoundaryKey;
+    }
+    this.saveShadowLockMeta(lockMeta);
+
+    return {
+      locked: true,
+      isNewStandard: resolvedShadow > previousShadow,
+      shadowAvg: resolvedShadow,
+    };
+  }
+
+  maybeAutoLockShadowAverage() {
+    const boundaryKey = this.getShadowDayDate(new Date());
+    const targetDate = this.shiftDateString(boundaryKey, -1);
+    if (!targetDate) return { locked: false, isNewStandard: false };
+
+    const lockMeta = this.getShadowLockMeta();
+    if (lockMeta.lastAutoBoundaryKey === boundaryKey) {
+      return { locked: false, isNewStandard: false };
+    }
+
+    if (lockMeta.lastLockedDate && lockMeta.lastLockedDate >= targetDate) {
+      this.saveShadowLockMeta({
+        shadowLastAutoBoundaryKey: boundaryKey,
+      });
+      return { locked: false, isNewStandard: false };
+    }
+
+    return this.commitLockedShadowAverage(targetDate, {
+      autoBoundaryKey: boundaryKey,
+    });
+  }
+
+  lockShadowAverageForToday() {
+    const result = this.commitLockedShadowAverage(
+      this.getShadowDayDate(new Date()),
+    );
+    this.refresh(false);
+    this.app.graphManager?.updateCharts?.();
+    return result;
+  }
+
   render({
     todayMinutes,
     shadowAvg,
@@ -4433,10 +4553,11 @@ class ShadowEngine {
     const targetToday = shadowAvg > 0 ? Math.ceil(shadowAvg + 1) : 0;
     const neededTie = Math.max(0, shadowAvg - todayMinutes);
     const neededLead = Math.max(0, shadowAvg - todayMinutes + 1);
-    const todayDate = this.app.getDateString(new Date());
-    const goalProgress = this.getTodayGoalProgress(todayDate);
+    const todayDate = this.getShadowDayDate(new Date());
+    const taskDate = this.app.getDateString(new Date());
+    const goalProgress = this.getTodayGoalProgress(taskDate);
     const missionScore = this.calculateMissionScore(goalProgress);
-    const distractionMinutes = this.getTodayDistractionMinutes(todayDate);
+    const distractionMinutes = this.getTodayDistractionMinutes(taskDate);
     const penalty = this.getPenalty(
       todayMinutes,
       shadowAvg,
@@ -4466,10 +4587,11 @@ class ShadowEngine {
     );
 
     const last7 = [];
+    const today = this.getShadowActiveDate();
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
+      const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const ds = this.app.getDateString(d);
+      const ds = this.formatCalendarDate(d);
       last7.push(dailyMap.get(ds) || 0);
     }
     const sorted7 = [...last7].sort((a, b) => a - b);
@@ -4782,7 +4904,7 @@ class ShadowEngine {
     this.app.elements["shadow-duel-shadow-fill"].style.width =
       `${shadowShare}%`;
     this.app.elements["shadow-note"].textContent =
-      "Rolling 7-day average";
+      "Locked until Sleep or 4:00 AM";
 
     const fill = this.app.elements["shadow-progress-fill"];
     const cappedWidth = Math.min(130, Math.max(0, percentage));
@@ -4800,17 +4922,12 @@ class ShadowEngine {
   }
 
   refresh(allowAnimation = true) {
+    const autoLock = this.maybeAutoLockShadowAverage();
     const metrics = this.computeRollingMetrics();
-    const resolvedShadow = Math.max(0, Math.round(metrics.currentAvg || 0));
-    const isNewStandard = resolvedShadow > this.shadowSevenDayAverage;
-
-    if (resolvedShadow !== this.shadowSevenDayAverage) {
-      this.shadowSevenDayAverage = resolvedShadow;
-      this.app.saveToStorage(
-        CONFIG.STORAGE_KEYS.SHADOW_AVG,
-        resolvedShadow,
-      );
-    }
+    const resolvedShadow = Math.max(
+      0,
+      Math.round(Number(this.shadowSevenDayAverage || 0)),
+    );
 
     this.render({
       todayMinutes: metrics.todayMinutes,
@@ -4818,7 +4935,7 @@ class ShadowEngine {
       currentAvg: metrics.currentAvg,
       previousAvg: metrics.previousAvg,
       hasMomentumBaseline: metrics.hasMomentumBaseline,
-      isNewStandard: allowAnimation && isNewStandard,
+      isNewStandard: allowAnimation && autoLock.isNewStandard,
     });
     if (this.app.trainerEngine) this.app.trainerEngine.refresh();
   }
