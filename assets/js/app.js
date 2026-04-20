@@ -6964,7 +6964,7 @@ class GraphManager {
         : "total",
     );
     this.updateGraphKpis();
-    this.renderGithubHeatmap();
+    this.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
   }
 
   getRangeDates(range) {
@@ -7880,7 +7880,7 @@ class GraphManager {
     this.lastFilteredTotalMinutes = toMinutes;
     this.animateFilteredTotal(fromMinutes, toMinutes, displayMode);
     this.updateGraphKpis();
-    this.renderGithubHeatmap();
+    this.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
     setTimeout(() => {
       if (prodContainer)
         prodContainer.classList.remove("filter-updating");
@@ -7941,7 +7941,8 @@ renderGithubHeatmap(year = null) {
     });
 
     const yearsWithData = Array.from(yearDataMap.keys()).sort((a, b) => a - b);
-    const currentYear = year || new Date().getFullYear();
+    const fallbackYear = this.app.uiManager.currentHeatmapYear || new Date().getFullYear();
+    const currentYear = year ?? fallbackYear;
     this.app.uiManager.currentHeatmapYear = currentYear;
 
     const prevBtn = document.getElementById("heatmap-prev-year");
@@ -8002,7 +8003,11 @@ renderGithubHeatmap(year = null) {
       }
     });
 
-    const todayEntry = days[days.length - 1];
+    const todayDate = this.app.getDateString(new Date());
+    const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
+    const streakAnchorIndex =
+      todayIndex >= 0 ? todayIndex : days.length - 1;
+    const todayEntry = days[streakAnchorIndex];
     const currentStreak = todayEntry?.streak || 0;
     let bestStreak = 0;
     let bestEndIndex = -1;
@@ -8014,11 +8019,12 @@ renderGithubHeatmap(year = null) {
     });
     const bestStartIndex = bestStreak > 0 ? (bestEndIndex - bestStreak + 1) : -1;
     const hasBrokenBestStreak =
-      bestStreak > 0 && bestEndIndex >= 0 && bestEndIndex < days.length - 1;
+      bestStreak > 0 &&
+      bestEndIndex >= 0 &&
+      bestEndIndex < streakAnchorIndex;
 
-    const currentStreakStartIndex = currentStreak > 0 ? (days.length - currentStreak) : -1;
-    const todayDate = this.app.getDateString(new Date());
-    const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
+    const currentStreakStartIndex =
+      currentStreak > 0 ? (streakAnchorIndex - currentStreak + 1) : -1;
     const todayWeek = todayIndex >= 0 ? Math.floor(todayIndex / 7) : 52;
 
     const wrapper = document.createElement("div");
@@ -8117,13 +8123,13 @@ class EventManager {
     if (this.app.elements["heatmap-prev-year"]) {
       this.app.elements["heatmap-prev-year"].addEventListener("click", () => {
         this.app.uiManager.currentHeatmapYear -= 1;
-        this.app.uiManager.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
+        this.app.graphManager.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
       });
     }
     if (this.app.elements["heatmap-next-year"]) {
       this.app.elements["heatmap-next-year"].addEventListener("click", () => {
         this.app.uiManager.currentHeatmapYear += 1;
-        this.app.uiManager.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
+        this.app.graphManager.renderGithubHeatmap(this.app.uiManager.currentHeatmapYear);
       });
     }
     const genBtn = this.app.elements["generate-roadmap-btn"];
