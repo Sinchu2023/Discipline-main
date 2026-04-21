@@ -216,7 +216,55 @@ After any non-trivial change, manually verify:
 - win ladder
 - mission score
 
-## 11. Strong Rule
+## 11. Sync Error Checks
+
+These are known high-risk mismatch errors.
+
+After changing any date, SHADOW, graph, or heatmap logic, always check:
+
+- `Shadow Buddy` baseline value
+- graph today shadow value
+- 365 heatmap tooltip `Shadow` value
+- 365 heatmap tooltip `Win Target` value
+- top day productivity value
+
+Expected relationship:
+
+- `Shadow Buddy` must match graph today shadow baseline
+- `Shadow Buddy` must match 365 tooltip `Shadow`
+- 365 tooltip `Win Target` must be `Shadow + 1 minute`
+- top day productivity is allowed to be different from Shadow Buddy
+  - because top day productivity is today's completed productive minutes
+  - Shadow Buddy is a derived baseline value
+
+If these fail:
+
+- do not patch text only
+- check date grouping first
+- check whether one path uses `task.date` and another uses `startTime`
+- check whether one path uses current day and another uses previous locked day
+- check whether one path uses baseline and another uses win target
+
+Known bad mismatch examples:
+
+- Buddy `1h 10m`, graph `1h 03m`, heatmap `1h 04m`
+- future heatmap cells turning white
+- same task counted into different days across sections
+- momentum delta shown twice
+
+Required debug order:
+
+1. `normalizeTask()`
+2. `getDateString()`
+3. `getShadowDayDate()`
+4. `getDailyProductiveMap()`
+5. `getHistoricalLockedShadowMap()` or equivalent baseline helper
+6. `getHistoricalBattleTargetMap()`
+7. `buildRollingShadowAverageMap()`
+8. `renderGithubHeatmap()`
+9. `ShadowEngine.refresh()`
+
+## 12. Strong Rule
 
 Do not patch only the displayed text if the bug is data-related.
 
