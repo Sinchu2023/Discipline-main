@@ -3998,20 +3998,20 @@ class ShadowEngine {
   }
 
   buildShadowBuddySnapshot(
-    boundaryDateStr = this.getShadowDayDate(new Date()),
+    lockedDateStr = this.shiftDateString(this.getShadowDayDate(new Date()), -1),
     resolvedShadow = this.shadowSevenDayAverage,
   ) {
-    const closedDate = this.shiftDateString(boundaryDateStr, -1);
-    const metrics = closedDate
-      ? this.computeRollingMetrics(closedDate)
+    const metrics = lockedDateStr
+      ? this.computeRollingMetrics(lockedDateStr)
       : { currentAvg: 0 };
     const shadowAvg = Math.max(0, Math.round(Number(resolvedShadow || 0)));
     const currentAvg = Math.max(0, Math.round(Number(metrics.currentAvg || 0)));
 
     return {
+      lockedDate: lockedDateStr || null,
       shadowAvg,
       currentAvg,
-      shadowStandard: this.getShadowStandardForDate(closedDate, shadowAvg),
+      shadowStandard: this.getShadowStandardForDate(lockedDateStr, shadowAvg),
       targetToday: shadowAvg > 0 ? Math.ceil(shadowAvg + 1) : 0,
       weeklyGap: shadowAvg - currentAvg,
     };
@@ -4019,6 +4019,11 @@ class ShadowEngine {
 
   resolveShadowBuddySnapshot(resolvedShadow = this.shadowSevenDayAverage) {
     const boundaryKey = this.getShadowDayDate(new Date());
+    const lockMeta = this.getShadowLockMeta();
+    const lockedDate =
+      lockMeta.lastLockedDate && lockMeta.lastLockedDate <= boundaryKey
+        ? lockMeta.lastLockedDate
+        : this.shiftDateString(boundaryKey, -1);
     const cached = this.getShadowBuddySnapshot();
     const normalizedShadow = Math.max(
       0,
@@ -4028,16 +4033,14 @@ class ShadowEngine {
     if (
       cached.date === boundaryKey &&
       cached.metrics &&
+      cached.metrics.lockedDate === lockedDate &&
       Math.max(0, Math.round(Number(cached.metrics.shadowAvg || 0))) ===
         normalizedShadow
     ) {
       return cached.metrics;
     }
 
-    const snapshot = this.buildShadowBuddySnapshot(
-      boundaryKey,
-      normalizedShadow,
-    );
+    const snapshot = this.buildShadowBuddySnapshot(lockedDate, normalizedShadow);
     this.saveShadowBuddySnapshot(boundaryKey, snapshot);
     return snapshot;
   }
