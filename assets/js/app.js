@@ -4725,17 +4725,11 @@ class ShadowEngine {
   }
 
   resolveLockedShadowAverage(boundaryKey = this.getShadowDayDate(new Date())) {
-    const lockMeta = this.getShadowLockMeta();
-    const lockedDate =
-      lockMeta.lastLockedDate && lockMeta.lastLockedDate <= boundaryKey
-        ? lockMeta.lastLockedDate
-        : this.shiftDateString(boundaryKey, -1);
-    if (!lockedDate) return 0;
     return Math.max(
       0,
       Math.round(
         Number(
-          this.getHistoricalLockedShadowMap(lockedDate, lockedDate).get(lockedDate) || 0,
+          this.getHistoricalLockedShadowMap(boundaryKey, boundaryKey).get(boundaryKey) || 0,
         ),
       ),
     );
@@ -8342,6 +8336,10 @@ renderGithubHeatmap(year = null) {
     }
     const firstDayOffset = startDate.getDay();
     const totalWeeks = Math.ceil((firstDayOffset + dates.length) / 7);
+    const lockedShadowMap = this.app.shadowEngine.getHistoricalLockedShadowMap(
+      dates[0],
+      dates[dates.length - 1],
+    );
     const targetMap = this.app.shadowEngine.getHistoricalBattleTargetMap(
       dates[0],
       dates[dates.length - 1],
@@ -8351,12 +8349,14 @@ renderGithubHeatmap(year = null) {
       const productive = productiveMap.get(dateStr) || 0;
       const tracked = trackedMap.get(dateStr) || 0;
       const hasData = tracked > 0;
+      const shadow = lockedShadowMap.get(dateStr) || Math.max(0, fallbackTarget - 1);
       const target = targetMap.get(dateStr) || fallbackTarget;
       const isWin = productive >= target;
       return {
         dateStr,
         productive,
         tracked,
+        shadow,
         target,
         hasData,
         isWin,
@@ -8437,7 +8437,7 @@ renderGithubHeatmap(year = null) {
       ) {
         cell.dataset.best = "broken";
       }
-      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Target ${this.app.formatDuration(day.target || fallbackTarget)} | Streak ${day.streak || 0}`;
+      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Shadow ${this.app.formatDuration(day.shadow || Math.max(0, fallbackTarget - 1))} | Win Target ${this.app.formatDuration(day.target || fallbackTarget)} | Streak ${day.streak || 0}`;
       grid.appendChild(cell);
     });
 
