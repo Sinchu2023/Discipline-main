@@ -8354,7 +8354,11 @@ renderGithubHeatmap(year = null) {
       const isWin = productive >= target;
       const remaining = Math.max(0, target - productive);
       const leftPercent = target > 0 ? remaining / target : 0;
-      const isNearGoal = hasData && !isWin && target > 0 && leftPercent <= 0.2;
+      let nearGoalTier = "";
+      if (hasData && !isWin && target > 0) {
+        if (leftPercent <= 0.2) nearGoalTier = "critical";
+        else if (leftPercent <= 0.4) nearGoalTier = "close";
+      }
       return {
         dateStr,
         productive,
@@ -8363,7 +8367,7 @@ renderGithubHeatmap(year = null) {
         target,
         hasData,
         isWin,
-        isNearGoal,
+        nearGoalTier,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
       };
     });
@@ -8427,8 +8431,8 @@ renderGithubHeatmap(year = null) {
       cell.style.gridColumn = String(week + 1);
       cell.style.gridRow = String(row + 1);
       cell.dataset.state = day.dateStr === todayDate ? "today" : day.state;
-      if (day.isNearGoal) {
-        cell.dataset.near = "goal";
+      if (day.nearGoalTier) {
+        cell.dataset.near = day.nearGoalTier;
       }
       if (
         currentStreak > 0 &&
@@ -8444,7 +8448,13 @@ renderGithubHeatmap(year = null) {
       ) {
         cell.dataset.best = "broken";
       }
-      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Shadow ${this.app.formatDuration(day.shadow || Math.max(0, fallbackTarget - 1))} | Win Target ${this.app.formatDuration(day.target || fallbackTarget)}${day.isNearGoal ? " | Near goal: 20% left or less" : ""} | Streak ${day.streak || 0}`;
+      const nearGoalLabel =
+        day.nearGoalTier === "critical"
+          ? " | Near goal: 20% left or less"
+          : day.nearGoalTier === "close"
+            ? " | Near goal: 40% left or less"
+            : "";
+      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Shadow ${this.app.formatDuration(day.shadow || Math.max(0, fallbackTarget - 1))} | Win Target ${this.app.formatDuration(day.target || fallbackTarget)}${nearGoalLabel} | Streak ${day.streak || 0}`;
       grid.appendChild(cell);
     });
 
