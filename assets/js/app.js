@@ -4697,6 +4697,17 @@ class ShadowEngine {
     return result;
   }
 
+  resolveLockedShadowAverage(boundaryKey = this.getShadowDayDate(new Date())) {
+    const lockMeta = this.getShadowLockMeta();
+    const lockedDate =
+      lockMeta.lastLockedDate && lockMeta.lastLockedDate <= boundaryKey
+        ? lockMeta.lastLockedDate
+        : this.shiftDateString(boundaryKey, -1);
+    if (!lockedDate) return 0;
+    const metrics = this.computeRollingMetrics(lockedDate);
+    return Math.max(0, Math.round(Number(metrics.currentAvg || 0)));
+  }
+
   render({
     todayMinutes,
     shadowAvg,
@@ -4878,8 +4889,10 @@ class ShadowEngine {
     this.app.elements["shadow-weekly-average"].textContent =
       this.app.formatDuration(lockedBuddyWeeklyAvg);
     if (this.app.elements["shadow-note"]) {
-      this.app.elements["shadow-note"].textContent =
-        "Live 7-day average from graph";
+      const lockedDate = this.app.parseDateKey(buddySnapshot?.lockedDate);
+      this.app.elements["shadow-note"].textContent = lockedDate
+        ? `Locked after ${lockedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} close`
+        : "Locked from completed days only";
     }
     if (this.app.elements["shadow-standard-metric"])
       this.app.elements["shadow-standard-metric"].textContent =
@@ -5122,10 +5135,7 @@ class ShadowEngine {
   refresh(allowAnimation = true) {
     const autoLock = this.maybeAutoLockShadowAverage();
     const metrics = this.computeRollingMetrics();
-    const resolvedShadow = Math.max(
-      0,
-      Math.round(Number(metrics.currentAvg || 0)),
-    );
+    const resolvedShadow = this.resolveLockedShadowAverage();
     if (resolvedShadow !== Math.max(0, Math.round(Number(this.shadowSevenDayAverage || 0)))) {
       this.shadowSevenDayAverage = resolvedShadow;
       this.app.saveToStorage(
@@ -5133,17 +5143,7 @@ class ShadowEngine {
         resolvedShadow,
       );
     }
-    const buddySnapshot = {
-      lockedDate: this.getShadowDayDate(new Date()),
-      shadowAvg: resolvedShadow,
-      currentAvg: resolvedShadow,
-      shadowStandard: this.getShadowStandardForDate(
-        this.getShadowDayDate(new Date()),
-        resolvedShadow,
-      ),
-      targetToday: resolvedShadow > 0 ? Math.ceil(resolvedShadow + 1) : 0,
-      weeklyGap: 0,
-    };
+    const buddySnapshot = this.resolveShadowBuddySnapshot(resolvedShadow);
 
     this.render({
       todayMinutes: metrics.todayMinutes,
@@ -7705,16 +7705,19 @@ class GraphManager {
 
     const dailyMap = this.app.shadowEngine?.getDailyProductiveMap?.() || new Map();
     const rollingMap = new Map();
+    const resolveShadowDateKey = (date) =>
+      this.app.shadowEngine?.formatCalendarDate?.(date) ||
+      this.app.getDateString(date);
 
     for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
       const pointDate = new Date(cursor);
       let total = 0;
-      for (let i = 0; i < 7; i += 1) {
+      for (let i = 1; i <= 7; i += 1) {
         const historyDate = new Date(pointDate);
         historyDate.setDate(pointDate.getDate() - i);
-        total += dailyMap.get(this.app.getDateString(historyDate)) || 0;
+        total += dailyMap.get(resolveShadowDateKey(historyDate)) || 0;
       }
-      rollingMap.set(this.app.getDateString(pointDate), total / 7);
+      rollingMap.set(resolveShadowDateKey(pointDate), total / 7);
     }
 
     return rollingMap;
@@ -8400,7 +8403,11 @@ renderGithubHeatmap(year = null) {
       cell.style.gridColumn = String(week + 1);
       cell.style.gridRow = String(row + 1);
       cell.dataset.state = day.dateStr === todayDate ? "today" : day.state;
-      if (currentStreak > 0 && index >= currentStreakStartIndex) {
+      if (
+        currentStreak > 0 &&
+        index >= currentStreakStartIndex &&
+        index <= streakAnchorIndex
+      ) {
         cell.dataset.streak = "active";
       }
       if (
