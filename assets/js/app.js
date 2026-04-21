@@ -8352,6 +8352,9 @@ renderGithubHeatmap(year = null) {
       const shadow = lockedShadowMap.get(dateStr) || Math.max(0, fallbackTarget - 1);
       const target = targetMap.get(dateStr) || fallbackTarget;
       const isWin = productive >= target;
+      const remaining = Math.max(0, target - productive);
+      const leftPercent = target > 0 ? remaining / target : 0;
+      const isNearGoal = hasData && !isWin && target > 0 && leftPercent <= 0.2;
       return {
         dateStr,
         productive,
@@ -8360,6 +8363,7 @@ renderGithubHeatmap(year = null) {
         target,
         hasData,
         isWin,
+        isNearGoal,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
       };
     });
@@ -8423,6 +8427,9 @@ renderGithubHeatmap(year = null) {
       cell.style.gridColumn = String(week + 1);
       cell.style.gridRow = String(row + 1);
       cell.dataset.state = day.dateStr === todayDate ? "today" : day.state;
+      if (day.isNearGoal) {
+        cell.dataset.near = "goal";
+      }
       if (
         currentStreak > 0 &&
         index >= currentStreakStartIndex &&
@@ -8437,7 +8444,7 @@ renderGithubHeatmap(year = null) {
       ) {
         cell.dataset.best = "broken";
       }
-      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Shadow ${this.app.formatDuration(day.shadow || Math.max(0, fallbackTarget - 1))} | Win Target ${this.app.formatDuration(day.target || fallbackTarget)} | Streak ${day.streak || 0}`;
+      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Shadow ${this.app.formatDuration(day.shadow || Math.max(0, fallbackTarget - 1))} | Win Target ${this.app.formatDuration(day.target || fallbackTarget)}${day.isNearGoal ? " | Near goal: 20% left or less" : ""} | Streak ${day.streak || 0}`;
       grid.appendChild(cell);
     });
 
