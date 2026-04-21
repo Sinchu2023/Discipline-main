@@ -4451,19 +4451,26 @@ class ShadowEngine {
       return {
         label: "Insufficient history",
         cls: "shadow-momentum-flat",
+        includeDelta: false,
       };
     const delta = currentAvg - previousAvg;
     if (delta > 8)
       return {
-        label: `Rising (+${this.app.formatDuration(delta)})`,
+        label: "Rising",
         cls: "shadow-momentum-positive",
+        includeDelta: true,
       };
     if (delta < -8)
       return {
-        label: `Drifting (-${this.app.formatDuration(Math.abs(delta))})`,
+        label: "Drifting",
         cls: "shadow-momentum-negative",
+        includeDelta: true,
       };
-    return { label: "Stable", cls: "shadow-momentum-flat" };
+    return {
+      label: "Stable",
+      cls: "shadow-momentum-flat",
+      includeDelta: false,
+    };
   }
 
   getPressure(percentage, weeklyGap, recentWinRate, missionScore = 100) {
@@ -4974,7 +4981,9 @@ class ShadowEngine {
     const momentumEl = this.app.elements["shadow-momentum"];
     const momentumDelta = Math.round(currentAvg - previousAvg);
     const momentumDeltaText = `${momentumDelta >= 0 ? "+" : "-"}${this.app.formatDuration(Math.abs(momentumDelta))}`;
-    momentumEl.textContent = `${momentum.label} (${momentumDeltaText})`;
+    momentumEl.textContent = momentum.includeDelta
+      ? `${momentum.label} (${momentumDeltaText})`
+      : momentum.label;
     momentumEl.className = momentum.cls;
 
     const gapEl = this.app.elements["shadow-gap"];
