@@ -3955,7 +3955,11 @@ class ShadowEngine {
     return thresholdMap;
   }
 
-  getHistoricalBattleTargetMap(
+  getShadowValueCapMinutes() {
+    return 12 * 60;
+  }
+
+  getHistoricalLockedShadowMap(
     startDateStr = null,
     endDateStr = this.getShadowDayDate(new Date()),
   ) {
@@ -3964,6 +3968,7 @@ class ShadowEngine {
       1,
       Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
     );
+    const cap = Math.max(baseline, this.getShadowValueCapMinutes());
     const firstTrackedDate = [...dailyMap.keys()].sort()[0] || endDateStr;
     const requestedStartStr = startDateStr || firstTrackedDate;
     const historyStartStr =
@@ -3991,7 +3996,8 @@ class ShadowEngine {
       prefix[i + 1] = prefix[i] + (dailyMap.get(days[i]) || 0);
     }
 
-    const targetMap = new Map();
+    const lockedMap = new Map();
+    let previousLocked = 0;
     for (let i = 0; i < days.length; i += 1) {
       const dateStr = days[i];
       const completedDays = i;
@@ -3999,17 +4005,34 @@ class ShadowEngine {
       const rollingAvg =
         completedDays > 0
           ? (prefix[completedDays] - prefix[windowStart]) / 7
-          : 0;
-      const lockedShadow =
-        completedDays > 0
-          ? Math.max(1, Math.round(rollingAvg))
           : baseline;
-      const target =
-        completedDays > 0 ? Math.max(1, lockedShadow + 1) : baseline;
+      const rawLocked = Math.max(1, Math.round(rollingAvg || baseline));
+      const ratchetedLocked =
+        previousLocked > 0 && previousLocked < cap
+          ? Math.max(rawLocked, previousLocked + 1)
+          : rawLocked;
+      const locked = Math.min(cap, Math.max(1, ratchetedLocked));
+      previousLocked = locked;
       if (dateStr >= requestedStartStr) {
-        targetMap.set(dateStr, target);
+        lockedMap.set(dateStr, locked);
       }
     }
+
+    return lockedMap;
+  }
+
+  getHistoricalBattleTargetMap(
+    startDateStr = null,
+    endDateStr = this.getShadowDayDate(new Date()),
+  ) {
+    const lockedMap = this.getHistoricalLockedShadowMap(
+      startDateStr,
+      endDateStr,
+    );
+    const targetMap = new Map();
+    lockedMap.forEach((lockedShadow, dateStr) => {
+      targetMap.set(dateStr, Math.max(1, Number(lockedShadow || 0) + 1));
+    });
 
     return targetMap;
   }
@@ -4652,10 +4675,13 @@ class ShadowEngine {
       0,
       Math.round(Number(this.shadowSevenDayAverage || 0)),
     );
-    const metrics = this.computeRollingMetrics(dateStr);
     const resolvedShadow = Math.max(
       0,
-      Math.round(Number(metrics.currentAvg || 0)),
+      Math.round(
+        Number(
+          this.getHistoricalLockedShadowMap(dateStr, dateStr).get(dateStr) || 0,
+        ),
+      ),
     );
 
     this.shadowSevenDayAverage = resolvedShadow;
@@ -4717,8 +4743,14 @@ class ShadowEngine {
         ? lockMeta.lastLockedDate
         : this.shiftDateString(boundaryKey, -1);
     if (!lockedDate) return 0;
-    const metrics = this.computeRollingMetrics(lockedDate);
-    return Math.max(0, Math.round(Number(metrics.currentAvg || 0)));
+    return Math.max(
+      0,
+      Math.round(
+        Number(
+          this.getHistoricalLockedShadowMap(lockedDate, lockedDate).get(lockedDate) || 0,
+        ),
+      ),
+    );
   }
 
   render({
@@ -7717,25 +7749,10 @@ class GraphManager {
       startDate > endDate
     )
       return new Map();
-
-    const dailyMap = this.app.shadowEngine?.getDailyProductiveMap?.() || new Map();
-    const rollingMap = new Map();
-    const resolveShadowDateKey = (date) =>
-      this.app.shadowEngine?.formatCalendarDate?.(date) ||
-      this.app.getDateString(date);
-
-    for (const cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
-      const pointDate = new Date(cursor);
-      let total = 0;
-      for (let i = 1; i <= 7; i += 1) {
-        const historyDate = new Date(pointDate);
-        historyDate.setDate(pointDate.getDate() - i);
-        total += dailyMap.get(resolveShadowDateKey(historyDate)) || 0;
-      }
-      rollingMap.set(resolveShadowDateKey(pointDate), total / 7);
-    }
-
-    return rollingMap;
+    return this.app.shadowEngine?.getHistoricalLockedShadowMap?.(
+      startDateStr,
+      endDateStr,
+    ) || new Map();
   }
 
   getColorScheme() {
