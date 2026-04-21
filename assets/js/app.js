@@ -3351,6 +3351,25 @@ class ShadowEngine {
     });
   }
 
+  getShadowBuddySnapshot() {
+    const stored =
+      this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+    return {
+      date: stored.shadowBuddySnapshotDate || null,
+      metrics: stored.shadowBuddySnapshot || null,
+    };
+  }
+
+  saveShadowBuddySnapshot(dateStr, snapshot) {
+    const stored =
+      this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE) || {};
+    this.app.saveToStorage(CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE, {
+      ...stored,
+      shadowBuddySnapshotDate: dateStr || null,
+      shadowBuddySnapshot: snapshot || null,
+    });
+  }
+
   initialize() {
     const stored = parseFloat(
       this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SHADOW_AVG),
@@ -3956,6 +3975,73 @@ class ShadowEngine {
     };
   }
 
+  getShadowStandardForDate(endDateStr, fallbackShadowAvg = 0) {
+    const anchorDate = this.parseCalendarDate(endDateStr);
+    if (!anchorDate) {
+      return Math.max(0, Math.round(Number(fallbackShadowAvg || 0)));
+    }
+
+    const dailyMap = this.getDailyProductiveMap();
+    const last7 = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(anchorDate);
+      d.setDate(anchorDate.getDate() - i);
+      last7.push(dailyMap.get(this.formatCalendarDate(d)) || 0);
+    }
+
+    const sorted7 = [...last7].sort((a, b) => a - b);
+    const p70Index = Math.max(0, Math.ceil(0.7 * sorted7.length) - 1);
+    return Math.max(
+      0,
+      Math.round(sorted7[p70Index] || fallbackShadowAvg || 0),
+    );
+  }
+
+  buildShadowBuddySnapshot(
+    boundaryDateStr = this.getShadowDayDate(new Date()),
+    resolvedShadow = this.shadowSevenDayAverage,
+  ) {
+    const closedDate = this.shiftDateString(boundaryDateStr, -1);
+    const metrics = closedDate
+      ? this.computeRollingMetrics(closedDate)
+      : { currentAvg: 0 };
+    const shadowAvg = Math.max(0, Math.round(Number(resolvedShadow || 0)));
+    const currentAvg = Math.max(0, Math.round(Number(metrics.currentAvg || 0)));
+
+    return {
+      shadowAvg,
+      currentAvg,
+      shadowStandard: this.getShadowStandardForDate(closedDate, shadowAvg),
+      targetToday: shadowAvg > 0 ? Math.ceil(shadowAvg + 1) : 0,
+      weeklyGap: shadowAvg - currentAvg,
+    };
+  }
+
+  resolveShadowBuddySnapshot(resolvedShadow = this.shadowSevenDayAverage) {
+    const boundaryKey = this.getShadowDayDate(new Date());
+    const cached = this.getShadowBuddySnapshot();
+    const normalizedShadow = Math.max(
+      0,
+      Math.round(Number(resolvedShadow || 0)),
+    );
+
+    if (
+      cached.date === boundaryKey &&
+      cached.metrics &&
+      Math.max(0, Math.round(Number(cached.metrics.shadowAvg || 0))) ===
+        normalizedShadow
+    ) {
+      return cached.metrics;
+    }
+
+    const snapshot = this.buildShadowBuddySnapshot(
+      boundaryKey,
+      normalizedShadow,
+    );
+    this.saveShadowBuddySnapshot(boundaryKey, snapshot);
+    return snapshot;
+  }
+
   buildDailyProductiveSeries(endDateStr = this.getShadowDayDate(new Date())) {
     const dailyMap = this.getDailyProductiveMap();
     if (dailyMap.size === 0) return [];
@@ -4537,6 +4623,7 @@ class ShadowEngine {
     currentAvg,
     previousAvg,
     hasMomentumBaseline,
+    buddySnapshot,
     isNewStandard,
   }) {
     const safeShadow = shadowAvg > 0 ? shadowAvg : 1;
@@ -4597,6 +4684,35 @@ class ShadowEngine {
     const sorted7 = [...last7].sort((a, b) => a - b);
     const p70Index = Math.max(0, Math.ceil(0.7 * sorted7.length) - 1);
     const shadowStandard = sorted7[p70Index] || shadowAvg;
+    const lockedBuddyShadowAvg = Math.max(
+      0,
+      Math.round(Number(buddySnapshot?.shadowAvg ?? shadowAvg)),
+    );
+    const lockedBuddyWeeklyAvg = Math.max(
+      0,
+      Math.round(Number(buddySnapshot?.currentAvg ?? currentAvg)),
+    );
+    const lockedBuddyStandard = Math.max(
+      0,
+      Math.round(Number(buddySnapshot?.shadowStandard ?? shadowStandard)),
+    );
+    const lockedBuddyTarget = Math.max(
+      0,
+      Math.round(
+        Number(
+          buddySnapshot?.targetToday ??
+            (lockedBuddyShadowAvg > 0
+              ? Math.ceil(lockedBuddyShadowAvg + 1)
+              : 0),
+        ),
+      ),
+    );
+    const lockedBuddyWeeklyGap = Math.round(
+      Number(
+        buddySnapshot?.weeklyGap ??
+          (lockedBuddyShadowAvg - lockedBuddyWeeklyAvg),
+      ),
+    );
     const momentumScore =
       shadowStandard > 0 ? todayMinutes / shadowStandard : 0;
     const daysAboveShadow = last7.filter(
@@ -4678,12 +4794,12 @@ class ShadowEngine {
     this.app.elements["shadow-current-minutes"].textContent =
       this.app.formatDuration(todayMinutes);
     this.app.elements["shadow-average"].textContent =
-      this.app.formatDuration(shadowAvg);
+      this.app.formatDuration(lockedBuddyShadowAvg);
     this.app.elements["shadow-weekly-average"].textContent =
-      this.app.formatDuration(currentAvg);
+      this.app.formatDuration(lockedBuddyWeeklyAvg);
     if (this.app.elements["shadow-standard-metric"])
       this.app.elements["shadow-standard-metric"].textContent =
-        this.app.formatDuration(shadowStandard);
+        this.app.formatDuration(lockedBuddyStandard);
     if (this.app.elements["shadow-momentum-score"])
       this.app.elements["shadow-momentum-score"].textContent =
         `${momentumScore.toFixed(2)}x`;
@@ -4693,7 +4809,7 @@ class ShadowEngine {
     if (this.app.elements["shadow-growth-trend"])
       this.app.elements["shadow-growth-trend"].textContent = growthTrend;
     this.app.elements["shadow-target"].textContent =
-      this.app.formatDuration(targetToday);
+      this.app.formatDuration(lockedBuddyTarget);
     this.app.elements["shadow-needed-tie"].textContent =
       neededTie > 0 ? this.app.formatDuration(neededTie) : "Already cleared";
     this.app.elements["shadow-needed-lead"].textContent =
@@ -4739,11 +4855,11 @@ class ShadowEngine {
     this.app.elements["shadow-mission-score"].textContent =
       `${missionScore}/100`;
     this.app.elements["shadow-weekly-gap"].textContent =
-      `${weeklyGap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(weeklyGap))}`;
+      `${lockedBuddyWeeklyGap >= 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(lockedBuddyWeeklyGap))}`;
     this.app.elements["shadow-weekly-gap"].className =
-      weeklyGap > 0
+      lockedBuddyWeeklyGap > 0
         ? "shadow-gap-positive"
-        : weeklyGap < 0
+        : lockedBuddyWeeklyGap < 0
           ? "shadow-gap-negative"
           : "shadow-gap-equal";
 
@@ -4904,7 +5020,7 @@ class ShadowEngine {
     this.app.elements["shadow-duel-shadow-fill"].style.width =
       `${shadowShare}%`;
     this.app.elements["shadow-note"].textContent =
-      "Locked until Sleep or 4:00 AM";
+      "Daily buddy baseline locked until Sleep or 4:00 AM";
 
     const fill = this.app.elements["shadow-progress-fill"];
     const cappedWidth = Math.min(130, Math.max(0, percentage));
@@ -4928,6 +5044,7 @@ class ShadowEngine {
       0,
       Math.round(Number(this.shadowSevenDayAverage || 0)),
     );
+    const buddySnapshot = this.resolveShadowBuddySnapshot(resolvedShadow);
 
     this.render({
       todayMinutes: metrics.todayMinutes,
@@ -4935,6 +5052,7 @@ class ShadowEngine {
       currentAvg: metrics.currentAvg,
       previousAvg: metrics.previousAvg,
       hasMomentumBaseline: metrics.hasMomentumBaseline,
+      buddySnapshot,
       isNewStandard: allowAnimation && autoLock.isNewStandard,
     });
     if (this.app.trainerEngine) this.app.trainerEngine.refresh();
