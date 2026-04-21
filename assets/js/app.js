@@ -3955,10 +3955,6 @@ class ShadowEngine {
     return thresholdMap;
   }
 
-  getShadowValueCapMinutes() {
-    return 12 * 60;
-  }
-
   getHistoricalLockedShadowMap(
     startDateStr = null,
     endDateStr = this.getShadowDayDate(new Date()),
@@ -3968,7 +3964,6 @@ class ShadowEngine {
       1,
       Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
     );
-    const cap = Math.max(baseline, this.getShadowValueCapMinutes());
     const firstTrackedDate = [...dailyMap.keys()].sort()[0] || endDateStr;
     const requestedStartStr = startDateStr || firstTrackedDate;
     const historyStartStr =
@@ -3997,7 +3992,6 @@ class ShadowEngine {
     }
 
     const lockedMap = new Map();
-    let previousLocked = 0;
     for (let i = 0; i < days.length; i += 1) {
       const dateStr = days[i];
       const completedDays = i;
@@ -4006,13 +4000,7 @@ class ShadowEngine {
         completedDays > 0
           ? (prefix[completedDays] - prefix[windowStart]) / 7
           : baseline;
-      const rawLocked = Math.max(1, Math.round(rollingAvg || baseline));
-      const ratchetedLocked =
-        previousLocked > 0 && previousLocked < cap
-          ? Math.max(rawLocked, previousLocked + 1)
-          : rawLocked;
-      const locked = Math.min(cap, Math.max(1, ratchetedLocked));
-      previousLocked = locked;
+      const locked = Math.max(1, Math.round(rollingAvg || baseline));
       if (dateStr >= requestedStartStr) {
         lockedMap.set(dateStr, locked);
       }
