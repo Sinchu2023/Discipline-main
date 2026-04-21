@@ -1473,6 +1473,10 @@ class DisciplineTracker {
       task.confidence ?? classification.confidence,
     );
 
+    const canonicalDate = Number.isFinite(startTime)
+      ? this.getDateString(new Date(startTime))
+      : String(task.date || "").trim() || this.getDateString();
+
     return {
       id:
         task.id ||
@@ -1483,7 +1487,7 @@ class DisciplineTracker {
       startTime,
       endTime,
       duration,
-      date: task.date || this.getDateString(new Date(startTime)),
+      date: canonicalDate,
       sourceDevice:
         task.sourceDevice || this.syncManager?.getDeviceId?.() || "local",
       createdAt: task.createdAt || Date.now(),
@@ -1506,7 +1510,8 @@ class DisciplineTracker {
   }
   getDateString(date = new Date()) {
     const d = new Date(date);
-    if (d.getHours() < 5) d.setDate(d.getDate() - 1); // Bind 12AM-5AM metrics natively to previous active day
+    const cutoff = Number(CONFIG.SHADOW_DAY_CUTOFF_HOUR || 4);
+    if (d.getHours() < cutoff) d.setDate(d.getDate() - 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
   parseDateKey(dateStr) {
@@ -1523,11 +1528,12 @@ class DisciplineTracker {
   getActiveDayEnd(date = new Date()) {
     const now = new Date(date);
     const end = new Date(now);
-    if (now.getHours() < 5) {
-      end.setHours(5, 0, 0, 0);
+    const cutoff = Number(CONFIG.SHADOW_DAY_CUTOFF_HOUR || 4);
+    if (now.getHours() < cutoff) {
+      end.setHours(cutoff, 0, 0, 0);
     } else {
       end.setDate(end.getDate() + 1);
-      end.setHours(5, 0, 0, 0);
+      end.setHours(cutoff, 0, 0, 0);
     }
     return end;
   }
