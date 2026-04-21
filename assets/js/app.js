@@ -4697,6 +4697,17 @@ class ShadowEngine {
     return result;
   }
 
+  resolveLockedShadowAverage(boundaryKey = this.getShadowDayDate(new Date())) {
+    const lockMeta = this.getShadowLockMeta();
+    const lockedDate =
+      lockMeta.lastLockedDate && lockMeta.lastLockedDate <= boundaryKey
+        ? lockMeta.lastLockedDate
+        : this.shiftDateString(boundaryKey, -1);
+    if (!lockedDate) return 0;
+    const metrics = this.computeRollingMetrics(lockedDate);
+    return Math.max(0, Math.round(Number(metrics.currentAvg || 0)));
+  }
+
   render({
     todayMinutes,
     shadowAvg,
@@ -5105,8 +5116,6 @@ class ShadowEngine {
       `${youShare}%`;
     this.app.elements["shadow-duel-shadow-fill"].style.width =
       `${shadowShare}%`;
-    this.app.elements["shadow-note"].textContent =
-      "Daily buddy baseline locked until Sleep or 4:00 AM";
 
     const fill = this.app.elements["shadow-progress-fill"];
     const cappedWidth = Math.min(130, Math.max(0, percentage));
@@ -5126,10 +5135,14 @@ class ShadowEngine {
   refresh(allowAnimation = true) {
     const autoLock = this.maybeAutoLockShadowAverage();
     const metrics = this.computeRollingMetrics();
-    const resolvedShadow = Math.max(
-      0,
-      Math.round(Number(this.shadowSevenDayAverage || 0)),
-    );
+    const resolvedShadow = this.resolveLockedShadowAverage();
+    if (resolvedShadow !== Math.max(0, Math.round(Number(this.shadowSevenDayAverage || 0)))) {
+      this.shadowSevenDayAverage = resolvedShadow;
+      this.app.saveToStorage(
+        CONFIG.STORAGE_KEYS.SHADOW_AVG,
+        resolvedShadow,
+      );
+    }
     const buddySnapshot = this.resolveShadowBuddySnapshot(resolvedShadow);
 
     this.render({
