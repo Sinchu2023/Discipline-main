@@ -3949,9 +3949,69 @@ class ShadowEngine {
     return thresholdMap;
   }
 
+  getHistoricalBattleTargetMap(
+    startDateStr = null,
+    endDateStr = this.getShadowDayDate(new Date()),
+  ) {
+    const dailyMap = this.getDailyProductiveMap();
+    const baseline = Math.max(
+      1,
+      Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
+    );
+    const firstTrackedDate = [...dailyMap.keys()].sort()[0] || endDateStr;
+    const requestedStartStr = startDateStr || firstTrackedDate;
+    const historyStartStr =
+      requestedStartStr < firstTrackedDate
+        ? requestedStartStr
+        : firstTrackedDate;
+    const historyStart = this.parseCalendarDate(historyStartStr);
+    const requestedStart = this.parseCalendarDate(requestedStartStr);
+    const endDate = this.parseCalendarDate(endDateStr);
+    if (!historyStart || !requestedStart || !endDate || historyStart > endDate) {
+      return new Map();
+    }
+
+    const days = [];
+    for (
+      const cursor = new Date(historyStart);
+      cursor <= endDate;
+      cursor.setDate(cursor.getDate() + 1)
+    ) {
+      days.push(this.formatCalendarDate(cursor));
+    }
+
+    const prefix = new Array(days.length + 1).fill(0);
+    for (let i = 0; i < days.length; i += 1) {
+      prefix[i + 1] = prefix[i] + (dailyMap.get(days[i]) || 0);
+    }
+
+    const targetMap = new Map();
+    for (let i = 0; i < days.length; i += 1) {
+      const dateStr = days[i];
+      const completedDays = i;
+      const windowStart = Math.max(0, completedDays - 7);
+      const rollingAvg =
+        completedDays > 0
+          ? (prefix[completedDays] - prefix[windowStart]) / 7
+          : 0;
+      const lockedShadow =
+        completedDays > 0
+          ? Math.max(1, Math.round(rollingAvg))
+          : baseline;
+      const target =
+        completedDays > 0 ? Math.max(1, lockedShadow + 1) : baseline;
+      if (dateStr >= requestedStartStr) {
+        targetMap.set(dateStr, target);
+      }
+    }
+
+    return targetMap;
+  }
+
   getWinLadder(dailyMap, shadowAvg) {
-    const thresholdMap = this.getHistoricalShadowThresholdMap(
+    const targetMap = this.getHistoricalBattleTargetMap(
       this.shiftDateString(this.getShadowDayDate(new Date()), -6),
+      this.getShadowDayDate(new Date()),
     );
     const days = [];
     const today = this.getShadowActiveDate();
@@ -3960,8 +4020,15 @@ class ShadowEngine {
       d.setDate(today.getDate() - i);
       const ds = this.formatCalendarDate(d);
       const minutes = dailyMap.get(ds) || 0;
-      const threshold = thresholdMap.get(ds) || shadowAvg;
-      days.push({ date: ds, win: minutes >= threshold, threshold });
+      const target =
+        targetMap.get(ds) ||
+        (shadowAvg > 0
+          ? Math.max(1, Math.round(shadowAvg) + 1)
+          : Math.max(
+            1,
+            Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
+          ));
+      days.push({ date: ds, win: minutes >= target, target });
     }
     const winsIn5 = days.slice(-5).filter((d) => d.win).length;
     const winsIn7 = days.filter((d) => d.win).length;
@@ -4455,16 +4522,26 @@ class ShadowEngine {
     let myWins = 0;
     const activeDays = now.getDate(); // elapsed days in current month
     const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-    const thresholdMap = this.getHistoricalShadowThresholdMap(monthStart);
+    const targetMap = this.getHistoricalBattleTargetMap(
+      monthStart,
+      this.formatCalendarDate(now),
+    );
 
     for (let day = 1; day <= activeDays; day++) {
       const d = new Date(year, month, day, 12, 0, 0, 0);
       const date = this.formatCalendarDate(d);
       const minutes = dailyMap.get(date) || 0;
-      const threshold = thresholdMap.get(date) || shadowAvg;
-      const isWin = minutes >= threshold;
+      const target =
+        targetMap.get(date) ||
+        (shadowAvg > 0
+          ? Math.max(1, Math.round(shadowAvg) + 1)
+          : Math.max(
+            1,
+            Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
+          ));
+      const isWin = minutes >= target;
       if (isWin) myWins++;
-      monthDays.push({ date, isWin, threshold });
+      monthDays.push({ date, isWin, target });
     }
 
     monthDays.sort((a, b) => a.date.localeCompare(b.date));
@@ -4800,6 +4877,12 @@ class ShadowEngine {
       this.app.formatDuration(lockedBuddyShadowAvg);
     this.app.elements["shadow-weekly-average"].textContent =
       this.app.formatDuration(lockedBuddyWeeklyAvg);
+    if (this.app.elements["shadow-note"]) {
+      const lockedDate = this.app.parseDateKey(buddySnapshot?.lockedDate);
+      this.app.elements["shadow-note"].textContent = lockedDate
+        ? `Locked after ${lockedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} close`
+        : "Rolling 7-day average";
+    }
     if (this.app.elements["shadow-standard-metric"])
       this.app.elements["shadow-standard-metric"].textContent =
         this.app.formatDuration(lockedBuddyStandard);
@@ -8166,15 +8249,24 @@ renderGithubHeatmap(year = null) {
     const yearDataMap = new Map();
     this.app.state.tasks.forEach((task) => {
       const duration = Math.max(0, Number(task.duration || 0));
-      trackedMap.set(task.date, (trackedMap.get(task.date) || 0) + duration);
-      const taskYear = Number(task.date?.split("-")[0] || 0);
+      const heatmapDateKey = Number.isFinite(Number(task.startTime))
+        ? this.app.shadowEngine?.getShadowDayDate?.(
+          new Date(Number(task.startTime)),
+        ) || String(task.date || "").trim()
+        : String(task.date || "").trim();
+      if (!heatmapDateKey) return;
+      trackedMap.set(
+        heatmapDateKey,
+        (trackedMap.get(heatmapDateKey) || 0) + duration,
+      );
+      const taskYear = Number(heatmapDateKey.split("-")[0] || 0);
       if (taskYear > 0) {
         yearDataMap.set(taskYear, (yearDataMap.get(taskYear) || 0) + duration);
       }
       if (!this.app.isProductiveCategory(task.category)) return;
       productiveMap.set(
-        task.date,
-        (productiveMap.get(task.date) || 0) + duration,
+        heatmapDateKey,
+        (productiveMap.get(heatmapDateKey) || 0) + duration,
       );
     });
 
@@ -8193,23 +8285,28 @@ renderGithubHeatmap(year = null) {
     if (prevBtn) prevBtn.style.display = canNavigate && currentYear > minYear ? "" : "none";
     if (nextBtn) nextBtn.style.display = canNavigate && currentYear < maxYear ? "" : "none";
 
-    const target = Math.max(
-      1,
-      Math.round(
-        Number(this.app.shadowEngine?.shadowSevenDayAverage || 0) ||
-        Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
-      ),
-    );
+    const fallbackShadow =
+      Number(this.app.shadowEngine?.shadowSevenDayAverage || 0) || 0;
+    const fallbackTarget =
+      fallbackShadow > 0
+        ? Math.max(1, Math.round(fallbackShadow) + 1)
+        : Math.max(
+          1,
+          Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
+        );
 
     const dates = [];
     const startDate = new Date(currentYear, 0, 1, 12, 0, 0, 0);
     const endDate = new Date(currentYear, 11, 31, 12, 0, 0, 0);
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      dates.push(this.app.getDateString(d));
+      dates.push(
+        this.app.shadowEngine?.formatCalendarDate?.(d) ||
+        this.app.getDateString(d),
+      );
     }
     const firstDayOffset = startDate.getDay();
     const totalWeeks = Math.ceil((firstDayOffset + dates.length) / 7);
-    const thresholdMap = this.app.shadowEngine.getHistoricalShadowThresholdMap(
+    const targetMap = this.app.shadowEngine.getHistoricalBattleTargetMap(
       dates[0],
       dates[dates.length - 1],
     );
@@ -8218,13 +8315,13 @@ renderGithubHeatmap(year = null) {
       const productive = productiveMap.get(dateStr) || 0;
       const tracked = trackedMap.get(dateStr) || 0;
       const hasData = tracked > 0;
-      const threshold = thresholdMap.get(dateStr) || target;
-      const isWin = productive >= threshold;
+      const target = targetMap.get(dateStr) || fallbackTarget;
+      const isWin = productive >= target;
       return {
         dateStr,
         productive,
         tracked,
-        threshold,
+        target,
         hasData,
         isWin,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
@@ -8242,7 +8339,9 @@ renderGithubHeatmap(year = null) {
       }
     });
 
-    const todayDate = this.app.getDateString(new Date());
+    const todayDate =
+      this.app.shadowEngine?.getShadowDayDate?.(new Date()) ||
+      this.app.getDateString(new Date());
     const todayIndex = days.findIndex((day) => day.dateStr === todayDate);
     const streakAnchorIndex =
       todayIndex >= 0 ? todayIndex : days.length - 1;
@@ -8298,7 +8397,7 @@ renderGithubHeatmap(year = null) {
       ) {
         cell.dataset.best = "broken";
       }
-      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | ${this.app.formatDuration(day.productive)} / ${this.app.formatDuration(day.threshold || target)} | Streak ${day.streak || 0}`;
+      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Target ${this.app.formatDuration(day.target || fallbackTarget)} | Streak ${day.streak || 0}`;
       grid.appendChild(cell);
     });
 
