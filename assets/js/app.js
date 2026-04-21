@@ -4697,17 +4697,6 @@ class ShadowEngine {
     return result;
   }
 
-  resolveLockedShadowAverage(boundaryKey = this.getShadowDayDate(new Date())) {
-    const lockMeta = this.getShadowLockMeta();
-    const lockedDate =
-      lockMeta.lastLockedDate && lockMeta.lastLockedDate <= boundaryKey
-        ? lockMeta.lastLockedDate
-        : this.shiftDateString(boundaryKey, -1);
-    if (!lockedDate) return 0;
-    const metrics = this.computeRollingMetrics(lockedDate);
-    return Math.max(0, Math.round(Number(metrics.currentAvg || 0)));
-  }
-
   render({
     todayMinutes,
     shadowAvg,
@@ -4889,10 +4878,8 @@ class ShadowEngine {
     this.app.elements["shadow-weekly-average"].textContent =
       this.app.formatDuration(lockedBuddyWeeklyAvg);
     if (this.app.elements["shadow-note"]) {
-      const lockedDate = this.app.parseDateKey(buddySnapshot?.lockedDate);
-      this.app.elements["shadow-note"].textContent = lockedDate
-        ? `Locked after ${lockedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} close`
-        : "Rolling 7-day average";
+      this.app.elements["shadow-note"].textContent =
+        "Live 7-day average from graph";
     }
     if (this.app.elements["shadow-standard-metric"])
       this.app.elements["shadow-standard-metric"].textContent =
@@ -5135,7 +5122,10 @@ class ShadowEngine {
   refresh(allowAnimation = true) {
     const autoLock = this.maybeAutoLockShadowAverage();
     const metrics = this.computeRollingMetrics();
-    const resolvedShadow = this.resolveLockedShadowAverage();
+    const resolvedShadow = Math.max(
+      0,
+      Math.round(Number(metrics.currentAvg || 0)),
+    );
     if (resolvedShadow !== Math.max(0, Math.round(Number(this.shadowSevenDayAverage || 0)))) {
       this.shadowSevenDayAverage = resolvedShadow;
       this.app.saveToStorage(
@@ -5143,7 +5133,17 @@ class ShadowEngine {
         resolvedShadow,
       );
     }
-    const buddySnapshot = this.resolveShadowBuddySnapshot(resolvedShadow);
+    const buddySnapshot = {
+      lockedDate: this.getShadowDayDate(new Date()),
+      shadowAvg: resolvedShadow,
+      currentAvg: resolvedShadow,
+      shadowStandard: this.getShadowStandardForDate(
+        this.getShadowDayDate(new Date()),
+        resolvedShadow,
+      ),
+      targetToday: resolvedShadow > 0 ? Math.ceil(resolvedShadow + 1) : 0,
+      weeklyGap: 0,
+    };
 
     this.render({
       todayMinutes: metrics.todayMinutes,
