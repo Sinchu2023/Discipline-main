@@ -2933,19 +2933,23 @@ class UIManager {
     return true;
   }
 
-  promptRequiredJournalForSleep() {
-    this.pendingSleepAfterJournal = true;
+  openSleepJournal() {
     this.app.trainerEngine.showWindow();
     this.renderSleepJournal();
-    this.setSleepJournalStatus(
-      "Complete tonight's journal first, then use Save And Sleep.",
-      "is-error",
-    );
     this.app.elements["sleep-journal-panel"]?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
     this.app.elements["sleep-journal-thoughts"]?.focus();
+  }
+
+  promptRequiredJournalForSleep() {
+    this.pendingSleepAfterJournal = true;
+    this.openSleepJournal();
+    this.setSleepJournalStatus(
+      "Complete tonight's journal first, then use Save And Sleep.",
+      "is-error",
+    );
   }
 
   buildJournalTextExport(entries) {
@@ -8590,7 +8594,7 @@ class EventManager {
     });
     if (this.app.elements["wake-now-btn"])
       this.app.elements["wake-now-btn"].addEventListener("click", () =>
-        this.app.flowEngine.markWakeNow(),
+        (this.app.flowEngine.markWakeNow(), this.app.uiManager.openSleepJournal()),
       );
     if (this.app.elements["first-action-btn"])
       this.app.elements["first-action-btn"].addEventListener(
