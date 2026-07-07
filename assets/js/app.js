@@ -8354,6 +8354,209 @@ class GraphManager {
     return tiers[Math.max(0, Math.min(3, Number(value) || 0))] || tiers[0];
   }
 
+  getHabitDateKey(task) {
+    const startTime = Number(task?.startTime);
+    if (Number.isFinite(startTime)) {
+      return (
+        this.app.shadowEngine?.getShadowDayDate?.(new Date(startTime)) ||
+        this.app.getDateString(new Date(startTime))
+      );
+    }
+    return String(task?.date || "").trim();
+  }
+
+  getAutomatedHabitLabel(task) {
+    const mission = String(task?.missionTopic || "").trim();
+    if (mission) return mission;
+    const subcategory = String(task?.subcategory || "").trim();
+    if (subcategory && subcategory !== "General") return subcategory;
+    return String(task?.category || "Tracked Work").trim();
+  }
+
+  getHabitTierFromMinutes(minutes, target = CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES) {
+    const safeMinutes = Math.max(0, Number(minutes) || 0);
+    const safeTarget = Math.max(1, Number(target) || CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES);
+    if (safeMinutes <= 0) return 0;
+    if (safeMinutes >= safeTarget) return 3;
+    if (safeMinutes >= Math.max(60, safeTarget * 0.5)) return 2;
+    return 1;
+  }
+
+  buildAutomatedHabitTracker(activeDate = new Date()) {
+    const monthStart = new Date(activeDate.getFullYear(), activeDate.getMonth(), 1, 12, 0, 0, 0);
+    const monthEnd = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0, 12, 0, 0, 0);
+    const daysInMonth = monthEnd.getDate();
+    const startKey =
+      this.app.shadowEngine?.formatCalendarDate?.(monthStart) ||
+      this.app.getDateString(monthStart);
+    const endKey =
+      this.app.shadowEngine?.formatCalendarDate?.(monthEnd) ||
+      this.app.getDateString(monthEnd);
+    const todayKey =
+      this.app.shadowEngine?.getShadowDayDate?.(new Date()) ||
+      this.app.getDateString(new Date());
+    const fallbackTarget = Math.max(
+      1,
+      Number(CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES || 240),
+    );
+    const targetMap =
+      this.app.shadowEngine?.getHistoricalBattleTargetMap?.(startKey, endKey) ||
+      new Map();
+    const lockedShadowMap =
+      this.app.shadowEngine?.getHistoricalLockedShadowMap?.(startKey, endKey) ||
+      new Map();
+    const days = {};
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(activeDate.getFullYear(), activeDate.getMonth(), day, 12, 0, 0, 0);
+      const dateStr =
+        this.app.shadowEngine?.formatCalendarDate?.(date) ||
+        this.app.getDateString(date);
+      days[day] = {
+        dateStr,
+        tracked: 0,
+        productive: 0,
+        sleep: 0,
+        distraction: 0,
+        target: targetMap.get(dateStr) || fallbackTarget,
+        shadow: lockedShadowMap.get(dateStr) || 0,
+        habits: new Map(),
+      };
+    }
+
+    const habitTotals = new Map();
+    const weeklyTotals = new Map();
+    const weekCount = 5;
+    this.app.state.tasks.forEach((task) => {
+      const dateStr = this.getHabitDateKey(task);
+      if (!dateStr || dateStr < startKey || dateStr > endKey) return;
+      const day = Number(dateStr.slice(-2));
+      const dayState = days[day];
+      if (!dayState) return;
+      const duration = Math.max(0, Number(task.duration || 0));
+      dayState.tracked += duration;
+      if (task.category === "Sleep") dayState.sleep += duration;
+      if (this.app.isDistractionCategory?.(task.category)) dayState.distraction += duration;
+      if (!this.app.isProductiveCategory(task.category)) return;
+
+      dayState.productive += duration;
+      const label = this.getAutomatedHabitLabel(task).slice(0, 48);
+      dayState.habits.set(label, (dayState.habits.get(label) || 0) + duration);
+      habitTotals.set(label, (habitTotals.get(label) || 0) + duration);
+
+      const weekIndex = Math.min(
+        weekCount - 1,
+        Math.floor((Math.max(1, day) - 1) / 7),
+      );
+      const key = `${label}::${weekIndex}`;
+      weeklyTotals.set(key, (weeklyTotals.get(key) || 0) + duration);
+    });
+
+    Object.values(days).forEach((day) => {
+      day.tier = this.getHabitTierFromMinutes(day.productive, day.target);
+      day.isWin = day.productive >= day.target;
+    });
+
+    const fallbackHabits = [
+      "Productive Work",
+      "Study / Skill Development",
+      "Physical Training",
+      "Planning",
+      "Execution",
+      "Reading",
+      "Project Work",
+    ];
+    const topHabits = [...habitTotals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([label]) => label);
+    const habitLabels = [...topHabits, ...fallbackHabits]
+      .filter((label, index, arr) => label && arr.indexOf(label) === index)
+      .slice(0, 7);
+    const weekly = habitLabels.map((label) => ({
+      label,
+      weeks: Array.from({ length: weekCount }, (_, weekIndex) => {
+        const minutes = weeklyTotals.get(`${label}::${weekIndex}`) || 0;
+        return {
+          minutes,
+          tier: this.getHabitTierFromMinutes(minutes, fallbackTarget),
+        };
+      }),
+    }));
+
+    const today = Object.values(days).find((day) => day.dateStr === todayKey);
+    const daily = habitLabels.map((label) => ({
+      label,
+      checked: !!today?.habits?.has(label),
+      minutes: today?.habits?.get(label) || 0,
+    }));
+    const dayList = Object.values(days);
+    const productiveDays = dayList.filter((day) => day.productive > 0).length;
+    const goldDays = dayList.filter((day) => day.tier === 3).length;
+    const sleepDays = dayList.filter((day) => day.sleep > 0).length;
+    const lowDistractionDays = dayList.filter(
+      (day) => day.tracked > 0 && day.distraction <= CONFIG.DISTRACTION_BUDGET_MINUTES,
+    ).length;
+    const monthly = [
+      {
+        label: `Productive days: ${productiveDays}/${daysInMonth}`,
+        checked: productiveDays >= Math.ceil(daysInMonth * 0.7),
+      },
+      {
+        label: `Gold target days: ${goldDays}/${daysInMonth}`,
+        checked: goldDays >= Math.ceil(daysInMonth * 0.45),
+      },
+      {
+        label: `Sleep logged: ${sleepDays}/${daysInMonth}`,
+        checked: sleepDays >= Math.ceil(daysInMonth * 0.7),
+      },
+      {
+        label: `Low distraction days: ${lowDistractionDays}/${daysInMonth}`,
+        checked: lowDistractionDays >= Math.ceil(daysInMonth * 0.7),
+      },
+      {
+        label: `Recurring habits touched: ${topHabits.length}/7`,
+        checked: topHabits.length >= 7,
+      },
+    ];
+
+    return {
+      days,
+      daily,
+      weekly,
+      monthly,
+      daysInMonth,
+      monthKey: this.getHabitSpiralMonthKey(activeDate),
+    };
+  }
+
+  buildAutomatedChecklist(className, items) {
+    const list = document.createElement("div");
+    list.className = className;
+    items.forEach((item) => {
+      const row = document.createElement("label");
+      row.className = "habit-check-row habit-check-row-auto";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = !!item.checked;
+      checkbox.disabled = true;
+
+      const text = document.createElement("div");
+      text.className = "habit-auto-label";
+      const label = document.createElement("span");
+      label.textContent = item.label;
+      text.appendChild(label);
+      if (Number(item.minutes || 0) > 0) {
+        const minutes = document.createElement("small");
+        minutes.textContent = this.app.formatDuration(item.minutes);
+        text.appendChild(minutes);
+      }
+
+      row.append(checkbox, text);
+      list.appendChild(row);
+    });
+    return list;
+  }
+
   buildHabitChecklist({
     className,
     items,
@@ -8435,7 +8638,42 @@ class GraphManager {
     return table;
   }
 
-  buildHabitSpiralSvg(month, monthKey, activeDate) {
+  buildAutomatedWeeklyMatrix(automation) {
+    const table = document.createElement("div");
+    table.className = "habit-weekly-matrix";
+
+    const header = document.createElement("div");
+    header.className = "habit-weekly-row habit-weekly-header";
+    ["Habit", "W1", "W2", "W3", "W4", "W5"].forEach((label) => {
+      const cell = document.createElement("div");
+      cell.textContent = label;
+      header.appendChild(cell);
+    });
+    table.appendChild(header);
+
+    automation.weekly.forEach((habit) => {
+      const row = document.createElement("div");
+      row.className = "habit-weekly-row";
+      const label = document.createElement("div");
+      label.className = "habit-weekly-name";
+      label.textContent = habit.label;
+      row.appendChild(label);
+
+      habit.weeks.forEach((week, weekIndex) => {
+        const tier = this.getHabitTierMeta(week.tier);
+        const cell = document.createElement("div");
+        cell.className = `habit-dot habit-dot-auto habit-tier-${tier.className}`;
+        cell.title = `${habit.label}, week ${weekIndex + 1}: ${this.app.formatDuration(week.minutes)} (${tier.label})`;
+        cell.setAttribute("aria-label", cell.title);
+        row.appendChild(cell);
+      });
+      table.appendChild(row);
+    });
+
+    return table;
+  }
+
+  buildHabitSpiralSvg(month, monthKey, activeDate, automation = null) {
     const daysInMonth = new Date(
       activeDate.getFullYear(),
       activeDate.getMonth() + 1,
@@ -8504,15 +8742,25 @@ class GraphManager {
       const labelX = centerX + Math.cos(angle) * labelRadius;
       const labelY = centerY + Math.sin(angle) * labelRadius;
       const disabled = day > daysInMonth;
-      const value = disabled ? 0 : Number(month.spiral[String(day)] || 0);
+      const dayState = automation?.days?.[day] || null;
+      const value = disabled ? 0 : (dayState ? dayState.tier : Number(month.spiral[String(day)] || 0));
       const tier = this.getHabitTierMeta(value);
 
       const button = document.createElementNS(svgNs, "g");
       button.setAttribute("class", `habit-spiral-node habit-tier-${tier.className}${disabled ? " is-disabled" : ""}`);
       button.setAttribute("tabindex", disabled ? "-1" : "0");
       button.setAttribute("role", "button");
-      button.setAttribute("aria-label", disabled ? `Day ${day} is not in this month` : `Day ${day}: ${tier.label}`);
+      button.setAttribute(
+        "aria-label",
+        disabled
+          ? `Day ${day} is not in this month`
+          : `Day ${day}: ${tier.label}, productive ${this.app.formatDuration(dayState?.productive || 0)}`,
+      );
       button.dataset.day = String(day);
+      if (dayState) {
+        button.dataset.productive = String(dayState.productive);
+        button.dataset.tracked = String(dayState.tracked);
+      }
 
       const circle = document.createElementNS(svgNs, "circle");
       circle.setAttribute("cx", x);
@@ -8529,7 +8777,7 @@ class GraphManager {
       button.appendChild(label);
 
       const cycleDay = () => {
-        if (disabled) return;
+        if (disabled || automation) return;
         this.updateHabitSpiralMonth(monthKey, (nextMonth) => {
           nextMonth.spiral[String(day)] =
             (Number(nextMonth.spiral[String(day)] || 0) + 1) % 4;
@@ -8558,6 +8806,7 @@ class GraphManager {
     const now = new Date();
     const monthKey = this.getHabitSpiralMonthKey(now);
     const { month } = this.getHabitSpiralMonthState(monthKey);
+    const automation = this.buildAutomatedHabitTracker(now);
     const monthName = now.toLocaleDateString("en-US", {
       month: "long",
       year: "numeric",
@@ -8573,32 +8822,31 @@ class GraphManager {
     const title = document.createElement("div");
     title.className = "habit-tracker-title";
     title.textContent = "Habit Tracker";
-    side.appendChild(title);
+    const subtitle = document.createElement("div");
+    subtitle.className = "habit-tracker-subtitle";
+    subtitle.textContent = "Auto-filled from tracked tasks";
+    side.append(title, subtitle);
 
     const dailySection = document.createElement("section");
     dailySection.className = "habit-panel";
     dailySection.innerHTML = `<h3>Daily Habits</h3>`;
-    dailySection.appendChild(this.buildHabitChecklist({
-      className: "habit-check-list",
-      items: month.daily,
-      monthKey,
-      type: "daily",
-    }));
+    dailySection.appendChild(this.buildAutomatedChecklist(
+      "habit-check-list",
+      automation.daily,
+    ));
 
     const weeklySection = document.createElement("section");
     weeklySection.className = "habit-panel";
     weeklySection.innerHTML = `<h3>Weekly Habits</h3>`;
-    weeklySection.appendChild(this.buildHabitWeeklyMatrix(month, monthKey));
+    weeklySection.appendChild(this.buildAutomatedWeeklyMatrix(automation));
 
     const monthlySection = document.createElement("section");
     monthlySection.className = "habit-panel";
     monthlySection.innerHTML = `<h3>Monthly Habits</h3>`;
-    monthlySection.appendChild(this.buildHabitChecklist({
-      className: "habit-check-list",
-      items: month.monthly,
-      monthKey,
-      type: "monthly",
-    }));
+    monthlySection.appendChild(this.buildAutomatedChecklist(
+      "habit-check-list",
+      automation.monthly,
+    ));
 
     side.append(dailySection, weeklySection, monthlySection);
 
@@ -8620,7 +8868,7 @@ class GraphManager {
       legend.appendChild(item);
     });
 
-    focus.append(this.buildHabitSpiralSvg(month, monthKey, now), legend);
+    focus.append(this.buildHabitSpiralSvg(month, monthKey, now, automation), legend);
     shell.append(side, focus);
     container.appendChild(shell);
   }

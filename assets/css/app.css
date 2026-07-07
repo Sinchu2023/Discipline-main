@@ -2428,6 +2428,14 @@
   max-width: 7ch;
 }
 
+.habit-tracker-subtitle {
+  margin-top: -0.52rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .habit-panel {
   padding-top: 0.2rem;
 }
@@ -2458,6 +2466,10 @@
   accent-color: #d7a929;
 }
 
+.habit-check-row-auto input[type="checkbox"] {
+  pointer-events: none;
+}
+
 .habit-check-row input[type="text"] {
   width: 100%;
   min-width: 0;
@@ -2473,6 +2485,31 @@
 .habit-check-row input[type="text"]:focus {
   outline: none;
   border-bottom-color: rgba(215, 169, 41, 0.75);
+}
+
+.habit-auto-label {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.16rem 0 0.22rem;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+}
+
+.habit-auto-label span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.habit-auto-label small {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
 }
 
 .habit-weekly-matrix {
@@ -2521,6 +2558,10 @@
   cursor: pointer;
 }
 
+.habit-dot-auto {
+  cursor: default;
+}
+
 .habit-dot::before,
 .habit-tier-swatch,
 .habit-spiral-node-circle {
@@ -2543,6 +2584,10 @@
 
 .habit-dot:hover::before {
   transform: scale(1.18);
+}
+
+.habit-dot-auto:hover::before {
+  transform: none;
 }
 
 .habit-spiral-panel {
