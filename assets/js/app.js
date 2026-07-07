@@ -69,6 +69,7 @@ const CONFIG = {
     ROADMAP_RESPONSE_DRAFT: "discipline_tracker_roadmap_response_draft",
     TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
     TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
+    SPIRAL_HABIT_TRACKER: "discipline_tracker_spiral_habit_tracker",
   },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
@@ -8273,7 +8274,361 @@ class GraphManager {
     return `${day}${months[(month || 1) - 1] || "jan"}${String(year || "").slice(-2)}`;
   }
 
+  getHabitSpiralMonthKey(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  getDefaultHabitSpiralMonth() {
+    return {
+      spiral: {},
+      daily: Array.from({ length: 7 }, (_, index) => ({
+        label: `Daily Habit ${index + 1}`,
+        checked: false,
+      })),
+      weekly: Array.from({ length: 7 }, () => Array.from({ length: 5 }, () => 0)),
+      monthly: Array.from({ length: 5 }, (_, index) => ({
+        label: `Monthly Habit ${index + 1}`,
+        checked: false,
+      })),
+    };
+  }
+
+  loadHabitSpiralStore() {
+    const stored = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.SPIRAL_HABIT_TRACKER);
+    if (!stored || typeof stored !== "object") return { months: {} };
+    return {
+      ...stored,
+      months: stored.months && typeof stored.months === "object" ? stored.months : {},
+    };
+  }
+
+  saveHabitSpiralStore(store) {
+    try {
+      localStorage.setItem(
+        CONFIG.STORAGE_KEYS.SPIRAL_HABIT_TRACKER,
+        JSON.stringify(store),
+      );
+    } catch (error) {
+      console.error("habit tracker save failed", error);
+    }
+  }
+
+  getHabitSpiralMonthState(monthKey) {
+    const store = this.loadHabitSpiralStore();
+    if (!store.months[monthKey]) {
+      store.months[monthKey] = this.getDefaultHabitSpiralMonth();
+      this.saveHabitSpiralStore(store);
+    }
+    const defaults = this.getDefaultHabitSpiralMonth();
+    const month = store.months[monthKey];
+    month.spiral = month.spiral && typeof month.spiral === "object" ? month.spiral : {};
+    month.daily = Array.from({ length: 7 }, (_, index) => ({
+      ...defaults.daily[index],
+      ...(month.daily?.[index] || {}),
+    }));
+    month.weekly = Array.from({ length: 7 }, (_, row) =>
+      Array.from({ length: 5 }, (_, col) => Number(month.weekly?.[row]?.[col] || 0)),
+    );
+    month.monthly = Array.from({ length: 5 }, (_, index) => ({
+      ...defaults.monthly[index],
+      ...(month.monthly?.[index] || {}),
+    }));
+    store.months[monthKey] = month;
+    return { store, month };
+  }
+
+  updateHabitSpiralMonth(monthKey, updater) {
+    const { store, month } = this.getHabitSpiralMonthState(monthKey);
+    updater(month);
+    store.months[monthKey] = month;
+    this.saveHabitSpiralStore(store);
+  }
+
+  getHabitTierMeta(value = 0) {
+    const tiers = [
+      { label: "Empty", className: "empty" },
+      { label: "Light Green", className: "light" },
+      { label: "Dark Green", className: "dark" },
+      { label: "Gold", className: "gold" },
+    ];
+    return tiers[Math.max(0, Math.min(3, Number(value) || 0))] || tiers[0];
+  }
+
+  buildHabitChecklist({
+    className,
+    items,
+    monthKey,
+    type,
+  }) {
+    const list = document.createElement("div");
+    list.className = className;
+    items.forEach((item, index) => {
+      const row = document.createElement("label");
+      row.className = "habit-check-row";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = !!item.checked;
+      checkbox.addEventListener("change", () => {
+        this.updateHabitSpiralMonth(monthKey, (month) => {
+          month[type][index].checked = checkbox.checked;
+        });
+      });
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = item.label || "";
+      input.maxLength = 48;
+      input.placeholder = `${type === "daily" ? "Daily" : "Monthly"} habit ${index + 1}`;
+      input.addEventListener("input", () => {
+        this.updateHabitSpiralMonth(monthKey, (month) => {
+          month[type][index].label = input.value.slice(0, 48);
+        });
+      });
+
+      row.append(checkbox, input);
+      list.appendChild(row);
+    });
+    return list;
+  }
+
+  buildHabitWeeklyMatrix(month, monthKey) {
+    const table = document.createElement("div");
+    table.className = "habit-weekly-matrix";
+
+    const header = document.createElement("div");
+    header.className = "habit-weekly-row habit-weekly-header";
+    ["Habit", "W1", "W2", "W3", "W4", "W5"].forEach((label) => {
+      const cell = document.createElement("div");
+      cell.textContent = label;
+      header.appendChild(cell);
+    });
+    table.appendChild(header);
+
+    month.weekly.forEach((rowValues, rowIndex) => {
+      const row = document.createElement("div");
+      row.className = "habit-weekly-row";
+      const label = document.createElement("div");
+      label.className = "habit-weekly-name";
+      label.textContent = `Habit ${rowIndex + 1}`;
+      row.appendChild(label);
+
+      rowValues.forEach((value, weekIndex) => {
+        const cell = document.createElement("button");
+        const tier = this.getHabitTierMeta(value);
+        cell.type = "button";
+        cell.className = `habit-dot habit-tier-${tier.className}`;
+        cell.title = `Habit ${rowIndex + 1}, week ${weekIndex + 1}: ${tier.label}`;
+        cell.setAttribute("aria-label", cell.title);
+        cell.addEventListener("click", () => {
+          this.updateHabitSpiralMonth(monthKey, (nextMonth) => {
+            nextMonth.weekly[rowIndex][weekIndex] =
+              (Number(nextMonth.weekly[rowIndex][weekIndex] || 0) + 1) % 4;
+          });
+          this.renderGithubHeatmap();
+        });
+        row.appendChild(cell);
+      });
+      table.appendChild(row);
+    });
+
+    return table;
+  }
+
+  buildHabitSpiralSvg(month, monthKey, activeDate) {
+    const daysInMonth = new Date(
+      activeDate.getFullYear(),
+      activeDate.getMonth() + 1,
+      0,
+    ).getDate();
+    const monthName = activeDate.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+    const svgNs = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNs, "svg");
+    svg.setAttribute("class", "habit-spiral-svg");
+    svg.setAttribute("viewBox", "0 0 520 520");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", `${monthName} habit spiral`);
+
+    const centerX = 260;
+    const centerY = 260;
+    const guideRadii = [92, 122, 152, 182, 212];
+    guideRadii.forEach((radius) => {
+      const circle = document.createElementNS(svgNs, "circle");
+      circle.setAttribute("cx", centerX);
+      circle.setAttribute("cy", centerY);
+      circle.setAttribute("r", radius);
+      circle.setAttribute("class", "habit-spiral-guide");
+      svg.appendChild(circle);
+    });
+
+    for (let day = 1; day <= 31; day += 1) {
+      const angle = (-88 + (day - 1) * (360 / 31)) * (Math.PI / 180);
+      const outerRadius = 212;
+      const innerRadius = 92;
+      const x1 = centerX + Math.cos(angle) * innerRadius;
+      const y1 = centerY + Math.sin(angle) * innerRadius;
+      const x2 = centerX + Math.cos(angle) * outerRadius;
+      const y2 = centerY + Math.sin(angle) * outerRadius;
+      const line = document.createElementNS(svgNs, "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      line.setAttribute("class", "habit-spiral-spoke");
+      svg.appendChild(line);
+    }
+
+    const title = document.createElementNS(svgNs, "text");
+    title.setAttribute("x", centerX);
+    title.setAttribute("y", centerY - 8);
+    title.setAttribute("class", "habit-spiral-center-title");
+    title.textContent = "MONTH";
+    svg.appendChild(title);
+
+    const sub = document.createElementNS(svgNs, "text");
+    sub.setAttribute("x", centerX);
+    sub.setAttribute("y", centerY + 22);
+    sub.setAttribute("class", "habit-spiral-center-subtitle");
+    sub.textContent = monthName;
+    svg.appendChild(sub);
+
+    for (let day = 1; day <= 31; day += 1) {
+      const angle = (-88 + (day - 1) * (360 / 31)) * (Math.PI / 180);
+      const nodeRadius = 212;
+      const labelRadius = 236;
+      const x = centerX + Math.cos(angle) * nodeRadius;
+      const y = centerY + Math.sin(angle) * nodeRadius;
+      const labelX = centerX + Math.cos(angle) * labelRadius;
+      const labelY = centerY + Math.sin(angle) * labelRadius;
+      const disabled = day > daysInMonth;
+      const value = disabled ? 0 : Number(month.spiral[String(day)] || 0);
+      const tier = this.getHabitTierMeta(value);
+
+      const button = document.createElementNS(svgNs, "g");
+      button.setAttribute("class", `habit-spiral-node habit-tier-${tier.className}${disabled ? " is-disabled" : ""}`);
+      button.setAttribute("tabindex", disabled ? "-1" : "0");
+      button.setAttribute("role", "button");
+      button.setAttribute("aria-label", disabled ? `Day ${day} is not in this month` : `Day ${day}: ${tier.label}`);
+      button.dataset.day = String(day);
+
+      const circle = document.createElementNS(svgNs, "circle");
+      circle.setAttribute("cx", x);
+      circle.setAttribute("cy", y);
+      circle.setAttribute("r", "13");
+      circle.setAttribute("class", "habit-spiral-node-circle");
+      button.appendChild(circle);
+
+      const label = document.createElementNS(svgNs, "text");
+      label.setAttribute("x", labelX);
+      label.setAttribute("y", labelY + 4);
+      label.setAttribute("class", "habit-spiral-day-label");
+      label.textContent = String(day);
+      button.appendChild(label);
+
+      const cycleDay = () => {
+        if (disabled) return;
+        this.updateHabitSpiralMonth(monthKey, (nextMonth) => {
+          nextMonth.spiral[String(day)] =
+            (Number(nextMonth.spiral[String(day)] || 0) + 1) % 4;
+        });
+        this.renderGithubHeatmap();
+      };
+      button.addEventListener("click", cycleDay);
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          cycleDay();
+        }
+      });
+
+      svg.appendChild(button);
+    }
+
+    return svg;
+  }
+
+  renderHabitSpiralTracker() {
+    const container = document.getElementById("github-heatmap-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const now = new Date();
+    const monthKey = this.getHabitSpiralMonthKey(now);
+    const { month } = this.getHabitSpiralMonthState(monthKey);
+    const monthName = now.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+    const label = document.getElementById("habit-month-label");
+    if (label) label.textContent = monthName;
+
+    const shell = document.createElement("div");
+    shell.className = "habit-tracker-shell";
+
+    const side = document.createElement("aside");
+    side.className = "habit-tracker-side";
+    const title = document.createElement("div");
+    title.className = "habit-tracker-title";
+    title.textContent = "Habit Tracker";
+    side.appendChild(title);
+
+    const dailySection = document.createElement("section");
+    dailySection.className = "habit-panel";
+    dailySection.innerHTML = `<h3>Daily Habits</h3>`;
+    dailySection.appendChild(this.buildHabitChecklist({
+      className: "habit-check-list",
+      items: month.daily,
+      monthKey,
+      type: "daily",
+    }));
+
+    const weeklySection = document.createElement("section");
+    weeklySection.className = "habit-panel";
+    weeklySection.innerHTML = `<h3>Weekly Habits</h3>`;
+    weeklySection.appendChild(this.buildHabitWeeklyMatrix(month, monthKey));
+
+    const monthlySection = document.createElement("section");
+    monthlySection.className = "habit-panel";
+    monthlySection.innerHTML = `<h3>Monthly Habits</h3>`;
+    monthlySection.appendChild(this.buildHabitChecklist({
+      className: "habit-check-list",
+      items: month.monthly,
+      monthKey,
+      type: "monthly",
+    }));
+
+    side.append(dailySection, weeklySection, monthlySection);
+
+    const focus = document.createElement("section");
+    focus.className = "habit-spiral-panel";
+    const legend = document.createElement("div");
+    legend.className = "habit-tier-legend";
+    [
+      ["empty", "Empty"],
+      ["light", "Light"],
+      ["dark", "Deep"],
+      ["gold", "Gold"],
+    ].forEach(([className, text]) => {
+      const item = document.createElement("span");
+      item.className = "habit-tier-legend-item";
+      const swatch = document.createElement("span");
+      swatch.className = `habit-tier-swatch habit-tier-${className}`;
+      item.append(swatch, document.createTextNode(text));
+      legend.appendChild(item);
+    });
+
+    focus.append(this.buildHabitSpiralSvg(month, monthKey, now), legend);
+    shell.append(side, focus);
+    container.appendChild(shell);
+  }
+
 renderGithubHeatmap(year = null) {
+    this.renderHabitSpiralTracker();
+    return;
+
     const container = document.getElementById("github-heatmap-container");
     if (!container) return;
     container.innerHTML = "";
