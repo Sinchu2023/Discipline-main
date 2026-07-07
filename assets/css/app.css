@@ -2515,16 +2515,20 @@
 .habit-weekly-matrix {
   display: grid;
   gap: 1px;
-  overflow: hidden;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
 }
 
 .habit-weekly-row {
   display: grid;
-  grid-template-columns: minmax(82px, 1fr) repeat(5, minmax(28px, 42px));
+  grid-template-columns: minmax(116px, 1fr) repeat(var(--habit-week-count, 5), 18px);
   gap: 1px;
+  min-width: max-content;
 }
 
 .habit-weekly-row > div,
@@ -2541,6 +2545,10 @@
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.habit-weekly-header > .habit-week-muted {
+  color: transparent;
 }
 
 .habit-weekly-name {
@@ -2569,8 +2577,7 @@
     fill var(--motion-base) var(--ease-smooth),
     background-color var(--motion-base) var(--ease-smooth),
     border-color var(--motion-base) var(--ease-smooth),
-    box-shadow var(--motion-base) var(--ease-smooth),
-    transform var(--motion-base) var(--ease-smooth);
+    box-shadow var(--motion-base) var(--ease-smooth);
 }
 
 .habit-dot::before {
@@ -2640,7 +2647,7 @@
 }
 
 .habit-spiral-node {
-  cursor: pointer;
+  cursor: default;
   outline: none;
 }
 
@@ -2651,8 +2658,6 @@
 
 .habit-spiral-node:hover .habit-spiral-node-circle,
 .habit-spiral-node:focus-visible .habit-spiral-node-circle {
-  transform: scale(1.16);
-  transform-origin: center;
   stroke: rgba(255, 255, 255, 0.92);
 }
 
@@ -2744,7 +2749,7 @@
   }
 
   .habit-weekly-row {
-    grid-template-columns: minmax(68px, 1fr) repeat(5, minmax(24px, 1fr));
+    grid-template-columns: minmax(96px, 1fr) repeat(var(--habit-week-count, 5), 16px);
   }
 
   .habit-spiral-panel {

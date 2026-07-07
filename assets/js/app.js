@@ -8282,12 +8282,26 @@ class GraphManager {
     return {
       spiral: {},
       daily: Array.from({ length: 7 }, (_, index) => ({
-        label: `Daily Habit ${index + 1}`,
+        label: [
+          "Deep Work",
+          "Study Session",
+          "Physical Training",
+          "Project Progress",
+          "Planning Review",
+          "Reading / Research",
+          "Low Distraction Day",
+        ][index],
         checked: false,
       })),
       weekly: Array.from({ length: 7 }, () => Array.from({ length: 5 }, () => 0)),
       monthly: Array.from({ length: 5 }, (_, index) => ({
-        label: `Monthly Habit ${index + 1}`,
+        label: [
+          "Consistent productive days",
+          "Strong target wins",
+          "Sleep tracked",
+          "Low distraction control",
+          "Recurring habits built",
+        ][index],
         checked: false,
       })),
     };
@@ -8383,15 +8397,15 @@ class GraphManager {
   }
 
   buildAutomatedHabitTracker(activeDate = new Date()) {
-    const monthStart = new Date(activeDate.getFullYear(), activeDate.getMonth(), 1, 12, 0, 0, 0);
-    const monthEnd = new Date(activeDate.getFullYear(), activeDate.getMonth() + 1, 0, 12, 0, 0, 0);
-    const daysInMonth = monthEnd.getDate();
+    const yearStart = new Date(activeDate.getFullYear(), 0, 1, 12, 0, 0, 0);
+    const yearEnd = new Date(activeDate.getFullYear(), 11, 31, 12, 0, 0, 0);
+    const daysInYear = 365;
     const startKey =
-      this.app.shadowEngine?.formatCalendarDate?.(monthStart) ||
-      this.app.getDateString(monthStart);
+      this.app.shadowEngine?.formatCalendarDate?.(yearStart) ||
+      this.app.getDateString(yearStart);
     const endKey =
-      this.app.shadowEngine?.formatCalendarDate?.(monthEnd) ||
-      this.app.getDateString(monthEnd);
+      this.app.shadowEngine?.formatCalendarDate?.(yearEnd) ||
+      this.app.getDateString(yearEnd);
     const todayKey =
       this.app.shadowEngine?.getShadowDayDate?.(new Date()) ||
       this.app.getDateString(new Date());
@@ -8406,13 +8420,17 @@ class GraphManager {
       this.app.shadowEngine?.getHistoricalLockedShadowMap?.(startKey, endKey) ||
       new Map();
     const days = {};
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = new Date(activeDate.getFullYear(), activeDate.getMonth(), day, 12, 0, 0, 0);
+    const dateToOrdinal = new Map();
+    for (let day = 1; day <= daysInYear; day += 1) {
+      const date = new Date(yearStart);
+      date.setDate(yearStart.getDate() + day - 1);
       const dateStr =
         this.app.shadowEngine?.formatCalendarDate?.(date) ||
         this.app.getDateString(date);
+      dateToOrdinal.set(dateStr, day);
       days[day] = {
         dateStr,
+        dayOfYear: day,
         tracked: 0,
         productive: 0,
         sleep: 0,
@@ -8425,11 +8443,12 @@ class GraphManager {
 
     const habitTotals = new Map();
     const weeklyTotals = new Map();
-    const weekCount = 5;
+    const weekCount = 53;
+    const weeklyTarget = Math.max(1, fallbackTarget * 5);
     this.app.state.tasks.forEach((task) => {
       const dateStr = this.getHabitDateKey(task);
       if (!dateStr || dateStr < startKey || dateStr > endKey) return;
-      const day = Number(dateStr.slice(-2));
+      const day = dateToOrdinal.get(dateStr);
       const dayState = days[day];
       if (!dayState) return;
       const duration = Math.max(0, Number(task.duration || 0));
@@ -8457,13 +8476,13 @@ class GraphManager {
     });
 
     const fallbackHabits = [
-      "Productive Work",
-      "Study / Skill Development",
+      "Deep Work",
+      "Study Session",
       "Physical Training",
-      "Planning",
-      "Execution",
-      "Reading",
-      "Project Work",
+      "Project Progress",
+      "Planning Review",
+      "Reading / Research",
+      "Low Distraction Day",
     ];
     const topHabits = [...habitTotals.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -8477,7 +8496,7 @@ class GraphManager {
         const minutes = weeklyTotals.get(`${label}::${weekIndex}`) || 0;
         return {
           minutes,
-          tier: this.getHabitTierFromMinutes(minutes, fallbackTarget),
+          tier: this.getHabitTierFromMinutes(minutes, weeklyTarget),
         };
       }),
     }));
@@ -8497,20 +8516,20 @@ class GraphManager {
     ).length;
     const monthly = [
       {
-        label: `Productive days: ${productiveDays}/${daysInMonth}`,
-        checked: productiveDays >= Math.ceil(daysInMonth * 0.7),
+        label: `Productive days: ${productiveDays}/${daysInYear}`,
+        checked: productiveDays >= Math.ceil(daysInYear * 0.7),
       },
       {
-        label: `Gold target days: ${goldDays}/${daysInMonth}`,
-        checked: goldDays >= Math.ceil(daysInMonth * 0.45),
+        label: `Gold target days: ${goldDays}/${daysInYear}`,
+        checked: goldDays >= Math.ceil(daysInYear * 0.45),
       },
       {
-        label: `Sleep logged: ${sleepDays}/${daysInMonth}`,
-        checked: sleepDays >= Math.ceil(daysInMonth * 0.7),
+        label: `Sleep logged: ${sleepDays}/${daysInYear}`,
+        checked: sleepDays >= Math.ceil(daysInYear * 0.7),
       },
       {
-        label: `Low distraction days: ${lowDistractionDays}/${daysInMonth}`,
-        checked: lowDistractionDays >= Math.ceil(daysInMonth * 0.7),
+        label: `Low distraction days: ${lowDistractionDays}/${daysInYear}`,
+        checked: lowDistractionDays >= Math.ceil(daysInYear * 0.7),
       },
       {
         label: `Recurring habits touched: ${topHabits.length}/7`,
@@ -8523,8 +8542,9 @@ class GraphManager {
       daily,
       weekly,
       monthly,
-      daysInMonth,
-      monthKey: this.getHabitSpiralMonthKey(activeDate),
+      daysInMonth: daysInYear,
+      weekCount,
+      monthKey: String(activeDate.getFullYear()),
     };
   }
 
@@ -8641,12 +8661,19 @@ class GraphManager {
   buildAutomatedWeeklyMatrix(automation) {
     const table = document.createElement("div");
     table.className = "habit-weekly-matrix";
+    table.style.setProperty("--habit-week-count", String(automation.weekCount || 53));
 
     const header = document.createElement("div");
     header.className = "habit-weekly-row habit-weekly-header";
-    ["Habit", "W1", "W2", "W3", "W4", "W5"].forEach((label) => {
+    [
+      "Habit",
+      ...Array.from({ length: automation.weekCount || 53 }, (_, index) => `W${index + 1}`),
+    ].forEach((label, index) => {
       const cell = document.createElement("div");
       cell.textContent = label;
+      if (index > 0 && index % 4 !== 1 && index !== (automation.weekCount || 53)) {
+        cell.className = "habit-week-muted";
+      }
       header.appendChild(cell);
     });
     table.appendChild(header);
@@ -8674,25 +8701,19 @@ class GraphManager {
   }
 
   buildHabitSpiralSvg(month, monthKey, activeDate, automation = null) {
-    const daysInMonth = new Date(
-      activeDate.getFullYear(),
-      activeDate.getMonth() + 1,
-      0,
-    ).getDate();
-    const monthName = activeDate.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
+    const year = activeDate.getFullYear();
+    const daysInYear = automation?.daysInMonth || 365;
+    const yearName = String(year);
     const svgNs = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNs, "svg");
     svg.setAttribute("class", "habit-spiral-svg");
     svg.setAttribute("viewBox", "0 0 520 520");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", `${monthName} habit spiral`);
+    svg.setAttribute("aria-label", `${yearName} 365-day habit spiral`);
 
     const centerX = 260;
     const centerY = 260;
-    const guideRadii = [92, 122, 152, 182, 212];
+    const guideRadii = [66, 98, 130, 162, 194, 226];
     guideRadii.forEach((radius) => {
       const circle = document.createElementNS(svgNs, "circle");
       circle.setAttribute("cx", centerX);
@@ -8702,10 +8723,10 @@ class GraphManager {
       svg.appendChild(circle);
     });
 
-    for (let day = 1; day <= 31; day += 1) {
-      const angle = (-88 + (day - 1) * (360 / 31)) * (Math.PI / 180);
+    for (let index = 0; index < 12; index += 1) {
+      const angle = (-90 + index * 30) * (Math.PI / 180);
       const outerRadius = 212;
-      const innerRadius = 92;
+      const innerRadius = 62;
       const x1 = centerX + Math.cos(angle) * innerRadius;
       const y1 = centerY + Math.sin(angle) * innerRadius;
       const x2 = centerX + Math.cos(angle) * outerRadius;
@@ -8723,25 +8744,37 @@ class GraphManager {
     title.setAttribute("x", centerX);
     title.setAttribute("y", centerY - 8);
     title.setAttribute("class", "habit-spiral-center-title");
-    title.textContent = "MONTH";
+    title.textContent = "YEAR";
     svg.appendChild(title);
 
     const sub = document.createElementNS(svgNs, "text");
     sub.setAttribute("x", centerX);
     sub.setAttribute("y", centerY + 22);
     sub.setAttribute("class", "habit-spiral-center-subtitle");
-    sub.textContent = monthName;
+    sub.textContent = `${yearName} - 365 days`;
     svg.appendChild(sub);
 
-    for (let day = 1; day <= 31; day += 1) {
-      const angle = (-88 + (day - 1) * (360 / 31)) * (Math.PI / 180);
-      const nodeRadius = 212;
-      const labelRadius = 236;
+    const yearStart = new Date(year, 0, 1, 12, 0, 0, 0);
+    const monthMarkerDays = new Map();
+    for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+      const markerDate = new Date(year, monthIndex, 1, 12, 0, 0, 0);
+      const ordinal = Math.floor((markerDate - yearStart) / 86400000) + 1;
+      monthMarkerDays.set(ordinal, markerDate.toLocaleDateString("en-US", { month: "short" }));
+    }
+
+    const turns = 6.2;
+    const minRadius = 54;
+    const maxRadius = 226;
+    for (let day = 1; day <= daysInYear; day += 1) {
+      const progress = daysInYear > 1 ? (day - 1) / (daysInYear - 1) : 0;
+      const angle = (-Math.PI / 2) + progress * turns * Math.PI * 2;
+      const nodeRadius = minRadius + progress * (maxRadius - minRadius);
+      const labelRadius = nodeRadius + 16;
       const x = centerX + Math.cos(angle) * nodeRadius;
       const y = centerY + Math.sin(angle) * nodeRadius;
       const labelX = centerX + Math.cos(angle) * labelRadius;
       const labelY = centerY + Math.sin(angle) * labelRadius;
-      const disabled = day > daysInMonth;
+      const disabled = false;
       const dayState = automation?.days?.[day] || null;
       const value = disabled ? 0 : (dayState ? dayState.tier : Number(month.spiral[String(day)] || 0));
       const tier = this.getHabitTierMeta(value);
@@ -8765,16 +8798,18 @@ class GraphManager {
       const circle = document.createElementNS(svgNs, "circle");
       circle.setAttribute("cx", x);
       circle.setAttribute("cy", y);
-      circle.setAttribute("r", "13");
+      circle.setAttribute("r", monthMarkerDays.has(day) ? "5.8" : "4.2");
       circle.setAttribute("class", "habit-spiral-node-circle");
       button.appendChild(circle);
 
-      const label = document.createElementNS(svgNs, "text");
-      label.setAttribute("x", labelX);
-      label.setAttribute("y", labelY + 4);
-      label.setAttribute("class", "habit-spiral-day-label");
-      label.textContent = String(day);
-      button.appendChild(label);
+      if (monthMarkerDays.has(day)) {
+        const label = document.createElementNS(svgNs, "text");
+        label.setAttribute("x", labelX);
+        label.setAttribute("y", labelY + 4);
+        label.setAttribute("class", "habit-spiral-day-label");
+        label.textContent = monthMarkerDays.get(day);
+        button.appendChild(label);
+      }
 
       const cycleDay = () => {
         if (disabled || automation) return;
@@ -8807,12 +8842,9 @@ class GraphManager {
     const monthKey = this.getHabitSpiralMonthKey(now);
     const { month } = this.getHabitSpiralMonthState(monthKey);
     const automation = this.buildAutomatedHabitTracker(now);
-    const monthName = now.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
+    const yearName = String(now.getFullYear());
     const label = document.getElementById("habit-month-label");
-    if (label) label.textContent = monthName;
+    if (label) label.textContent = `${yearName} Annual Spiral`;
 
     const shell = document.createElement("div");
     shell.className = "habit-tracker-shell";
@@ -8842,7 +8874,7 @@ class GraphManager {
 
     const monthlySection = document.createElement("section");
     monthlySection.className = "habit-panel";
-    monthlySection.innerHTML = `<h3>Monthly Habits</h3>`;
+    monthlySection.innerHTML = `<h3>Yearly Habits</h3>`;
     monthlySection.appendChild(this.buildAutomatedChecklist(
       "habit-check-list",
       automation.monthly,
