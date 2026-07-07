@@ -4056,8 +4056,8 @@ class ShadowEngine {
     return {
       winsIn5,
       winsIn7,
-      status3in5: `${winsIn5}/3`,
-      status5in7: `${winsIn7}/5`,
+      status3in5: `${winsIn5}/5 need 3`,
+      status5in7: `${winsIn7}/7 need 5`,
       clear3in5: winsIn5 >= 3,
       clear5in7: winsIn7 >= 5,
     };
@@ -4979,7 +4979,7 @@ class ShadowEngine {
     budgetEl.className =
       penalty.overBudget > 0 ? "shadow-overbudget" : "";
     this.app.elements["shadow-win-ladder"].textContent =
-      `3/5 ${ladder.status3in5}  5/7 ${ladder.status5in7}`;
+      `Last 5: ${ladder.status3in5} | Last 7: ${ladder.status5in7}`;
     this.app.elements["shadow-mission-score"].textContent =
       `${missionScore}/100`;
     this.app.elements["shadow-weekly-gap"].textContent =
@@ -5535,7 +5535,7 @@ Level: ${d.userLevel.current.name} | L${d.userMicroLevel}/100
 Active Penalties: ${this.app.formatDuration(d.penaltyMinutes)} (${d.penaltyPoints}pt) | ${d.penaltyReasons.length ? d.penaltyReasons.join(" | ") : "No active penalty triggers"}
 Mission Score: ${d.missionScore}/100
 Distraction Budget: ${this.app.formatDuration(d.distractionMinutes)} / ${this.app.formatDuration(CONFIG.DISTRACTION_BUDGET_MINUTES)}${d.distractionOverBudget > 0 ? ` (+${this.app.formatDuration(d.distractionOverBudget)} over)` : ""}
-Win Ladder: 3/5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " [CLEAR]" : ""} | 5/7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " [CLEAR]" : ""}
+Win Ladder: Last 5 ${d.winLadder.status3in5}${d.winLadder.clear3in5 ? " [CLEAR]" : ""} | Last 7 ${d.winLadder.status5in7}${d.winLadder.clear5in7 ? " [CLEAR]" : ""}
 Mode: ${d.mode}
 Gap: ${d.gap > 0 ? "-" : "+"}${this.app.formatDuration(Math.abs(d.gap))}
 Minutes to Tie: ${this.app.formatDuration(d.minutesToTie)}
@@ -6399,7 +6399,7 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const h = String(Math.floor(ms / 3600000)).padStart(2, "0");
     const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, "0");
     const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, "0");
-    el.textContent = `${pending} tasks  Reset if loss`;
+    el.textContent = `${pending} task${pending === 1 ? "" : "s"} left | ${h}:${m}:${s}`;
   }
 
   setGeneratorStatus(key, message, kind = "idle") {
