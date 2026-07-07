@@ -8798,7 +8798,7 @@ class GraphManager {
       const circle = document.createElementNS(svgNs, "circle");
       circle.setAttribute("cx", x);
       circle.setAttribute("cy", y);
-      const dotRadius = 2.6 + progress * 1.7 + (monthMarkerDays.has(day) ? 0.55 : 0);
+      const dotRadius = 3.2 + progress * 2.2 + (monthMarkerDays.has(day) ? 1.05 : 0);
       circle.setAttribute("r", dotRadius.toFixed(2));
       circle.setAttribute("class", "habit-spiral-node-circle");
       button.appendChild(circle);
