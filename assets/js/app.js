@@ -7773,10 +7773,10 @@ class GraphManager {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 420, easing: "easeOutCubic" },
+        animation: { duration: 620, easing: "easeOutQuart" },
         transitions: {
-          active: { animation: { duration: 320 } },
-          resize: { animation: { duration: 320 } },
+          active: { animation: { duration: 360, easing: "easeOutQuart" } },
+          resize: { animation: { duration: 420, easing: "easeOutQuart" } },
         },
         plugins: {
           legend: { display: false },
@@ -7824,7 +7824,7 @@ class GraphManager {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 380, easing: "easeOutQuad" },
+        animation: { duration: 560, easing: "easeOutQuart" },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -8188,7 +8188,7 @@ class GraphManager {
         ? "Average productivity per day across the displayed range"
         : "Total productivity across the displayed range";
     const start = performance.now();
-    const duration = 450;
+    const duration = 620;
     const tick = (now) => {
       const progress = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);

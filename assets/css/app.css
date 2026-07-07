@@ -13,7 +13,18 @@
         --info: #17a2b8;
         --purple: #6f42c1;
         --yellow: #ffcc00;
-        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+        --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+        --motion-fast: 180ms;
+        --motion-base: 320ms;
+        --motion-slow: 520ms;
+        --transition:
+          color var(--motion-base) var(--ease-smooth),
+          background-color var(--motion-base) var(--ease-smooth),
+          border-color var(--motion-base) var(--ease-smooth),
+          box-shadow var(--motion-base) var(--ease-smooth),
+          opacity var(--motion-base) var(--ease-smooth),
+          transform var(--motion-base) var(--ease-smooth);
         --shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.4);
       }
@@ -24,6 +35,9 @@
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           "Helvetica Neue", Arial, sans-serif;
+      }
+      html {
+        scroll-behavior: smooth;
       }
       body {
         background: linear-gradient(135deg, #121212 0%, #0d0d0d 100%);
@@ -2363,4 +2377,127 @@
 .github-heatmap-wrapper {
   overflow: visible !important;
   padding-bottom: 0 !important;
+}
+
+/* Motion polish: scoped to existing animated/interactive surfaces. */
+.btn,
+.login-gate-btn,
+.profile-rank-guide,
+.favorite-card,
+.task-card,
+.shadow-card,
+.graph-card,
+.range-select,
+.github-cell,
+.generator-panel-head,
+.roadmap-check,
+.mission-check {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.btn,
+.login-gate-btn,
+.profile-rank-guide,
+.favorite-card,
+.task-card,
+.shadow-card,
+.graph-card,
+.range-select {
+  transition:
+    transform var(--motion-base) var(--ease-smooth),
+    box-shadow var(--motion-base) var(--ease-smooth),
+    border-color var(--motion-base) var(--ease-smooth),
+    background-color var(--motion-base) var(--ease-smooth),
+    color var(--motion-base) var(--ease-smooth),
+    opacity var(--motion-base) var(--ease-smooth);
+}
+
+.task-input,
+.generator-input,
+.generator-output,
+select,
+textarea,
+input {
+  transition:
+    border-color var(--motion-base) var(--ease-smooth),
+    box-shadow var(--motion-base) var(--ease-smooth),
+    background-color var(--motion-base) var(--ease-smooth),
+    color var(--motion-base) var(--ease-smooth);
+}
+
+.shadow-progress-fill,
+.shadow-duel-you-fill,
+.shadow-duel-shadow-fill {
+  transition:
+    width var(--motion-slow) var(--ease-smooth),
+    background-color var(--motion-slow) var(--ease-smooth),
+    box-shadow var(--motion-slow) var(--ease-smooth);
+}
+
+.github-cell {
+  transform-origin: center;
+  transition:
+    transform var(--motion-fast) var(--ease-smooth),
+    border-color var(--motion-fast) var(--ease-smooth),
+    box-shadow var(--motion-fast) var(--ease-smooth),
+    background-color var(--motion-fast) var(--ease-smooth),
+    opacity var(--motion-fast) var(--ease-smooth);
+}
+
+.active-task-indicator {
+  animation: pulse 2.4s var(--ease-smooth) infinite;
+}
+
+.shadow-goal-item.mission-active-now .mission-title::before {
+  animation: mission-pulse 1.8s var(--ease-smooth) infinite;
+}
+
+.shadow-new-standard {
+  animation: shadowPulse 720ms var(--ease-smooth);
+}
+
+.graph-card {
+  animation:
+    graphFadeIn 520ms var(--ease-smooth),
+    graphSlideUp 620ms var(--ease-smooth);
+}
+
+.streak-popup {
+  animation: popupAppear 420ms var(--ease-smooth);
+}
+
+.motivation-container,
+.date-display,
+.stopwatch-container,
+.stat-card,
+.task-input,
+.active-task-indicator,
+.shadow-goal-item,
+.shadow-mini-card,
+.shadow-summary-card,
+.trainer-section,
+.trainer-row,
+.modal-content,
+.login-gate-card {
+  transition:
+    border-color var(--motion-base) var(--ease-smooth),
+    box-shadow var(--motion-base) var(--ease-smooth),
+    background-color var(--motion-base) var(--ease-smooth),
+    opacity var(--motion-base) var(--ease-smooth);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }
