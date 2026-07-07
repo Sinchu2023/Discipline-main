@@ -8906,9 +8906,6 @@ class GraphManager {
   }
 
 renderGithubHeatmap(year = null) {
-    this.renderHabitSpiralTracker();
-    return;
-
     const container = document.getElementById("github-heatmap-container");
     if (!container) return;
     container.innerHTML = "";
