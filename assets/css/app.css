@@ -2607,6 +2607,11 @@
   overflow: hidden;
 }
 
+.habit-spiral-only-panel {
+  width: 100%;
+  min-height: min(72vw, 620px);
+}
+
 .habit-spiral-svg {
   width: min(100%, 560px);
   height: auto;

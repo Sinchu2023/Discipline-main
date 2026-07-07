@@ -8846,44 +8846,8 @@ class GraphManager {
     const label = document.getElementById("habit-month-label");
     if (label) label.textContent = `${yearName} Annual Spiral`;
 
-    const shell = document.createElement("div");
-    shell.className = "habit-tracker-shell";
-
-    const side = document.createElement("aside");
-    side.className = "habit-tracker-side";
-    const title = document.createElement("div");
-    title.className = "habit-tracker-title";
-    title.textContent = "Habit Tracker";
-    const subtitle = document.createElement("div");
-    subtitle.className = "habit-tracker-subtitle";
-    subtitle.textContent = "Auto-filled from tracked tasks";
-    side.append(title, subtitle);
-
-    const dailySection = document.createElement("section");
-    dailySection.className = "habit-panel";
-    dailySection.innerHTML = `<h3>Daily Habits</h3>`;
-    dailySection.appendChild(this.buildAutomatedChecklist(
-      "habit-check-list",
-      automation.daily,
-    ));
-
-    const weeklySection = document.createElement("section");
-    weeklySection.className = "habit-panel";
-    weeklySection.innerHTML = `<h3>Weekly Habits</h3>`;
-    weeklySection.appendChild(this.buildAutomatedWeeklyMatrix(automation));
-
-    const monthlySection = document.createElement("section");
-    monthlySection.className = "habit-panel";
-    monthlySection.innerHTML = `<h3>Yearly Habits</h3>`;
-    monthlySection.appendChild(this.buildAutomatedChecklist(
-      "habit-check-list",
-      automation.monthly,
-    ));
-
-    side.append(dailySection, weeklySection, monthlySection);
-
     const focus = document.createElement("section");
-    focus.className = "habit-spiral-panel";
+    focus.className = "habit-spiral-panel habit-spiral-only-panel";
     const legend = document.createElement("div");
     legend.className = "habit-tier-legend";
     [
@@ -8901,11 +8865,13 @@ class GraphManager {
     });
 
     focus.append(this.buildHabitSpiralSvg(month, monthKey, now, automation), legend);
-    shell.append(side, focus);
-    container.appendChild(shell);
+    container.appendChild(focus);
   }
 
 renderGithubHeatmap(year = null) {
+    this.renderHabitSpiralTracker();
+    return;
+
     const container = document.getElementById("github-heatmap-container");
     if (!container) return;
     container.innerHTML = "";
