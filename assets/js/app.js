@@ -8707,13 +8707,13 @@ class GraphManager {
     const svgNs = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(svgNs, "svg");
     svg.setAttribute("class", "habit-spiral-svg");
-    svg.setAttribute("viewBox", "0 0 520 520");
+    svg.setAttribute("viewBox", "0 0 620 620");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", `${yearName} 365-day habit spiral`);
 
-    const centerX = 260;
-    const centerY = 260;
-    const guideRadii = [66, 98, 130, 162, 194, 226];
+    const centerX = 310;
+    const centerY = 310;
+    const guideRadii = [112, 144, 176, 208, 240, 272];
     guideRadii.forEach((radius) => {
       const circle = document.createElementNS(svgNs, "circle");
       circle.setAttribute("cx", centerX);
@@ -8725,8 +8725,8 @@ class GraphManager {
 
     for (let index = 0; index < 12; index += 1) {
       const angle = (-90 + index * 30) * (Math.PI / 180);
-      const outerRadius = 212;
-      const innerRadius = 62;
+      const outerRadius = 272;
+      const innerRadius = 108;
       const x1 = centerX + Math.cos(angle) * innerRadius;
       const y1 = centerY + Math.sin(angle) * innerRadius;
       const x2 = centerX + Math.cos(angle) * outerRadius;
@@ -8762,9 +8762,9 @@ class GraphManager {
       monthMarkerDays.set(ordinal, markerDate.toLocaleDateString("en-US", { month: "short" }));
     }
 
-    const turns = 6.2;
-    const minRadius = 54;
-    const maxRadius = 226;
+    const turns = 4.2;
+    const minRadius = 112;
+    const maxRadius = 274;
     for (let day = 1; day <= daysInYear; day += 1) {
       const progress = daysInYear > 1 ? (day - 1) / (daysInYear - 1) : 0;
       const angle = (-Math.PI / 2) + progress * turns * Math.PI * 2;
@@ -8798,7 +8798,7 @@ class GraphManager {
       const circle = document.createElementNS(svgNs, "circle");
       circle.setAttribute("cx", x);
       circle.setAttribute("cy", y);
-      circle.setAttribute("r", monthMarkerDays.has(day) ? "5.8" : "4.2");
+      circle.setAttribute("r", monthMarkerDays.has(day) ? "4.8" : "3.2");
       circle.setAttribute("class", "habit-spiral-node-circle");
       button.appendChild(circle);
 
