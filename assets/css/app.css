@@ -2884,3 +2884,89 @@ input {
     transition-duration: 1ms !important;
   }
 }
+
+/* 365-day Streak Battle Grid final layout */
+.github-heatmap-container {
+  --heatmap-cell: clamp(8px, calc((100vw - 170px) / 61), 13px);
+  --heatmap-gap: 2px;
+  width: 100%;
+  overflow: hidden !important;
+}
+
+.github-heatmap-wrapper {
+  width: 100%;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.github-heatmap-inner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.github-months-row {
+  display: grid;
+  gap: var(--heatmap-gap);
+  width: max-content;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.github-month-label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
+}
+
+.github-heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heatmap-cell));
+  gap: var(--heatmap-gap);
+  width: max-content;
+  align-items: start;
+}
+
+.github-cell {
+  width: var(--heatmap-cell);
+  height: var(--heatmap-cell);
+  border-radius: 3px;
+}
+
+@media (min-width: 980px) {
+  .github-heatmap-container {
+    --heatmap-cell: 13px;
+    --heatmap-gap: 3px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .main-content {
+    grid-template-columns: minmax(300px, 1fr) minmax(900px, 1.2fr);
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1279px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .github-heatmap-container {
+    --heatmap-cell: clamp(4px, calc((100vw - 96px) / 61), 8px);
+    --heatmap-gap: 1px;
+  }
+
+  .github-months-row {
+    font-size: 0.58rem;
+  }
+
+  .github-cell {
+    border-radius: 2px;
+  }
+}

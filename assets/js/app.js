@@ -8869,10 +8869,7 @@ class GraphManager {
     container.appendChild(focus);
   }
 
-renderGithubHeatmap(year = null) {
-    this.renderHabitSpiralTracker();
-    return;
-
+  renderGithubHeatmap(year = null) {
     const container = document.getElementById("github-heatmap-container");
     if (!container) return;
     container.innerHTML = "";
@@ -8906,6 +8903,9 @@ renderGithubHeatmap(year = null) {
     const yearsWithData = Array.from(yearDataMap.keys()).sort((a, b) => a - b);
     const currentYear = year || new Date().getFullYear();
     this.app.uiManager.currentHeatmapYear = currentYear;
+
+    const label = document.getElementById("habit-month-label");
+    if (label) label.textContent = `${currentYear} Full Year`;
 
     const prevBtn = document.getElementById("heatmap-prev-year");
     const nextBtn = document.getElementById("heatmap-next-year");
@@ -9021,9 +9021,22 @@ renderGithubHeatmap(year = null) {
     const inner = document.createElement("div");
     inner.className = "github-heatmap-inner";
 
+    const monthsRow = document.createElement("div");
+    monthsRow.className = "github-months-row";
+    monthsRow.style.gridTemplateColumns = `repeat(${totalWeeks}, var(--heatmap-cell))`;
+    for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+      const monthDate = new Date(currentYear, monthIndex, 1, 12, 0, 0, 0);
+      const week = Math.floor((firstDayOffset + Math.floor((monthDate - startDate) / 86400000)) / 7);
+      const monthLabel = document.createElement("span");
+      monthLabel.className = "github-month-label";
+      monthLabel.style.gridColumn = `${week + 1} / span 4`;
+      monthLabel.textContent = monthDate.toLocaleDateString("en-US", { month: "short" });
+      monthsRow.appendChild(monthLabel);
+    }
+
     const grid = document.createElement("div");
     grid.className = "github-heatmap-grid";
-    grid.style.gridTemplateColumns = `repeat(${totalWeeks}, 10px)`;
+    grid.style.gridTemplateColumns = `repeat(${totalWeeks}, var(--heatmap-cell))`;
 
     days.forEach((day, index) => {
       const dayDate = this.app.parseDateKey(day.dateStr);
@@ -9061,18 +9074,9 @@ renderGithubHeatmap(year = null) {
       grid.appendChild(cell);
     });
 
-    inner.appendChild(grid);
+    inner.append(monthsRow, grid);
     wrapper.appendChild(inner);
     container.appendChild(wrapper);
-
-    const isCurrentYear = currentYear === new Date().getFullYear();
-    if (isCurrentYear) {
-      requestAnimationFrame(() => {
-        const cellWidth = 12;
-        const targetScroll = Math.max(0, (todayWeek * cellWidth) - container.clientWidth + 36);
-        container.scrollLeft = targetScroll;
-      });
-    }
   }
 }
 class EventManager {
