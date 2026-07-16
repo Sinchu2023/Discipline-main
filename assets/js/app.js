@@ -6337,8 +6337,6 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     };
 
     const orderedEntries = tasks.map((item, idx) => ({ item, idx }));
-    const primaryEntries = orderedEntries.filter((_, visualIdx) => visualIdx % 2 === 0);
-    const secondaryEntries = orderedEntries.filter((_, visualIdx) => visualIdx % 2 === 1);
 
     const renderEntrySet = (entries, secondary = false) => {
       if (!entries.length) return "";
@@ -6346,9 +6344,9 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     };
 
     // Phase 0.3: structural innerHTML render â€” ONLY called here, never on interaction
-    primaryContainer.innerHTML = renderEntrySet(primaryEntries);
+    primaryContainer.innerHTML = renderEntrySet(orderedEntries);
     if (secondaryContainer) {
-      secondaryContainer.innerHTML = renderEntrySet(secondaryEntries, true);
+      secondaryContainer.innerHTML = "";
     }
 
 
@@ -7822,32 +7820,34 @@ class GraphManager {
       },
     });
 
-    const sleepCtx = this.app.elements["sleep-chart"].getContext("2d");
-    this.charts.sleep = new Chart(sleepCtx, {
-      type: "bar",
-      data: this.getSleepData("7d"),
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 560, easing: "easeOutQuart" },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) =>
-                `${ctx.dataset.label}: ${this.formatHoursForTooltip(ctx.parsed.y)}`,
+    if (this.app.elements["sleep-chart"]) {
+      const sleepCtx = this.app.elements["sleep-chart"].getContext("2d");
+      this.charts.sleep = new Chart(sleepCtx, {
+        type: "bar",
+        data: this.getSleepData("7d"),
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 560, easing: "easeOutQuart" },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) =>
+                  `${ctx.dataset.label}: ${this.formatHoursForTooltip(ctx.parsed.y)}`,
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 12,
+              ticks: { callback: (v) => this.formatHoursForTooltip(v) },
             },
           },
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            max: 12,
-            ticks: { callback: (v) => this.formatHoursForTooltip(v) },
-          },
-        },
-      },
-    });
+      });
+    }
   }
 
   getProductivityData(range = "7d", filter = "productivity") {
@@ -8208,9 +8208,9 @@ class GraphManager {
   }
 
   updateCharts() {
-    if (!this.charts.productivity || !this.charts.sleep) return;
+    if (!this.charts.productivity) return;
     const prodRange = this.app.elements["prod-range"].value;
-    const sleepRange = this.app.elements["sleep-range"].value;
+    const sleepRange = this.app.elements["sleep-range"]?.value || "7d";
     const filter = this.getCurrentFilter();
 
     const prodContainer = this.app.elements["productivity-chart"].closest(
@@ -8231,10 +8231,10 @@ class GraphManager {
       prodRange,
       filter,
     );
-    this.charts.sleep.data = this.getSleepData(sleepRange);
+    if (this.charts.sleep) this.charts.sleep.data = this.getSleepData(sleepRange);
     this.applyProductivityChartViewport(prodRange);
     this.charts.productivity.update();
-    this.charts.sleep.update();
+    if (this.charts.sleep) this.charts.sleep.update();
 
     const toMinutes = this.getCurrentFilteredTotalMinutes();
     this.lastFilteredTotalMinutes = toMinutes;
@@ -8254,7 +8254,7 @@ class GraphManager {
     this.app.elements["prod-filter"]?.addEventListener("change", () =>
       this.updateCharts(),
     );
-    this.app.elements["sleep-range"].addEventListener("change", () =>
+    this.app.elements["sleep-range"]?.addEventListener("change", () =>
       this.updateCharts(),
     );
   }
