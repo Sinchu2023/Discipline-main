@@ -2142,8 +2142,9 @@ class TaskManager {
     const totalTime = this.app.getTrackedMinutesForDate(today);
     this.app.elements["productive-time"].textContent =
       this.app.formatDuration(productiveTime);
-    this.app.elements["sleep-time"].textContent =
-      this.app.formatDuration(sleepTime);
+    if (this.app.elements["sleep-time"])
+      this.app.elements["sleep-time"].textContent =
+        this.app.formatDuration(sleepTime);
     this.app.elements["total-time"].textContent =
       this.app.formatDuration(totalTime);
 

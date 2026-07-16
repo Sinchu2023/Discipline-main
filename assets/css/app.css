@@ -149,7 +149,7 @@
         font-size: 0.72rem;
         text-transform: uppercase;
         letter-spacing: 0.4px;
-        color: var(--text-secondary);
+        color: rgba(255, 255, 255, 0.92);
       }
       .btn {
         background: linear-gradient(145deg, #2a2a2a, #222);
@@ -383,7 +383,7 @@
         border-radius: 10px;
       }
       .task-history-label {
-        color: var(--text-secondary);
+        color: rgba(255, 255, 255, 0.92);
         font-size: 0.95rem;
         margin-left: auto;
       }
@@ -449,7 +449,7 @@
       /* Stats Dashboard */
       .stats-dashboard {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 1.5rem;
         margin-bottom: 2rem;
       }
@@ -613,12 +613,12 @@
         align-items: center;
         gap: 0.85rem;
         font-size: 0.82rem;
-        color: var(--text-secondary);
+        color: rgba(255, 255, 255, 0.92);
         cursor: pointer;
         padding: 0.55rem 0.7rem;
         border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.02);
+        background: rgba(255, 255, 255, 0.05);
       }
       .shadow-goal-item.mission-secondary {
         background: rgba(255, 255, 255, 0.015);
@@ -632,7 +632,8 @@
         gap: 0.58rem;
       }
       .mission-title {
-        color: var(--text-main, #f5f5f5);
+        color: rgba(255, 255, 255, 0.96);
+        font-weight: 400;
         line-height: 1.35;
         flex: 1 1 220px;
       }
@@ -642,13 +643,13 @@
         accent-color: var(--success);
       }
       .shadow-goal-done {
-        color: var(--success) !important;
+        color: rgba(255, 255, 255, 0.96) !important;
       }
       /* �16 � expired: time window passed, task not completed */
       .mission-expired {
-        opacity: 0.45;
+        opacity: 0.72;
         text-decoration: line-through;
-        color: #666 !important;
+        color: rgba(255, 255, 255, 0.7) !important;
       }
       .mission-expired .mission-check {
         opacity: 0.3;
@@ -656,17 +657,17 @@
       /* time badge shown next to each mission */
       .mission-time-badge {
         font-size: 0.72rem;
-        color: var(--text-muted, #999);
+        color: rgba(255, 255, 255, 0.86);
         display: inline-flex;
         width: fit-content;
         padding: 0.12rem 0.45rem;
         border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.07);
         letter-spacing: 0.2px;
       }
       .mission-expired .mission-time-badge {
-        color: #555;
+        color: rgba(255, 255, 255, 0.62);
       }
       /* active (within window) pulse dot */
       .shadow-goal-item.mission-active-now .mission-title::before {
@@ -1291,7 +1292,7 @@
         gap: 10px;
         padding: 12px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.02);
+        background: rgba(255, 255, 255, 0.05);
       }
 
       .trainer-overview-card {
@@ -1811,6 +1812,9 @@
           grid-template-columns: 1fr;
         }
         .stats-dashboard {
+          grid-template-columns: 1fr;
+        }
+        .daily-mission-section .mission-phase-items {
           grid-template-columns: 1fr;
         }
         .shadow-grid {
@@ -2900,16 +2904,24 @@ input {
 }
 
 /* 365-day Streak Battle Grid final layout */
-.github-heatmap-container {
-  --heatmap-cell: clamp(7px, calc((100vw - 180px) / 68), 10px);
-  --heatmap-gap: 2px;
+.streak-battle-card {
   width: 100%;
-  overflow: hidden !important;
+  margin-top: 2rem;
+}
+
+.github-heatmap-container {
+  --heatmap-cell: clamp(14px, calc((100vw - 260px) / 58), 20px);
+  --heatmap-gap: 4px;
+  width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding-bottom: 0.25rem !important;
 }
 
 .github-heatmap-wrapper {
   width: 100%;
-  overflow: hidden !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
   padding: 0 !important;
 }
 
@@ -2917,8 +2929,8 @@ input {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
-  align-items: flex-start;
+  gap: 0.6rem;
+  align-items: center;
 }
 
 .github-months-row {
@@ -2926,8 +2938,9 @@ input {
   gap: var(--heatmap-gap);
   width: max-content;
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1;
+  margin: 0 auto;
 }
 
 .github-month-label {
@@ -2943,18 +2956,19 @@ input {
   gap: var(--heatmap-gap);
   width: max-content;
   align-items: start;
+  margin: 0 auto;
 }
 
 .github-cell {
   width: var(--heatmap-cell);
   height: var(--heatmap-cell);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 @media (min-width: 980px) {
   .github-heatmap-container {
-    --heatmap-cell: 10px;
-    --heatmap-gap: 2px;
+    --heatmap-cell: 20px;
+    --heatmap-gap: 4px;
   }
 }
 
@@ -2972,12 +2986,12 @@ input {
 
 @media (max-width: 560px) {
   .github-heatmap-container {
-    --heatmap-cell: clamp(4px, calc((100vw - 96px) / 61), 8px);
-    --heatmap-gap: 1px;
+    --heatmap-cell: 10px;
+    --heatmap-gap: 2px;
   }
 
   .github-months-row {
-    font-size: 0.58rem;
+    font-size: 0.62rem;
   }
 
   .github-cell {
