@@ -2906,12 +2906,12 @@ input {
 /* 365-day Streak Battle Grid final layout */
 .streak-battle-card {
   width: 100%;
-  margin-top: 2rem;
+  margin-top: 0;
 }
 
 .github-heatmap-container {
-  --heatmap-cell: clamp(14px, calc((100vw - 260px) / 58), 20px);
-  --heatmap-gap: 4px;
+  --heatmap-cell: clamp(10px, calc((100vw - 620px) / 68), 13px);
+  --heatmap-gap: 3px;
   width: 100%;
   overflow-x: auto !important;
   overflow-y: hidden !important;
@@ -2967,8 +2967,8 @@ input {
 
 @media (min-width: 980px) {
   .github-heatmap-container {
-    --heatmap-cell: 20px;
-    --heatmap-gap: 4px;
+    --heatmap-cell: 13px;
+    --heatmap-gap: 3px;
   }
 }
 

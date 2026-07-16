@@ -9069,13 +9069,12 @@ class GraphManager {
       ) {
         cell.dataset.best = "broken";
       }
-      const nearGoalLabel =
-        day.nearGoalTier === "critical"
-          ? " | Near goal: 20% left or less"
-          : day.nearGoalTier === "close"
-            ? " | Near goal: 40% left or less"
-            : "";
-      cell.title = `${this.formatCompactBattleDate(day.dateStr)} | ${day.state === "neutral" ? "No data" : (day.state === "win" ? "Win" : "Loss")} | Productive ${this.app.formatDuration(day.productive)} | Shadow ${this.app.formatDuration(day.shadow || Math.max(0, fallbackTarget - 1))} | Win Target ${this.app.formatDuration(day.target || fallbackTarget)}${nearGoalLabel} | Streak ${day.streak || 0}`;
+      const dateLabel = this.formatCompactBattleDate(day.dateStr);
+      const statusLabel =
+        day.state === "neutral" ? "No activity" : day.state === "win" ? "Win" : "Loss";
+      const productiveLabel =
+        day.productive > 0 ? ` - ${this.app.formatDuration(day.productive)} productive` : "";
+      cell.title = `${statusLabel} on ${dateLabel}${productiveLabel}`;
       grid.appendChild(cell);
     });
 
