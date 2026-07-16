@@ -86,6 +86,7 @@
       .profile-menu-container {
         position: relative;
         display: none;
+        z-index: 2000;
       }
       .profile-trigger {
         width: 36px;
@@ -105,7 +106,7 @@
         box-shadow: var(--shadow);
         padding: 8px;
         display: none;
-        z-index: 50;
+        z-index: 3000;
       }
       .profile-menu.open {
         display: block;
@@ -3110,6 +3111,17 @@ header {
 
 .view-controls {
   gap: 6px !important;
+  z-index: 2500 !important;
+}
+
+.profile-menu-container {
+  z-index: 3000 !important;
+}
+
+.profile-menu {
+  background: #1b1b1b !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.72) !important;
+  z-index: 4000 !important;
 }
 
 .view-controls .btn,

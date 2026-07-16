@@ -70,6 +70,7 @@ const CONFIG = {
     TASK_PROMPT_DRAFT: "discipline_tracker_task_prompt_draft",
     TASK_RESPONSE_DRAFT: "discipline_tracker_task_response_draft",
     SPIRAL_HABIT_TRACKER: "discipline_tracker_spiral_habit_tracker",
+    STATS_RESET_AT: "discipline_tracker_stats_reset_at",
   },
   MOTIVATION_INTERVAL: 15000,
   CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
@@ -1133,65 +1134,34 @@ class FirebaseCloudManager {
     await window.FirebaseServices.deleteDoc(this.taskDoc(taskId));
   }
 
-  async resetCloudData() {
+  async resetCloudStatsOnly() {
     if (!this.isReady || !window.FirebaseServices) return true;
     const services = window.FirebaseServices;
 
     try {
       this.detachTimerListener();
-      this.detachRoadmapListener();
-      this.detachTasksListener();
-      this.detachFavoritesListener();
-
-      const deleteCollectionDocs = async (collectionRef) => {
-        const snap = await services.getDocs(collectionRef);
-        await Promise.all(
-          snap.docs.map((docSnap) => services.deleteDoc(docSnap.ref)),
-        );
-      };
 
       const stateDoc = (name) =>
         services.doc(this.db, "users", this.user.uid, "state", name);
-      const roadmapDoc = services.doc(
-        this.db,
-        "users",
-        this.user.uid,
-        "roadmap",
-        "main",
-      );
 
       await Promise.all([
-        deleteCollectionDocs(this.tasksCollection()),
-        deleteCollectionDocs(this.favoritesCollection()),
-        services.deleteDoc(stateDoc("favorites")),
         services.deleteDoc(stateDoc("timer")),
-        services.deleteDoc(roadmapDoc),
-      ]);
-
-      await services.setDoc(
-        this.userDoc(),
-        {
-          profile: {
-            uid: this.user.uid,
-            email: this.user.email || "",
-            displayName: this.user.displayName || "",
+        services.setDoc(
+          this.userDoc(),
+          {
+            revision: { status: "pending", timeSpent: 0 },
+            flowProtocol: { byDate: {} },
+            trainerState: {},
+            shadowAvg: 0,
+            updatedAt: Date.now(),
           },
-          revision: { status: "pending", timeSpent: 0 },
-          flowProtocol: { byDate: {} },
-          trainerState: {},
-          shadowAvg: 0,
-          roadmapPromptDraft: "",
-          roadmapResponseDraft: "",
-          taskPromptDraft: "",
-          taskResponseDraft: "",
-          updatedAt: Date.now(),
-        },
-        { merge: false },
-      );
+          { merge: true },
+        ),
+      ]);
 
       return true;
     } catch (error) {
-      console.warn("cloud reset failed", error);
+      console.warn("cloud stats reset failed", error);
       return false;
     }
   }
@@ -1214,6 +1184,8 @@ class DisciplineTracker {
       ),
       journalEntries:
         this.loadFromStorage(CONFIG.STORAGE_KEYS.JOURNAL_ENTRIES) || {},
+      statsResetAt:
+        Number(this.loadFromStorage(CONFIG.STORAGE_KEYS.STATS_RESET_AT)) || 0,
       activeTask: this.loadFromStorage(CONFIG.STORAGE_KEYS.ACTIVE_TASK),
       charts: { productivity: null, sleep: null },
     };
@@ -1278,17 +1250,12 @@ class DisciplineTracker {
       "view-report",
       "export-data",
       "import-data",
-      "open-shadow-ranks",
       "import-file",
       "report-modal",
       "report-content",
       "close-modal",
       "print-report",
       "close-report",
-      "shadow-ranks-modal",
-      "shadow-ranks-content",
-      "close-shadow-ranks",
-      "close-shadow-ranks-modal",
       "open-trainer",
       "trainer-modal",
       "generator-panel",
@@ -1394,6 +1361,7 @@ class DisciplineTracker {
       "roadmap-penalty-timer",
       "google-login-btn",
       "google-logout-btn",
+      "reset-stats-btn",
       "auth-user-name",
       "profile-menu-container",
       "profile-menu-toggle",
@@ -1425,35 +1393,50 @@ class DisciplineTracker {
   }
   async completeResetData() {
     const confirmed = window.confirm(
-      "Complete reset will clear saved tasks, favorites, streaks, journal entries, roadmap/trainer state, shadow state, drafts, and local sync data. Continue?",
+      "Reset stats will clear streaks, mission checks, shadow/flow stats, journal entries, and timer state. Your tasks and Master Study Pipeline stay saved. Continue?",
     );
     if (!confirmed) return;
 
-    const cloudResetOk = await this.cloudManager?.resetCloudData?.();
-
-    const keysToRemove = new Set(Object.values(CONFIG.STORAGE_KEYS));
-
-    try {
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("discipline_tracker_")) {
-          keysToRemove.add(key);
-        }
-      });
-    } catch (error) {
-      console.warn("storage reset scan failed", error);
-    }
+    const cloudResetOk = await this.cloudManager?.resetCloudStatsOnly?.();
+    const keysToRemove = [
+      CONFIG.STORAGE_KEYS.STREAK,
+      CONFIG.STORAGE_KEYS.LAST_ACTIVITY,
+      CONFIG.STORAGE_KEYS.ACTIVE_TASK,
+      CONFIG.STORAGE_KEYS.SHADOW_AVG,
+      CONFIG.STORAGE_KEYS.TRAINER_STATE,
+      CONFIG.STORAGE_KEYS.FLOW_PROTOCOL,
+      CONFIG.STORAGE_KEYS.JOURNAL_ENTRIES,
+      CONFIG.STORAGE_KEYS.TIMER_CLOUD_STATE,
+      CONFIG.STORAGE_KEYS.SHADOW_ENGINE_STATE,
+      CONFIG.STORAGE_KEYS.SPIRAL_HABIT_TRACKER,
+    ];
 
     keysToRemove.forEach((key) => {
       try {
         localStorage.removeItem(key);
       } catch (error) {
-        console.warn("storage reset failed", key, error);
+        console.warn("stats reset failed", key, error);
       }
     });
 
+    this.state.streak = 0;
+    this.state.lastActivityDate = null;
+    this.state.activeTask = null;
+    this.state.journalEntries = {};
+    this.state.statsResetAt = Date.now();
+    this.saveToStorage(
+      CONFIG.STORAGE_KEYS.STATS_RESET_AT,
+      this.state.statsResetAt,
+    );
+    this.stopwatch?.reset?.();
+
     try {
       Object.keys(sessionStorage).forEach((key) => {
-        if (key.startsWith("discipline_tracker_")) {
+        if (
+          key.startsWith("discipline_tracker_timer") ||
+          key.startsWith("discipline_tracker_shadow") ||
+          key.startsWith("discipline_tracker_flow")
+        ) {
           sessionStorage.removeItem(key);
         }
       });
@@ -1463,7 +1446,7 @@ class DisciplineTracker {
 
     if (cloudResetOk === false) {
       window.alert(
-        "Local data was cleared, but cloud reset failed. Check your connection and press Complete Reset again if old synced data returns.",
+        "Local stats were reset, but cloud stats reset failed. Check your connection and press Reset Stats again if old synced stats return.",
       );
     }
 
@@ -1654,6 +1637,12 @@ class DisciplineTracker {
   isDistractionCategory(category) {
     return category === "Time Waste / Distraction";
   }
+  isTaskAfterStatsReset(task) {
+    const resetAt = Number(this.state.statsResetAt || 0);
+    if (!resetAt) return true;
+    const taskTime = Number(task.endTime || task.startTime || 0);
+    return Number.isFinite(taskTime) && taskTime >= resetAt;
+  }
   getTrackedMinutesForDate(
     dateStr,
     sourceTasks = this.state.tasks,
@@ -1663,7 +1652,8 @@ class DisciplineTracker {
         (task) =>
           task.date === dateStr &&
           Number.isFinite(task.duration) &&
-          task.duration > 0,
+          task.duration > 0 &&
+          this.isTaskAfterStatsReset(task),
       )
       .reduce((sum, task) => sum + task.duration, 0);
   }
@@ -1675,7 +1665,8 @@ class DisciplineTracker {
       .filter(
         (task) =>
           task.date === dateStr &&
-          this.isProductiveCategory(task.category),
+          this.isProductiveCategory(task.category) &&
+          this.isTaskAfterStatsReset(task),
       )
       .reduce((sum, task) => sum + task.duration, 0);
   }
@@ -1685,7 +1676,10 @@ class DisciplineTracker {
   ) {
     return sourceTasks
       .filter(
-        (task) => task.date === dateStr && task.category === "Sleep",
+        (task) =>
+          task.date === dateStr &&
+          task.category === "Sleep" &&
+          this.isTaskAfterStatsReset(task),
       )
       .reduce((sum, task) => sum + task.duration, 0);
   }
@@ -1697,7 +1691,8 @@ class DisciplineTracker {
       .filter(
         (task) =>
           task.date === dateStr &&
-          this.isDistractionCategory(task.category),
+          this.isDistractionCategory(task.category) &&
+          this.isTaskAfterStatsReset(task),
       )
       .reduce((sum, task) => sum + task.duration, 0);
   }
@@ -1797,7 +1792,8 @@ class DisciplineTracker {
             (t) =>
               this.isProductiveCategory(t.category) &&
               Number.isFinite(t.duration) &&
-              t.duration > 0,
+              t.duration > 0 &&
+              this.isTaskAfterStatsReset(t),
           )
           .map((t) => t.date),
       ),
@@ -1807,7 +1803,8 @@ class DisciplineTracker {
       (t) =>
         t.date === today &&
         Number.isFinite(t.duration) &&
-        t.duration > 0,
+        t.duration > 0 &&
+        this.isTaskAfterStatsReset(t),
     );
     const hasProductiveTaskToday = productiveDates.includes(today);
     if (
@@ -9301,8 +9298,8 @@ class EventManager {
     this.app.elements["import-data"].addEventListener("click", () =>
       (this.app.uiManager.triggerImportPicker(), this.app.cloudManager.closeProfileMenu()),
     );
-    this.app.elements["open-shadow-ranks"].addEventListener("click", () => {
-      this.app.uiManager.showShadowRanksGuide();
+    this.app.elements["reset-stats-btn"]?.addEventListener("click", () => {
+      this.app.completeResetData();
       this.app.cloudManager.closeProfileMenu();
     });
     this.app.elements["import-file"].addEventListener("change", (e) => {
@@ -9350,10 +9347,10 @@ class EventManager {
     this.app.elements["close-report"].addEventListener("click", () =>
       this.app.uiManager.hideReport(),
     );
-    this.app.elements["close-shadow-ranks"].addEventListener("click", () =>
+    this.app.elements["close-shadow-ranks"]?.addEventListener("click", () =>
       this.app.uiManager.hideShadowRanksGuide(),
     );
-    this.app.elements["close-shadow-ranks-modal"].addEventListener(
+    this.app.elements["close-shadow-ranks-modal"]?.addEventListener(
       "click",
       () => this.app.uiManager.hideShadowRanksGuide(),
     );
@@ -9394,7 +9391,7 @@ class EventManager {
       if (e.target === this.app.elements["report-modal"])
         this.app.uiManager.hideReport();
     });
-    this.app.elements["shadow-ranks-modal"].addEventListener("click", (e) => {
+    this.app.elements["shadow-ranks-modal"]?.addEventListener("click", (e) => {
       if (e.target === this.app.elements["shadow-ranks-modal"])
         this.app.uiManager.hideShadowRanksGuide();
     });
