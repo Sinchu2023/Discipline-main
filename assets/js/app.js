@@ -1132,6 +1132,69 @@ class FirebaseCloudManager {
     if (!this.isReady || !taskId) return;
     await window.FirebaseServices.deleteDoc(this.taskDoc(taskId));
   }
+
+  async resetCloudData() {
+    if (!this.isReady || !window.FirebaseServices) return true;
+    const services = window.FirebaseServices;
+
+    try {
+      this.detachTimerListener();
+      this.detachRoadmapListener();
+      this.detachTasksListener();
+      this.detachFavoritesListener();
+
+      const deleteCollectionDocs = async (collectionRef) => {
+        const snap = await services.getDocs(collectionRef);
+        await Promise.all(
+          snap.docs.map((docSnap) => services.deleteDoc(docSnap.ref)),
+        );
+      };
+
+      const stateDoc = (name) =>
+        services.doc(this.db, "users", this.user.uid, "state", name);
+      const roadmapDoc = services.doc(
+        this.db,
+        "users",
+        this.user.uid,
+        "roadmap",
+        "main",
+      );
+
+      await Promise.all([
+        deleteCollectionDocs(this.tasksCollection()),
+        deleteCollectionDocs(this.favoritesCollection()),
+        services.deleteDoc(stateDoc("favorites")),
+        services.deleteDoc(stateDoc("timer")),
+        services.deleteDoc(roadmapDoc),
+      ]);
+
+      await services.setDoc(
+        this.userDoc(),
+        {
+          profile: {
+            uid: this.user.uid,
+            email: this.user.email || "",
+            displayName: this.user.displayName || "",
+          },
+          revision: { status: "pending", timeSpent: 0 },
+          flowProtocol: { byDate: {} },
+          trainerState: {},
+          shadowAvg: 0,
+          roadmapPromptDraft: "",
+          roadmapResponseDraft: "",
+          taskPromptDraft: "",
+          taskResponseDraft: "",
+          updatedAt: Date.now(),
+        },
+        { merge: false },
+      );
+
+      return true;
+    } catch (error) {
+      console.warn("cloud reset failed", error);
+      return false;
+    }
+  }
 }
 class DisciplineTracker {
   constructor() {
@@ -1360,11 +1423,13 @@ class DisciplineTracker {
     }
     this.cloudManager?.syncByStorageKey?.(key, data);
   }
-  completeResetData() {
+  async completeResetData() {
     const confirmed = window.confirm(
       "Complete reset will clear saved tasks, favorites, streaks, journal entries, roadmap/trainer state, shadow state, drafts, and local sync data. Continue?",
     );
     if (!confirmed) return;
+
+    const cloudResetOk = await this.cloudManager?.resetCloudData?.();
 
     const keysToRemove = new Set(Object.values(CONFIG.STORAGE_KEYS));
 
@@ -1394,6 +1459,12 @@ class DisciplineTracker {
       });
     } catch (error) {
       console.warn("session reset failed", error);
+    }
+
+    if (cloudResetOk === false) {
+      window.alert(
+        "Local data was cleared, but cloud reset failed. Check your connection and press Complete Reset again if old synced data returns.",
+      );
     }
 
     window.location.reload();
