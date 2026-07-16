@@ -56,7 +56,7 @@
         </h1>
         <div class="view-controls">
           <button class="btn" id="open-trainer">
-            <i class="fas fa-road"></i> Roadmap
+            <i class="fas fa-road"></i> Pipeline
           </button>
           <button class="btn btn-primary" id="view-report">
             <i class="fas fa-chart-bar"></i> Report
@@ -323,7 +323,7 @@
     <div class="modal-overlay" id="trainer-modal">
       <div class="modal">
         <div class="modal-header">
-          <h2 class="modal-title">Analog IC Roadmap</h2>
+          <h2 class="modal-title">Master Study Pipeline</h2>
           <button
             class="btn"
             id="close-trainer-modal"
@@ -332,66 +332,105 @@
             <i class="fas fa-times"></i>
           </button>
           <div class="trainer-meta">
-            <span class="trainer-pill">Module Progress</span>
-            <span class="trainer-pill">Editable</span>
-            <span class="trainer-pill">Shadow Synced</span>
+            <span class="trainer-pill">Main Slots</span>
+            <span class="trainer-pill">Subject Pipelines</span>
+            <span class="trainer-pill">Daily Routine</span>
           </div>
         </div>
         <div class="modal-content">
-          <div class="trainer-terminal">
-            <div class="trainer-terminal-head">
-              <span>Roadmap Console</span>
-              <div class="trainer-dots">
-                <span></span><span></span><span></span>
+          <div class="study-pipeline">
+            <section class="pipeline-section">
+              <h3>Main Slots (3 Parallel Subjects)</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead><tr><th>Main Slot</th><th>Time</th><th>Subject</th><th>Primary Book</th><th>Why This Slot?</th><th>After Completion</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>Main Slot 1</strong></td><td><strong>5:30 - 8:30 AM</strong></td><td><strong>Karnataka History</strong></td><td><strong>A Concise History of Karnataka (Suryanath U. Kamath) -> Spectrum (Modern India)</strong></td><td>Highest memory load (Kings, Dynasties, Freedom Movement)</td><td><strong>Geography (Dr. Ranganath)</strong></td></tr>
+                    <tr><td><strong>Main Slot 2</strong></td><td><strong>9:00 - 12:00 PM</strong></td><td><strong>Rural Development & Panchayat Raj (RDPR)</strong></td><td><strong>Rural Development & Panchayat Raj (K.M. Suresh)</strong></td><td>Highest-scoring PDO subject requiring deep reading</td><td><strong>Indian Economy (Garani / Krishnamurthy)</strong></td></tr>
+                    <tr><td><strong>Main Slot 3</strong></td><td><strong>12:45 - 3:45 PM</strong></td><td><strong>Indian Polity</strong></td><td><strong>Indian Polity (M. Laxmikanth, 8th Edition)</strong></td><td>Concept-heavy subject, ideal after lunch</td><td><strong>Science & Technology (Ravi H.N.)</strong></td></tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
-            
-            <div class="trainer-overview" id="trainer-overview"></div>
-            <div id="trainer-content"></div>
+            </section>
 
-            <details class="generator-panel" id="generator-panel" aria-label="Structured generators">
-              <summary class="generator-panel-head" id="generator-panel-toggle">
-                <span class="generator-panel-head-copy">
-                  <h3 class="generator-panel-title"><i class="fas fa-magic"></i> Structured Generators</h3>
-                  <p class="generator-panel-subtitle">Paste it into any other AI.</p>
-                </span>
-                <span class="generator-panel-caret" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
-              </summary>
-              <div class="generator-grid" id="generator-panel-body">
-                <form class="generator-card" onsubmit="return false;">
-                  <div class="generator-card-head">
-                    <h4><i class="fas fa-route"></i> Roadmap</h4>
-                  </div>
-                  <input type="text" id="ai-roadmap-topic" class="generator-input" placeholder="e.g. Analog IC Design" />
-                  <div class="generator-actions">
-                    <button class="btn btn-primary" id="generate-roadmap-btn" type="button"><i class="fas fa-magic"></i> Prompt</button>
-                    <button class="btn" id="copy-roadmap-prompt-btn" type="button"><i class="fas fa-copy"></i> Copy</button>
-                  </div>
-                  <textarea id="ai-roadmap-output" class="generator-output" readonly placeholder="Prompt"></textarea>
-                  <textarea id="ai-roadmap-response" class="generator-output generator-response" placeholder="Paste roadmap JSON here"></textarea>
-                  <div class="generator-actions">
-                    <button class="btn" id="apply-roadmap-response-btn" type="button"><i class="fas fa-download"></i> Apply</button>
-                  </div>
-                  <div id="ai-roadmap-status" class="generator-status"></div>
-                </form>
-                <form class="generator-card" onsubmit="return false;">
-                  <div class="generator-card-head">
-                    <h4><i class="fas fa-code"></i> Task Format</h4>
-                  </div>
-                  <input type="text" id="ai-task-topic" class="generator-input" placeholder="Optional extra context" />
-                  <div class="generator-actions">
-                    <button class="btn btn-primary" id="generate-task-prompt-btn" type="button"><i class="fas fa-code"></i> Prompt</button>
-                    <button class="btn" id="copy-task-prompt-btn" type="button"><i class="fas fa-copy"></i> Copy</button>
-                  </div>
-                  <textarea id="ai-task-output" class="generator-output" readonly placeholder="Prompt"></textarea>
-                  <textarea id="ai-task-response" class="generator-output generator-response" placeholder="Paste makeTask(...) code here"></textarea>
-                  <div class="generator-actions">
-                    <button class="btn" id="save-task-response-btn" type="button"><i class="fas fa-save"></i> Save</button>
-                  </div>
-                  <div id="ai-task-status" class="generator-status"></div>
-                </form>
+            <section class="pipeline-section">
+              <h3>Subject Pipelines</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead><tr><th>Pipeline</th><th>Category</th><th>Subject</th><th>Book</th><th>Next</th><th>Book</th><th>Final Stage</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>Pipeline A</strong></td><td>Memory</td><td>Karnataka History</td><td><strong>A Concise History of Karnataka (Kamath) -> Spectrum</strong></td><td>Geography</td><td><strong>Geography of Karnataka -> Geography of India -> Physical Geography (Dr. Ranganath)</strong></td><td>Full Revision</td></tr>
+                    <tr><td><strong>Pipeline B</strong></td><td>PDO Core</td><td>Rural Development & Panchayat Raj</td><td><strong>K.M. Suresh</strong></td><td>Indian Economy</td><td><strong>Indian Economy (Garani / Krishnamurthy)</strong></td><td>Full Revision</td></tr>
+                    <tr><td><strong>Pipeline C</strong></td><td>Concept</td><td>Indian Polity</td><td><strong>Indian Polity (M. Laxmikanth)</strong></td><td>Science & Technology</td><td><strong>Science & Technology (Ravi H.N.)</strong></td><td>Mock Tests + Advanced PYQs</td></tr>
+                  </tbody>
+                </table>
               </div>
-            </details>
+            </section>
+
+            <section class="pipeline-section">
+              <h3>Ghost Subject (30 Minutes)</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead><tr><th>Current Main Subject</th><th>Ghost Subject</th><th>Primary Book</th><th>Purpose</th></tr></thead>
+                  <tbody>
+                    <tr><td>Karnataka History</td><td>Geography Preview</td><td><strong>Geography of Karnataka (Dr. Ranganath)</strong></td><td>Prepare for next Main Subject</td></tr>
+                    <tr><td>Geography</td><td>Science & Technology Preview</td><td><strong>Science & Technology (Ravi H.N.)</strong></td><td>Prepare for next Main Subject</td></tr>
+                    <tr><td>RDPR</td><td>Economy Preview</td><td><strong>Indian Economy (Garani / Krishnamurthy)</strong></td><td>Build economic fundamentals</td></tr>
+                    <tr><td>Indian Polity</td><td>Science & Technology Preview</td><td><strong>Science & Technology (Ravi H.N.)</strong></td><td>Prepare next pipeline</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="pipeline-section">
+              <h3>Daily Fixed Subjects</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead><tr><th>Time</th><th>Subject</th><th>Primary Book</th><th>Purpose</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>4:45 - 5:15 PM</strong></td><td>General Kannada</td><td><strong>Samanya Kannada (2026)</strong></td><td>Paper 2 - Language</td></tr>
+                    <tr><td><strong>5:15 - 5:45 PM</strong></td><td>Current Affairs</td><td><strong>Monthly Current Affairs PDF + Notes</strong></td><td>Daily GK</td></tr>
+                    <tr><td><strong>5:45 - 6:15 PM</strong></td><td>Computer Knowledge</td><td><strong>Computer Knowledge (D.A. Goutham)</strong></td><td>Paper 2 - Computer</td></tr>
+                    <tr><td><strong>6:15 - 6:45 PM</strong></td><td>General English</td><td><strong>General English PYQ (Shivakumar Mavali)</strong></td><td>Paper 2 - English</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="pipeline-section">
+              <h3>Night Routine</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead><tr><th>Time</th><th>Activity</th><th>Resource</th><th>Purpose</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>7:30 - 8:15 PM</strong></td><td>Rolling Revision</td><td>Notes + Main Books</td><td>Revise today's learning</td></tr>
+                    <tr><td><strong>8:15 - 9:00 PM</strong></td><td>3-Day Revision</td><td>Notes</td><td>Strengthen retention</td></tr>
+                    <tr><td><strong>9:00 - 9:45 PM</strong></td><td>6-Day Revision</td><td>Notes</td><td>Long-term memory</td></tr>
+                    <tr><td><strong>9:45 - 11:15 PM</strong></td><td>Mixed Topic-wise PYQs</td><td><strong>KEA All Rounder + SSC Topic-wise PYQs</strong></td><td>Exam practice</td></tr>
+                    <tr><td><strong>11:15 - 11:30 PM</strong></td><td>Error Notebook</td><td>Error Register</td><td>Mistake analysis & planning</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="pipeline-section">
+              <h3>Active Desk (Maximum 8 Resources)</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead><tr><th>Category</th><th>Book</th></tr></thead>
+                  <tbody>
+                    <tr><td>Main Slot 1</td><td><strong>A Concise History of Karnataka (Suryanath U. Kamath)</strong></td></tr>
+                    <tr><td>Main Slot 2</td><td><strong>Rural Development & Panchayat Raj (K.M. Suresh)</strong></td></tr>
+                    <tr><td>Main Slot 3</td><td><strong>Indian Polity (M. Laxmikanth, 8th Edition)</strong></td></tr>
+                    <tr><td>Ghost Subject</td><td><strong>Geography of Karnataka (Dr. Ranganath)</strong></td></tr>
+                    <tr><td>Daily Subject</td><td><strong>Samanya Kannada (2026)</strong></td></tr>
+                    <tr><td>Daily Subject</td><td><strong>Computer Knowledge (D.A. Goutham)</strong></td></tr>
+                    <tr><td>Daily Subject</td><td><strong>General English PYQ (Shivakumar Mavali)</strong></td></tr>
+                    <tr><td>Daily Resource</td><td><strong>Monthly Current Affairs PDF + KEA/SSC Topic-wise PYQs</strong></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
             <section class="sleep-journal-panel" id="sleep-journal-panel">
               <div class="sleep-journal-head">
@@ -460,11 +499,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn" id="refresh-trainer">
-            <i class="fas fa-pen"></i> Edit
-          </button>
-          <button class="btn" id="copy-trainer">
-            <i class="fas fa-save"></i> Save
+          <button class="btn btn-danger" id="complete-reset-btn" type="button">
+            <i class="fas fa-trash"></i> Complete Reset
           </button>
           <button class="btn btn-primary" id="close-trainer">Close</button>
         </div>

@@ -133,10 +133,10 @@ const MISSION_THRESHOLDS = {
 const CATEGORY_DEFINITIONS = {
   Sleep: ["Night Sleep", "Nap", "Recovery"],
   "Productive Work": [
-    "Analog",
-    "PCB",
+    "Main Study",
+    "Revision",
     "Coding",
-    "Control Systems",
+    "Practice",
     "Planning",
     "Execution",
   ],
@@ -264,9 +264,12 @@ class ActivityClassifier {
       "chest",
       "back",
       "legs",
-      "pcb",
-      "analog",
-      "control systems",
+      "revision",
+      "current affairs",
+      "polity",
+      "history",
+      "geography",
+      "economy",
       "research",
       "writing",
       "build",
@@ -1247,6 +1250,7 @@ class DisciplineTracker {
       "close-trainer-modal",
       "refresh-trainer",
       "copy-trainer",
+      "complete-reset-btn",
       "sleep-journal-panel",
       "sleep-journal-date",
       "sleep-journal-mood",
@@ -1355,6 +1359,44 @@ class DisciplineTracker {
       console.error("storage save failed", e);
     }
     this.cloudManager?.syncByStorageKey?.(key, data);
+  }
+  completeResetData() {
+    const confirmed = window.confirm(
+      "Complete reset will clear saved tasks, favorites, streaks, journal entries, roadmap/trainer state, shadow state, drafts, and local sync data. Continue?",
+    );
+    if (!confirmed) return;
+
+    const keysToRemove = new Set(Object.values(CONFIG.STORAGE_KEYS));
+
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("discipline_tracker_")) {
+          keysToRemove.add(key);
+        }
+      });
+    } catch (error) {
+      console.warn("storage reset scan failed", error);
+    }
+
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn("storage reset failed", key, error);
+      }
+    });
+
+    try {
+      Object.keys(sessionStorage).forEach((key) => {
+        if (key.startsWith("discipline_tracker_")) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch (error) {
+      console.warn("session reset failed", error);
+    }
+
+    window.location.reload();
   }
   setSelectedTaskDate(dateStr) {
     this.state.selectedTaskDate = dateStr || this.getDateString();
@@ -5961,11 +6003,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const isGenericRoadmapPlaceholder =
       /^roadmaptopic\d+$/.test(normalized) ||
       normalized === "roadmapreviewtopic";
-    const isLegacyAnalogPlaceholder =
-      /^analog\d+topic$/.test(normalized) ||
-      normalized === "analogrevisiontopic";
 
-    if (!isGenericRoadmapPlaceholder && !isLegacyAnalogPlaceholder) {
+    if (!isGenericRoadmapPlaceholder) {
       return null;
     }
 
@@ -6640,7 +6679,7 @@ Rules:
 6. Keep module names uppercase and concise.
 7. Keep each topic practical and specific.
 8. Make the roadmap fit the user's actual domain and goal, whatever it is.
-9. Do not assume Analog, IB, bodybuilding, or any other fixed domain unless the topic explicitly says so.
+9. Do not assume any fixed domain unless the topic explicitly says so.
 10. Write topics that can later be used directly in task blocks.
 11. Output JSON only.
 
@@ -6723,7 +6762,7 @@ Rules:
 10. Output only the code block, nothing else.
 11. The second makeTask argument must come from the roadmap topics.
 12. You may use real quoted roadmap strings OR these generic placeholder tokens only: roadmapTopic1, roadmapTopic2, roadmapTopic3, roadmapTopic4, roadmapReviewTopic.
-13. Do not invent custom variable names like analog1Topic or bodybuildingTopic1.
+13. Do not invent custom variable names outside the roadmapTopic placeholders.
 14. If you use a placeholder token, leave it unquoted in the second makeTask argument and the app will resolve it from the current user's roadmap.
 15. Use roadmap placeholders only for roadmap-driven study blocks. Keep unrelated blocks like IB, breaks, lunch, dinner, training, and generic revision as normal quoted strings unless they truly come from the roadmap.
 16. If extra user context exists, use it only as secondary guidance after the roadmap.
@@ -9250,20 +9289,23 @@ class EventManager {
     this.app.elements["print-report"].addEventListener("click", () =>
       window.print(),
     );
-    this.app.elements["close-trainer"].addEventListener("click", () =>
+    this.app.elements["close-trainer"]?.addEventListener("click", () =>
       this.app.trainerEngine.hideWindow(),
     );
-    this.app.elements["close-trainer-modal"].addEventListener(
+    this.app.elements["close-trainer-modal"]?.addEventListener(
       "click",
       () => this.app.trainerEngine.hideWindow(),
     );
-    this.app.elements["refresh-trainer"].addEventListener("click", () => {
+    this.app.elements["refresh-trainer"]?.addEventListener("click", () => {
       this.app.trainerEngine.state.roadmap.editMode =
         !this.app.trainerEngine.state.roadmap.editMode;
       this.app.trainerEngine.refresh();
     });
-    this.app.elements["copy-trainer"].addEventListener("click", () =>
+    this.app.elements["copy-trainer"]?.addEventListener("click", () =>
       this.app.trainerEngine.copyPlan(),
+    );
+    this.app.elements["complete-reset-btn"]?.addEventListener("click", () =>
+      this.app.completeResetData(),
     );
     this.app.elements["journal-save-btn"].addEventListener("click", () =>
       this.app.uiManager.saveSleepJournal(),
