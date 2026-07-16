@@ -501,6 +501,15 @@
         align-items: stretch;
         gap: 1rem;
       }
+      .daily-mission-section .shadow-grid {
+        display: block;
+      }
+      .daily-mission-card {
+        width: 100%;
+      }
+      .daily-mission-card .shadow-mission-details {
+        margin-top: 0;
+      }
       .shadow-card {
         background: linear-gradient(
           145deg,
@@ -2887,7 +2896,7 @@ input {
 
 /* 365-day Streak Battle Grid final layout */
 .github-heatmap-container {
-  --heatmap-cell: clamp(8px, calc((100vw - 170px) / 61), 13px);
+  --heatmap-cell: clamp(7px, calc((100vw - 180px) / 68), 10px);
   --heatmap-gap: 2px;
   width: 100%;
   overflow: hidden !important;
@@ -2939,8 +2948,8 @@ input {
 
 @media (min-width: 980px) {
   .github-heatmap-container {
-    --heatmap-cell: 13px;
-    --heatmap-gap: 3px;
+    --heatmap-cell: 10px;
+    --heatmap-gap: 2px;
   }
 }
 

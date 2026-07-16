@@ -2796,16 +2796,11 @@ class UIManager {
         "Improvement vs Previous Month",
         `Productive ${this.app.formatDuration(r.improvement.productiveDeltaMinutes)} | Waste ${this.app.formatDuration(r.improvement.wasteDeltaMinutes)}`,
       ],
-      ["Best Productive Day", best],
-      ["Worst Waste Day", worst],
-      [
-        "Sleep Consistency",
-        `Longest >=7h streak: ${r.sleepConsistency.longestStreakDays} days`,
-      ],
       [
         "Sleep Last 7 Days",
         `Avg ${this.app.formatDuration(sleepInsights.averageLast7)} | ${sleepInsights.sleepDebt > 0 ? `Debt ${this.app.formatDuration(sleepInsights.sleepDebt)}` : `Surplus ${this.app.formatDuration(Math.abs(sleepInsights.sleepDebt))}`} | Consistency ${sleepInsights.consistency}`,
       ],
+      ["Best / Worst", `Best ${best} | Waste ${worst}`],
       [
         "Alerts",
         r.alerts.underProductivity
@@ -2815,23 +2810,18 @@ class UIManager {
     ]
       .map(
         ([label, value]) =>
-          `<tr><td style="padding:0.75rem;border-bottom:1px solid var(--border);font-weight:600;">${this.app.escapeHtml(label)}</td><td style="padding:0.75rem;border-bottom:1px solid var(--border);">${this.app.escapeHtml(value)}</td></tr>`,
+          `<div style="padding:0.75rem;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.03);"><div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.25rem;">${this.app.escapeHtml(label)}</div><strong style="display:block;font-size:0.94rem;line-height:1.35;">${this.app.escapeHtml(value)}</strong></div>`,
       )
       .join("");
     this.app.elements["report-content"].innerHTML = `
           <h3 style="margin-bottom:1rem;">${this.app.escapeHtml(`${monthName} ${r.year} Monthly Report`)}</h3>
-          <h4 style="margin-top:1rem;">Summary</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><tbody>${summaryRows}</tbody></table></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.65rem;">${summaryRows}</div>
           <h4 style="margin-top:1rem;">Category Totals</h4>
           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Category</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Share</th></tr></thead><tbody>${catRows}</tbody></table></div>
-           <h4 style="margin-top:1rem;">Productive Work Breakdown</h4>
-           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div>
-           <h4 style="margin-top:1rem;">Mission Progress</h4>
-           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Mission Topic</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Tracked Time</th></tr></thead><tbody>${missionBreak}</tbody></table></div>
-           <h4 style="margin-top:1rem;">Physical Training Breakdown</h4>
-           <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div>
-          <h4>Daily Breakdown</h4>
-          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+          <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Productive Work Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div></details>
+          <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Mission Progress</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Mission Topic</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Tracked Time</th></tr></thead><tbody>${missionBreak}</tbody></table></div></details>
+          <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Physical Training Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div></details>
+          <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Daily Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
     this.app.elements["report-modal"].style.display = "flex";
   }
   hideReport() {
@@ -4913,6 +4903,20 @@ class ShadowEngine {
       : `${activeRank.title} Confirmed`;
     const shieldLabel =
       rankProgress.progress.shieldCharges > 0 ? "Ready" : "Broken";
+    const shadowPanelVisible =
+      this.app.elements["shadow-current-minutes"] ||
+      this.app.elements["shadow-standard-card"];
+
+    if (!shadowPanelVisible) {
+      if (this.app.elements["shadow-mission-score"])
+        this.app.elements["shadow-mission-score"].textContent =
+          `${missionScore}/100`;
+      if (this.app.trainerEngine?.syncMissionFromRoadmap)
+        this.app.trainerEngine.syncMissionFromRoadmap();
+      if (this.app.trainerEngine?.updatePenaltyTimer)
+        this.app.trainerEngine.updatePenaltyTimer();
+      return;
+    }
 
     this.app.elements["shadow-current-minutes"].textContent =
       this.app.formatDuration(todayMinutes);

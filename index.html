@@ -121,58 +121,10 @@
         </div>
       </div>
 
-      <!-- SHADOW Engine -->
-      <section class="shadow-section">
-        <h2 class="shadow-title">SHADOW</h2>
+      <!-- Daily Mission -->
+      <section class="shadow-section daily-mission-section">
         <div class="shadow-grid">
-          <div class="shadow-card" id="shadow-current-card">
-            <div class="shadow-card-title">Current You</div>
-            <div class="shadow-hidden-metrics">
-              <div id="shadow-verdict">Verdict loading...</div>
-            </div>
-            <div class="shadow-main-value" id="shadow-current-minutes">
-              0h 00m
-            </div>
-            <div class="shadow-top-grid">
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Today Margin</div>
-                <div class="shadow-mini-value" id="shadow-gap">0h 00m</div>
-                <div class="shadow-mini-sub">Reached <strong id="shadow-percent">0%</strong></div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Needed Today to Tie</div>
-                <div class="shadow-mini-value" id="shadow-needed-tie">0h 00m</div>
-                <div class="shadow-mini-sub">Needed Today to Lead <strong id="shadow-needed-lead">0h 00m</strong></div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Tomorrow Defense</div>
-                <div class="shadow-mini-value" id="shadow-defense-target">0h 00m</div>
-                <div class="shadow-mini-sub">Protect the new floor</div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Status</div>
-                <div class="shadow-mini-value" id="shadow-status">OUT OF RANGE</div>
-                <div class="shadow-mini-sub" id="shadow-pressure">Pressure: High</div>
-              </div>
-              <div class="shadow-mini-card shadow-battle-card">
-                <div class="shadow-mini-label">MONTHLY BATTLE</div>
-                <div class="shadow-battle-line">
-                  <span class="shadow-battle-side">YOU</span>
-                  <span class="shadow-battle-number" id="shadow-battle-you">3</span>
-                  <span class="shadow-battle-vs">vs</span>
-                  <span class="shadow-battle-number shadow" id="shadow-battle-shadow">27</span>
-                  <span class="shadow-battle-side">SHADOW</span>
-                </div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label" id="shadow-next-rank-label">Next Rank</div>
-                <div class="shadow-mini-value" id="shadow-next-rank">Javelin</div>
-                <div class="shadow-mini-sub" id="shadow-next-rank-sub">Need 0 SR</div>
-              </div>
-            </div>
-            <div class="shadow-progress">
-              <div class="shadow-progress-fill" id="shadow-progress-fill"></div>
-            </div>
+          <div class="shadow-card daily-mission-card">
             <div class="shadow-mission-details">
               <div class="shadow-mission-title-row">
                 <div class="shadow-mission-title">Daily Mission</div>
@@ -222,79 +174,6 @@
                   ><input class="mission-check" type="checkbox" />
                 </div>
               </div>
-            </div>
-          </div>
-          <div class="shadow-card" id="shadow-standard-card">
-            <div class="shadow-card-title">&#9876;&#65039; Shadow Buddy</div>
-            <div class="shadow-main-value" id="shadow-average">0h 00m</div>
-            <div class="shadow-top-grid">
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Shadow Standard</div>
-                <div class="shadow-mini-value" id="shadow-standard-metric">0h 00m</div>
-                <div class="shadow-mini-sub">Avg: <strong id="shadow-weekly-average">0h 00m</strong></div>
-                <div class="shadow-note-inline" id="shadow-note">Rolling 7-day average</div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Momentum</div>
-                <div class="shadow-mini-value" id="shadow-momentum-score">0.00x</div>
-                <div class="shadow-summary-stack">
-                  <div class="shadow-mini-sub"><strong id="shadow-momentum" class="shadow-momentum-flat">Stable</strong></div>
-                  <div class="shadow-mini-sub"><strong id="shadow-consistency-index">0/7</strong>  <strong id="shadow-growth-trend">UP</strong></div>
-
-                </div>
-              </div>
-              <div class="shadow-mini-card">
-                <div class="shadow-mini-label">Today Target</div>
-                <div class="shadow-mini-value" id="shadow-target">0h 00m</div>
-                <div class="shadow-mini-sub">7-Day Avg Gap <strong id="shadow-weekly-gap" class="shadow-gap-equal">0h 00m</strong></div>
-              </div>
-            </div>
-            <div class="shadow-summary-grid">
-              <div class="shadow-summary-card">
-                <div class="shadow-summary-label">Position</div>
-                <div class="shadow-summary-value" id="shadow-rank">Stinger</div>
-                <div class="shadow-summary-stack">
-                  <div class="shadow-summary-sub" id="shadow-badge">SR: 0</div>
-                  <div class="shadow-summary-sub" id="shadow-duel">Leader 0</div>
-                </div>
-                <div class="shadow-hidden-metrics">
-                  <div id="shadow-score">Monthly Score: You 0 - Shadow 0</div>
-                  <div id="shadow-lead-margin">Lead Margin: 0</div>
-                  <div id="shadow-trend">Monthly trend: 0%</div>
-                  <div class="shadow-duel-bar">
-                    <div class="shadow-duel-you">
-                      <div class="shadow-duel-you-fill" id="shadow-duel-you-fill"></div>
-                    </div>
-                    <div class="shadow-duel-shadow">
-                      <div class="shadow-duel-shadow-fill" id="shadow-duel-shadow-fill"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="shadow-summary-card">
-                <div class="shadow-summary-label">Penalty</div>
-                <div class="shadow-summary-value shadow-gap-positive" id="shadow-penalty">-0h 00m</div>
-                <div class="shadow-summary-sub" id="shadow-penalty-reason">Clear</div>
-              </div>
-              <div class="shadow-summary-card">
-                <div class="shadow-summary-label">Deadline / Ladder</div>
-                <div class="shadow-summary-value" id="shadow-penalty-expiry">00:00:00</div>
-                <div class="shadow-summary-stack">
-                  <div class="shadow-summary-sub"><strong id="roadmap-penalty-timer">0 tasks  Hold</strong></div>
-                  <div class="shadow-summary-sub" id="shadow-win-ladder">3/5 0/3  5/7 0/5</div>
-                  <div class="shadow-hidden-metrics">Distraction budget: <strong id="shadow-distraction-budget">0h 00m / 1h 30m</strong></div>
-                </div>
-                <div class="shadow-hidden-metrics">
-                  <div id="flow-blockers-status-compact">-</div>
-                  <div id="flow-proneness-status-compact">-</div>
-                  <div id="flow-triggers-status-compact">-</div>
-                </div>
-              </div>
-            </div>
-            <div class="shadow-mission-details shadow-mission-secondary">
-
-
-
               <div class="shadow-goal-list" id="shadow-goal-list-secondary"></div>
             </div>
           </div>
