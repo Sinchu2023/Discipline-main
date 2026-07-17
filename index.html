@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -57,6 +57,9 @@
         <div class="view-controls">
           <button class="btn" id="open-trainer">
             <i class="fas fa-road"></i> Pipeline
+          </button>
+          <button class="btn btn-warning" id="edit-tasks-btn">
+            <i class="fas fa-edit"></i> Edit Tasks
           </button>
           <button class="btn btn-primary" id="view-report">
             <i class="fas fa-chart-bar"></i> Report
@@ -307,6 +310,34 @@
         </div>
       </div>
     </div>
+    <!-- Edit Tasks Modal -->
+    <div class="modal-overlay" id="edit-tasks-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 class="modal-title">Edit Daily Tasks (JS/JSON Array)</h2>
+          <button
+            class="btn"
+            id="close-edit-tasks-modal"
+            style="position: absolute; right: 20px; top: 20px"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-content">
+          <p style="margin-bottom: 10px; color: var(--text-secondary); font-size: 0.9rem;">
+            Paste your daily mission task array here. Changes take effect immediately.<br>
+            <strong>Format:</strong> JSON array or makeTask() JS code. Leave blank to use defaults.
+          </p>
+          <textarea id="task-response-draft-input" style="width: 100%; height: 320px; background: rgba(15,15,15,0.9); color: var(--text-primary); font-family: monospace; font-size: 0.85rem; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: vertical;" placeholder='[ { "topic": "My Subject", "target_minutes": 90, "label": "Morning Study", "win": [6, 7.5], "priority": "HIGH", "discipline_type": "STRICT", "phase": "Morning", "secondary": false, "score_weight": 10 } ]'></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-success" id="save-tasks-btn">
+            <i class="fas fa-save"></i> Save &amp; Apply
+          </button>
+          <button class="btn btn-primary" id="close-edit-tasks-modal-btn">Close</button>
+        </div>
+      </div>
+    </div>
     <!-- Trainer Window -->
     <div class="modal-overlay" id="trainer-modal">
       <div class="modal">
@@ -489,6 +520,9 @@
         <div class="modal-footer">
           <button class="btn btn-danger" id="complete-reset-btn" type="button">
             <i class="fas fa-rotate-left"></i> Reset Stats
+          </button>
+          <button class="btn btn-warning" id="edit-timetable-from-pipeline-btn" type="button">
+            <i class="fas fa-edit"></i> Edit Timetable
           </button>
           <button class="btn btn-primary" id="close-trainer">Close</button>
         </div>

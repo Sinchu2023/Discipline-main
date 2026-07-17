@@ -1,4 +1,4 @@
-window.AppModule = {
+﻿window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
     if (!services?.auth || typeof services.onAuthStateChanged !== "function") {
@@ -657,8 +657,20 @@ class FirebaseCloudManager {
 
   toggleProfileMenu() {
     const menu = this.app.elements["profile-menu"];
+    const toggle = this.app.elements["profile-menu-toggle"];
     if (!menu) return;
-    menu.classList.toggle("open");
+    const isOpen = menu.classList.contains("open");
+    if (isOpen) {
+      menu.classList.remove("open");
+    } else {
+      if (toggle) {
+        const rect = toggle.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 8) + "px";
+        menu.style.right = (window.innerWidth - rect.right) + "px";
+        menu.style.left = "";
+      }
+      menu.classList.add("open");
+    }
   }
 
   closeProfileMenu() {
@@ -1366,6 +1378,13 @@ class DisciplineTracker {
       "profile-menu-container",
       "profile-menu-toggle",
       "profile-menu",
+      "edit-tasks-btn",
+      "edit-tasks-modal",
+      "close-edit-tasks-modal",
+      "close-edit-tasks-modal-btn",
+      "task-response-draft-input",
+      "save-tasks-btn",
+      "edit-timetable-from-pipeline-btn",
     ].forEach((id) => (elements[id] = document.getElementById(id)));
     return elements;
   }
@@ -9398,6 +9417,60 @@ class EventManager {
     this.app.elements["trainer-modal"].addEventListener("click", (e) => {
       if (e.target === this.app.elements["trainer-modal"])
         this.app.trainerEngine.hideWindow();
+    });
+
+    // Edit Tasks Modal
+    const openEditTasksModal = () => {
+      const modal = this.app.elements["edit-tasks-modal"];
+      const textarea = this.app.elements["task-response-draft-input"];
+      if (!modal) return;
+      if (textarea) {
+        const saved = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT) || "";
+        textarea.value = saved;
+      }
+      modal.style.display = "flex";
+    };
+    const closeEditTasksModal = () => {
+      const modal = this.app.elements["edit-tasks-modal"];
+      if (modal) modal.style.display = "none";
+    };
+    this.app.elements["edit-tasks-btn"]?.addEventListener("click", openEditTasksModal);
+    this.app.elements["close-edit-tasks-modal"]?.addEventListener("click", closeEditTasksModal);
+    this.app.elements["close-edit-tasks-modal-btn"]?.addEventListener("click", closeEditTasksModal);
+    this.app.elements["edit-tasks-modal"]?.addEventListener("click", (e) => {
+      if (e.target === this.app.elements["edit-tasks-modal"]) closeEditTasksModal();
+    });
+    this.app.elements["save-tasks-btn"]?.addEventListener("click", () => {
+      const textarea = this.app.elements["task-response-draft-input"];
+      const raw = textarea?.value?.trim() || "";
+      if (!raw) {
+        this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT, "");
+        this.app.trainerEngine?.syncMissionFromRoadmap?.();
+        closeEditTasksModal();
+        return;
+      }
+      const parsedTasks = this.app.trainerEngine?.parseTaskPlanCode?.(raw);
+      if (parsedTasks && parsedTasks.length) {
+        this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT, raw);
+        this.app.trainerEngine?.syncMissionFromRoadmap?.();
+        this.app.shadowEngine?.refresh?.(false);
+      } else {
+        this.app.saveToStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT, raw);
+        this.app.trainerEngine?.syncMissionFromRoadmap?.();
+        this.app.shadowEngine?.refresh?.(false);
+      }
+      closeEditTasksModal();
+    });
+    this.app.elements["edit-timetable-from-pipeline-btn"]?.addEventListener("click", () => {
+      this.app.trainerEngine?.hideWindow?.();
+      const modal = this.app.elements["edit-tasks-modal"];
+      const textarea = this.app.elements["task-response-draft-input"];
+      if (!modal) return;
+      if (textarea) {
+        const saved = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT) || "";
+        textarea.value = saved;
+      }
+      modal.style.display = "flex";
     });
   }
 }
