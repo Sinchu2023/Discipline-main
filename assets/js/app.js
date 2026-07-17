@@ -648,10 +648,24 @@ class FirebaseCloudManager {
       },
     );
 
+    // Pipeline dropdown toggle
+    this.app.elements["pipeline-menu-toggle"]?.addEventListener(
+      "click",
+      (e) => {
+        e.stopPropagation();
+        this.togglePipelineMenu();
+      },
+    );
+
     document.addEventListener("click", (e) => {
       const container = this.app.elements["profile-menu-container"];
       if (!container || container.contains(e.target)) return;
       this.closeProfileMenu();
+    });
+    document.addEventListener("click", (e) => {
+      const container = this.app.elements["pipeline-menu-container"];
+      if (!container || container.contains(e.target)) return;
+      this.closePipelineMenu();
     });
   }
 
@@ -675,6 +689,33 @@ class FirebaseCloudManager {
 
   closeProfileMenu() {
     this.app.elements["profile-menu"]?.classList.remove("open");
+  }
+
+  togglePipelineMenu() {
+    const menu = this.app.elements["pipeline-menu"];
+    const toggle = this.app.elements["pipeline-menu-toggle"];
+    if (!menu) return;
+    const isOpen = menu.classList.contains("open");
+    if (isOpen) {
+      menu.classList.remove("open");
+    } else {
+      // Close profile menu when opening pipeline menu
+      this.closeProfileMenu();
+      if (toggle) {
+        const rect = toggle.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 8) + "px";
+        menu.style.left = rect.left + "px";
+        menu.style.right = "";
+      }
+      menu.classList.add("open");
+    }
+  }
+
+  closePipelineMenu() {
+    const menu = this.app.elements["pipeline-menu"];
+    if (menu) menu.classList.remove("open");
+    const status = this.app.elements["pipeline-copy-status"];
+    if (status) { status.textContent = ""; status.classList.remove("visible"); }
   }
 
   renderAuthState() {
@@ -1378,6 +1419,11 @@ class DisciplineTracker {
       "profile-menu-container",
       "profile-menu-toggle",
       "profile-menu",
+      "pipeline-menu-container",
+      "pipeline-menu-toggle",
+      "pipeline-menu",
+      "copy-timetable-prompt-btn",
+      "pipeline-copy-status",
       "edit-tasks-btn",
       "edit-tasks-modal",
       "close-edit-tasks-modal",
@@ -9255,7 +9301,22 @@ class EventManager {
       this.app.uiManager.showReport(),
     );
     this.app.elements["open-trainer"].addEventListener("click", () => {
+      this.app.cloudManager?.closePipelineMenu?.();
       this.app.trainerEngine.showWindow();
+    });
+    // Copy Timetable Prompt
+    this.app.elements["copy-timetable-prompt-btn"]?.addEventListener("click", () => {
+      const TIMETABLE_PROMPT = "You are generating a timetable for this productivity system.\n\nStrictly follow ALL existing task structures, IDs, priorities, dependencies, scheduling rules, and formatting already used by this application.\n\nRequirements:\n\n1. Never invent a different format.\n2. Preserve the existing makeTask() structure exactly.\n3. Generate only valid tasks compatible with the application.\n4. Respect task order.\n5. Maintain dependency relationships.\n6. Preserve task categories.\n7. Use realistic study durations.\n8. Balance difficult and easy subjects.\n9. Include revision sessions.\n10. Include breaks where appropriate.\n11. Keep wake-up, meals, sleep, exercise, and fixed routines intact unless explicitly instructed otherwise.\n12. Never remove mandatory tasks.\n13. Never duplicate tasks.\n14. Ensure no overlapping time slots.\n15. Ensure the timetable is logically consistent from start to finish.\n16. Return only valid code/output required by the application.\n17. Do not include explanations unless explicitly requested.\n18. If a subject list is provided, distribute subjects evenly across the schedule.\n19. Follow every instruction exactly without changing the application's formatting.";
+      const statusEl = this.app.elements["pipeline-copy-status"];
+      navigator.clipboard.writeText(TIMETABLE_PROMPT).then(() => {
+        if (statusEl) { statusEl.textContent = "✅ Timetable prompt copied."; statusEl.classList.add("visible"); }
+        setTimeout(() => {
+          if (statusEl) { statusEl.textContent = ""; statusEl.classList.remove("visible"); }
+          this.app.cloudManager?.closePipelineMenu?.();
+        }, 1800);
+      }).catch(() => {
+        if (statusEl) { statusEl.textContent = "⚠ Copy failed - try again."; statusEl.classList.add("visible"); }
+      });
     });
     if (this.app.elements["heatmap-prev-year"]) {
       this.app.elements["heatmap-prev-year"].addEventListener("click", () => {
@@ -9424,6 +9485,7 @@ class EventManager {
       const modal = this.app.elements["edit-tasks-modal"];
       const textarea = this.app.elements["task-response-draft-input"];
       if (!modal) return;
+      this.app.cloudManager?.closePipelineMenu?.();
       if (textarea) {
         const saved = this.app.loadFromStorage(CONFIG.STORAGE_KEYS.TASK_RESPONSE_DRAFT) || "";
         textarea.value = saved;
