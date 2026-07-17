@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -371,14 +371,14 @@
         <div class="modal-content">
           <div class="study-pipeline">
             <section class="pipeline-section">
-              <h3>Main Slots (3 Parallel Subjects)</h3>
+              <h3>Main Slots</h3>
               <div class="pipeline-table-wrap">
                 <table class="pipeline-table">
                   <thead><tr><th>Main Slot</th><th>Time</th><th>Subject</th><th>Primary Book</th><th>Why This Slot?</th><th>After Completion</th></tr></thead>
                   <tbody>
-                    <tr><td><strong>Main Slot 1</strong></td><td><strong>5:30 - 8:30 AM</strong></td><td><strong>Karnataka History</strong></td><td><strong>A Concise History of Karnataka (Suryanath U. Kamath) -> Spectrum (Modern India)</strong></td><td>Highest memory load (Kings, Dynasties, Freedom Movement)</td><td><strong>Geography (Dr. Ranganath)</strong></td></tr>
-                    <tr><td><strong>Main Slot 2</strong></td><td><strong>9:00 - 12:00 PM</strong></td><td><strong>Rural Development & Panchayat Raj (RDPR)</strong></td><td><strong>Rural Development & Panchayat Raj (K.M. Suresh)</strong></td><td>Highest-scoring PDO subject requiring deep reading</td><td><strong>Indian Economy (Garani / Krishnamurthy)</strong></td></tr>
-                    <tr><td><strong>Main Slot 3</strong></td><td><strong>12:45 - 3:45 PM</strong></td><td><strong>Indian Polity</strong></td><td><strong>Indian Polity (M. Laxmikanth, 8th Edition)</strong></td><td>Concept-heavy subject, ideal after lunch</td><td><strong>Science & Technology (Ravi H.N.)</strong></td></tr>
+                    <tr><td><strong>Main Slot 1</strong></td><td><strong>5:30 – 8:30 AM</strong></td><td><strong>Pipeline A (Karnataka History)</strong></td><td><strong>Kamath → Spectrum</strong></td><td>Deep learning, highest focus</td><td><strong>Continue same subject</strong></td></tr>
+                    <tr><td><strong>Main Slot 2</strong></td><td><strong>9:00 – 12:00 PM</strong></td><td><strong>Pipeline A (continued)</strong></td><td><strong>Same book</strong></td><td>Finish chapter + Notes + MCQs</td><td><strong>Next subject in Pipeline A</strong></td></tr>
+                    <tr><td><strong>Main Slot 3</strong></td><td><strong>12:45 – 3:45 PM</strong></td><td><strong>Pipeline B (RDPR)</strong></td><td><strong>K.M. Suresh</strong></td><td>Second major subject of the day</td><td><strong>Next subject in Pipeline B</strong></td></tr>
                   </tbody>
                 </table>
               </div>
@@ -388,14 +388,14 @@
               <h3>Subject Pipelines</h3>
               <div class="pipeline-table-wrap">
                 <table class="pipeline-table">
-                  <thead><tr><th>Pipeline</th><th>Category</th><th>Subject</th><th>Book</th><th>Next</th><th>Book</th><th>Final Stage</th></tr></thead>
+                  <thead><tr><th>Pipeline</th><th>Category</th><th>Current</th><th>Book</th><th>Next</th><th>Book</th><th>Then</th><th>Book</th><th>Final Stage</th></tr></thead>
                   <tbody>
-                    <tr><td><strong>Pipeline A</strong></td><td>Memory</td><td>Karnataka History</td><td><strong>A Concise History of Karnataka (Kamath) -> Spectrum</strong></td><td>Geography</td><td><strong>Geography of Karnataka -> Geography of India -> Physical Geography (Dr. Ranganath)</strong></td><td>Full Revision</td></tr>
-                    <tr><td><strong>Pipeline B</strong></td><td>PDO Core</td><td>Rural Development & Panchayat Raj</td><td><strong>K.M. Suresh</strong></td><td>Indian Economy</td><td><strong>Indian Economy (Garani / Krishnamurthy)</strong></td><td>Full Revision</td></tr>
-                    <tr><td><strong>Pipeline C</strong></td><td>Concept</td><td>Indian Polity</td><td><strong>Indian Polity (M. Laxmikanth)</strong></td><td>Science & Technology</td><td><strong>Science & Technology (Ravi H.N.)</strong></td><td>Mock Tests + Advanced PYQs</td></tr>
+                    <tr><td><strong>Pipeline A</strong></td><td>Memory</td><td>Karnataka History</td><td><strong>Kamath → Spectrum</strong></td><td>Geography</td><td><strong>Geography of Karnataka → Geography of India → Physical Geography (Dr. Ranganath)</strong></td><td>—</td><td>—</td><td>Full Revision</td></tr>
+                    <tr><td><strong>Pipeline B</strong></td><td>PDO Core + Concept</td><td>RDPR</td><td><strong>K.M. Suresh</strong></td><td>Indian Economy</td><td><strong>Garani / Krishnamurthy</strong></td><td>Indian Polity → Science & Tech</td><td><strong>Laxmikanth → Ravi H.N.</strong></td><td>Full Revision</td></tr>
                   </tbody>
                 </table>
               </div>
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 10px; text-align: center;">Pipeline B Flow: RDPR → Indian Economy → Indian Polity → Science & Technology → Full Revision</p>
             </section>
 
             <section class="pipeline-section">
@@ -404,10 +404,12 @@
                 <table class="pipeline-table">
                   <thead><tr><th>Current Main Subject</th><th>Ghost Subject</th><th>Primary Book</th><th>Purpose</th></tr></thead>
                   <tbody>
-                    <tr><td>Karnataka History</td><td>Geography Preview</td><td><strong>Geography of Karnataka (Dr. Ranganath)</strong></td><td>Prepare for next Main Subject</td></tr>
-                    <tr><td>Geography</td><td>Science & Technology Preview</td><td><strong>Science & Technology (Ravi H.N.)</strong></td><td>Prepare for next Main Subject</td></tr>
-                    <tr><td>RDPR</td><td>Economy Preview</td><td><strong>Indian Economy (Garani / Krishnamurthy)</strong></td><td>Build economic fundamentals</td></tr>
-                    <tr><td>Indian Polity</td><td>Science & Technology Preview</td><td><strong>Science & Technology (Ravi H.N.)</strong></td><td>Prepare next pipeline</td></tr>
+                    <tr><td>Karnataka History</td><td>Geography Preview</td><td><strong>Dr. Ranganath</strong></td><td>Prepare next Pipeline A subject</td></tr>
+                    <tr><td>Geography</td><td>RDPR Preview</td><td><strong>K.M. Suresh</strong></td><td>Prepare next pipeline</td></tr>
+                    <tr><td>RDPR</td><td>Economy Preview</td><td><strong>Garani / Krishnamurthy</strong></td><td>Build fundamentals</td></tr>
+                    <tr><td>Indian Economy</td><td>Polity Preview</td><td><strong>Laxmikanth</strong></td><td>Prepare next subject</td></tr>
+                    <tr><td>Indian Polity</td><td>Science & Tech Preview</td><td><strong>Ravi H.N.</strong></td><td>Prepare next subject</td></tr>
+                    <tr><td>Science & Tech</td><td>Karnataka History Preview</td><td><strong>Kamath</strong></td><td>Restart Pipeline A</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -419,10 +421,10 @@
                 <table class="pipeline-table">
                   <thead><tr><th>Time</th><th>Subject</th><th>Primary Book</th><th>Purpose</th></tr></thead>
                   <tbody>
-                    <tr><td><strong>4:45 - 5:15 PM</strong></td><td>General Kannada</td><td><strong>Samanya Kannada (2026)</strong></td><td>Paper 2 - Language</td></tr>
-                    <tr><td><strong>5:15 - 5:45 PM</strong></td><td>Current Affairs</td><td><strong>Monthly Current Affairs PDF + Notes</strong></td><td>Daily GK</td></tr>
-                    <tr><td><strong>5:45 - 6:15 PM</strong></td><td>Computer Knowledge</td><td><strong>Computer Knowledge (D.A. Goutham)</strong></td><td>Paper 2 - Computer</td></tr>
-                    <tr><td><strong>6:15 - 6:45 PM</strong></td><td>General English</td><td><strong>General English PYQ (Shivakumar Mavali)</strong></td><td>Paper 2 - English</td></tr>
+                    <tr><td><strong>4:45 – 5:15 PM</strong></td><td>General Kannada</td><td><strong>Samanya Kannada (2026)</strong></td><td>Paper 2 – Language</td></tr>
+                    <tr><td><strong>5:15 – 5:45 PM</strong></td><td>Current Affairs + GK</td><td><strong>Monthly CA PDF + Lucent's General Knowledge</strong></td><td>Daily GK, broad syllabus coverage</td></tr>
+                    <tr><td><strong>5:45 – 6:15 PM</strong></td><td>Computer Knowledge</td><td><strong>D.A. Goutham</strong></td><td>Paper 2 – Computer</td></tr>
+                    <tr><td><strong>6:15 – 6:45 PM</strong></td><td>General English</td><td><strong>Shivakumar Mavali PYQs</strong></td><td>Paper 2 – English</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -434,30 +436,30 @@
                 <table class="pipeline-table">
                   <thead><tr><th>Time</th><th>Activity</th><th>Resource</th><th>Purpose</th></tr></thead>
                   <tbody>
-                    <tr><td><strong>7:30 - 8:15 PM</strong></td><td>Rolling Revision</td><td>Notes + Main Books</td><td>Revise today's learning</td></tr>
-                    <tr><td><strong>8:15 - 9:00 PM</strong></td><td>3-Day Revision</td><td>Notes</td><td>Strengthen retention</td></tr>
-                    <tr><td><strong>9:00 - 9:45 PM</strong></td><td>6-Day Revision</td><td>Notes</td><td>Long-term memory</td></tr>
-                    <tr><td><strong>9:45 - 11:15 PM</strong></td><td>Mixed Topic-wise PYQs</td><td><strong>KEA All Rounder + SSC Topic-wise PYQs</strong></td><td>Exam practice</td></tr>
-                    <tr><td><strong>11:15 - 11:30 PM</strong></td><td>Error Notebook</td><td>Error Register</td><td>Mistake analysis & planning</td></tr>
+                    <tr><td><strong>7:30 – 8:15 PM</strong></td><td>Rolling Revision</td><td>Today's Notes</td><td>Revise today's learning</td></tr>
+                    <tr><td><strong>8:15 – 9:00 PM</strong></td><td>3-Day Revision</td><td>Notes</td><td>Strengthen retention</td></tr>
+                    <tr><td><strong>9:00 – 9:45 PM</strong></td><td>6-Day Revision</td><td>Notes</td><td>Long-term memory</td></tr>
+                    <tr><td><strong>9:45 – 11:15 PM</strong></td><td>Mixed Topic-wise PYQs</td><td><strong>KEA All Rounder + SSC Topic-wise PYQs</strong></td><td>Exam practice</td></tr>
+                    <tr><td><strong>11:15 – 11:30 PM</strong></td><td>Error Notebook</td><td>Error Register</td><td>Mistake analysis & planning</td></tr>
                   </tbody>
                 </table>
               </div>
             </section>
 
             <section class="pipeline-section">
-              <h3>Active Desk (Maximum 8 Resources)</h3>
+              <h3>Active Desk (Max 8 Resources)</h3>
               <div class="pipeline-table-wrap">
                 <table class="pipeline-table">
                   <thead><tr><th>Category</th><th>Book</th></tr></thead>
                   <tbody>
-                    <tr><td>Main Slot 1</td><td><strong>A Concise History of Karnataka (Suryanath U. Kamath)</strong></td></tr>
-                    <tr><td>Main Slot 2</td><td><strong>Rural Development & Panchayat Raj (K.M. Suresh)</strong></td></tr>
-                    <tr><td>Main Slot 3</td><td><strong>Indian Polity (M. Laxmikanth, 8th Edition)</strong></td></tr>
-                    <tr><td>Ghost Subject</td><td><strong>Geography of Karnataka (Dr. Ranganath)</strong></td></tr>
+                    <tr><td>Pipeline A</td><td><strong>Current Pipeline A Book</strong></td></tr>
+                    <tr><td>Pipeline A</td><td><strong>Next Pipeline A Book (if needed)</strong></td></tr>
+                    <tr><td>Pipeline B</td><td><strong>Current Pipeline B Book</strong></td></tr>
+                    <tr><td>Ghost Subject</td><td><strong>Current Ghost Subject Book</strong></td></tr>
                     <tr><td>Daily Subject</td><td><strong>Samanya Kannada (2026)</strong></td></tr>
                     <tr><td>Daily Subject</td><td><strong>Computer Knowledge (D.A. Goutham)</strong></td></tr>
-                    <tr><td>Daily Subject</td><td><strong>General English PYQ (Shivakumar Mavali)</strong></td></tr>
-                    <tr><td>Daily Resource</td><td><strong>Monthly Current Affairs PDF + KEA/SSC Topic-wise PYQs</strong></td></tr>
+                    <tr><td>Daily Subject</td><td><strong>General English PYQs (Shivakumar Mavali)</strong></td></tr>
+                    <tr><td>Daily Resource</td><td><strong>Monthly Current Affairs PDF + Lucent's GK + KEA/SSC PYQs</strong></td></tr>
                   </tbody>
                 </table>
               </div>
