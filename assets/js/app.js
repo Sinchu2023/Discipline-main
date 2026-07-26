@@ -434,6 +434,7 @@ class FirebaseCloudManager {
     this.roadmapUnsub = null;
     this.favoritesUnsub = null;
     this.userUnsub = null;
+    this.userStateUnsub = null;
     this.hasHydratedTasks = false;
     this.firebaseInitCompleted = false;
   }
@@ -535,6 +536,7 @@ class FirebaseCloudManager {
         this.detachTasksListener();
         this.detachRoadmapListener();
         this.detachFavoritesListener();
+        this.detachUserStateListener();
         this.user = user || null;
         if (user) sessionStorage.removeItem(this.redirectLoginKey);
         this.renderAuthState();
@@ -545,6 +547,7 @@ class FirebaseCloudManager {
           this.listenToTasks();
           this.listenToRoadmap();
           this.listenToFavorites();
+          this.listenToUserState();
         } catch (error) {
           console.error("Post-login bootstrap failed:", error);
           alert(
@@ -847,7 +850,7 @@ class FirebaseCloudManager {
           },
           roadmap: {
             currentDay: 1,
-            module: "MODULE 1 â€” DIODES",
+            module: "MODULE 1 — DIODES",
             completedDays: [],
           },
           revision: { status: "pending", timeSpent: 0 },
@@ -965,17 +968,55 @@ class FirebaseCloudManager {
     }
   }
 
-  async writePatch(patch) {
+  // Debounced user-doc writer: batches rapid saves into ONE Firestore write.
+  _scheduleUserDocWrite(patch) {
     if (!this.isReady || this.isHydratingCloudState) return;
-    try {
-      await window.FirebaseServices.setDoc(
-        this.userDoc(),
-        { ...patch, updatedAt: Date.now() },
-        { merge: true },
-      );
-    } catch (e) {
-      console.warn("firebase write failed", e);
-    }
+    this._pendingUserDocPatch = Object.assign({}, this._pendingUserDocPatch || {}, patch);
+    if (this._userDocWriteTimer) return;
+    this._userDocWriteTimer = setTimeout(async () => {
+      this._userDocWriteTimer = null;
+      const payload = this._pendingUserDocPatch || {};
+      this._pendingUserDocPatch = null;
+      if (!Object.keys(payload).length) return;
+      try {
+        await window.FirebaseServices.setDoc(
+          this.userDoc(),
+          Object.assign({}, payload, { updatedAt: Date.now() }),
+          { merge: true },
+        );
+      } catch (e) {
+        console.warn("firebase debounced write failed", e);
+      }
+    }, 1500);
+  }
+
+  async writePatch(patch) {
+    this._scheduleUserDocWrite(patch);
+  }
+
+  // Tiny dedicated doc for mission checkbox state only.
+  missionChecksDoc() {
+    return window.FirebaseServices.doc(
+      this.db, "users", this.user.uid, "state", "missionChecks"
+    );
+  }
+
+  // Write ONLY today checks to the tiny missionChecks doc (debounced 800ms).
+  async syncMissionChecks(todayKey, checks) {
+    if (!this.isReady) return;
+    if (this._missionChecksWriteTimer) clearTimeout(this._missionChecksWriteTimer);
+    this._missionChecksWriteTimer = setTimeout(async () => {
+      this._missionChecksWriteTimer = null;
+      try {
+        await window.FirebaseServices.setDoc(
+          this.missionChecksDoc(),
+          Object.assign({ [todayKey]: checks }, { updatedAt: Date.now() }),
+          { merge: true },
+        );
+      } catch (e) {
+        console.warn("missionChecks sync failed", e);
+      }
+    }, 800);
   }
 
   async syncByStorageKey(key, value) {
@@ -996,8 +1037,7 @@ class FirebaseCloudManager {
     }
     if (key === CONFIG.STORAGE_KEYS.FLOW_PROTOCOL)
       patch.flowProtocol = value || { byDate: {} };
-    if (key === CONFIG.STORAGE_KEYS.TRAINER_STATE)
-      patch.trainerState = value || {};
+    // TRAINER_STATE synced via dedicated missionChecks doc, NOT the user doc.
     if (key === CONFIG.STORAGE_KEYS.SHADOW_AVG)
       patch.shadowAvg = Number(value) || 0;
     if (key === CONFIG.STORAGE_KEYS.ROADMAP_PROMPT_DRAFT)
@@ -1023,7 +1063,7 @@ class FirebaseCloudManager {
           timeSpent: 0,
         };
     }
-    if (Object.keys(patch).length) await this.writePatch(patch);
+    if (Object.keys(patch).length) this._scheduleUserDocWrite(patch);
   }
 
   async setTimerState(state) {
@@ -1044,7 +1084,7 @@ class FirebaseCloudManager {
     this.detachTimerListener();
     // Defensive guard: fall back to getDoc if onSnapshot not yet loaded
     if (typeof window.FirebaseServices.onSnapshot !== "function") {
-      console.warn("onSnapshot not available â€” falling back to one-time timer restore");
+      console.warn("onSnapshot not available — falling back to one-time timer restore");
       window.FirebaseServices.getDoc(this.timerDoc()).then(snap => {
         if (snap.exists()) this.app.stopwatch.restoreFromCloud(snap.data());
       }).catch(e => console.warn("Timer restore failed", e));
@@ -1165,6 +1205,46 @@ class FirebaseCloudManager {
     if (!this.userUnsub) return;
     this.userUnsub();
     this.userUnsub = null;
+  }
+
+  detachUserStateListener() {
+    if (!this.userStateUnsub) return;
+    this.userStateUnsub();
+    this.userStateUnsub = null;
+  }
+
+  /**
+   * Real-time listener on the user doc so that trainerState (mission checks)
+   * and other user-level fields sync instantly across devices.
+   */
+  listenToUserState() {
+    if (!this.isReady) return;
+    this.detachUserStateListener();
+    if (typeof window.FirebaseServices.onSnapshot !== "function") return;
+    this.userStateUnsub = window.FirebaseServices.onSnapshot(
+      this.missionChecksDoc(),
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data() || {};
+        const today = this.app.getDateString(new Date());
+        const cloudChecks = data[today] || {};
+        if (!Object.keys(cloudChecks).length) return;
+        const localTrainer = this.app.trainerEngine.state || {};
+        if (!localTrainer.manualMissionChecks) localTrainer.manualMissionChecks = {};
+        const localToday = localTrainer.manualMissionChecks[today] || {};
+        // Cloud wins: merge cloud ticks over local for today
+        localTrainer.manualMissionChecks[today] = Object.assign({}, localToday, cloudChecks);
+        // Persist locally without triggering another cloud write
+        localStorage.setItem(
+          CONFIG.STORAGE_KEYS.TRAINER_STATE,
+          JSON.stringify(localTrainer),
+        );
+        // Invalidate cache and re-render mission list
+        this.app.trainerEngine._missionStateCache = null;
+        this.app.trainerEngine.syncMissionFromRoadmap();
+      },
+      (err) => console.warn("User state sync listener failed", err),
+    );
   }
 
   detachTasksListener() {
@@ -1729,7 +1809,7 @@ class DisciplineTracker {
     return sourceTasks
       .filter(
         (task) =>
-          task.date === dateStr &&
+          dateStr === task.date &&
           this.isProductiveCategory(task.category) &&
           this.isTaskAfterStatsReset(task),
       )
@@ -2146,6 +2226,21 @@ class StopwatchManager {
 
   stopFromRemote() {
     if (!this.isRunning) return;
+    // Save elapsed time as a completed task so nothing is lost when
+    // the timer is stopped from another device.
+    const totalElapsed = this.getElapsedNow();
+    if (totalElapsed > 60000 && this.app.state.activeTask) {
+      const endTime = Date.now();
+      const entry = this.app.normalizeTask(
+        Object.assign({ id: String(endTime) }, this.app.state.activeTask, {
+          startTime: this.startTime,
+          endTime,
+          duration: Math.max(1, Math.round(totalElapsed / 60000)),
+          date: this.app.getDateString(new Date(this.startTime)),
+        })
+      );
+      this.app.taskManager.addTask(entry);
+    }
     this.reset();
   }
 
@@ -6435,11 +6530,13 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         this._applyRowState(row, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH);
       }
 
-      // Persist manual check state
+      // Persist manual check state locally + sync tiny missionChecks doc only
       const checks = this.getTodayManualMissionChecks();
       checks[checkId] = !!e.target.checked;
-      this.saveTrainerState();
+      localStorage.setItem(CONFIG.STORAGE_KEYS.TRAINER_STATE, JSON.stringify(this.state));
       this.updateMissionChecklistScore();
+      const today = this.app.getDateString(new Date());
+      this.app.cloudManager?.syncMissionChecks?.(today, checks);
 
       if (this.syncRoadmapDayFromMissionTopic(cached?.item?.topic, !!e.target.checked)) {
         this.armRoadmapSlotRollover();
