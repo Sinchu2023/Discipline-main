@@ -369,6 +369,7 @@
             <span class="trainer-pill">Main Slots</span>
             <span class="trainer-pill">Subject Pipelines</span>
             <span class="trainer-pill">Daily Routine</span>
+            <span class="trainer-pill">Study Algorithm</span>
           </div>
         </div>
         <div class="modal-content">
@@ -466,6 +467,179 @@
                   </tbody>
                 </table>
               </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- MASTER STUDY ALGORITHM — KEY OPERATIONAL RULES             -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <section class="pipeline-section" id="master-study-algorithm">
+              <h3><i class="fas fa-brain"></i> Master Study Algorithm — Key Operational Rules</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead>
+                    <tr>
+                      <th style="width:22%">Rule</th>
+                      <th style="width:38%">Description</th>
+                      <th style="width:22%">Trigger Condition</th>
+                      <th style="width:18%">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>🛡️ Anti-Illusion Rule</strong></td>
+                      <td>If a fact is only <em>recognized</em> after looking at the text, it is classified as <strong>Forgotten (F)</strong>. Recognition ≠ Recall.</td>
+                      <td>Fact recognized only after re-opening book</td>
+                      <td><strong>Re-learn → Immediate Active Recall (book closed)</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>📖 3-Read Throttling</strong></td>
+                      <td>If comprehension is not achieved after <strong>n = 3</strong> readings of the same paragraph, stop re-reading.</td>
+                      <td>read_count ≥ 3 && comprehension = false</td>
+                      <td><strong>Status ← Blocked → Consult EXTERNAL SOURCE</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>⏱️ 8-Minute Boundary</strong></td>
+                      <td>To maintain cognitive efficiency and prevent diminishing returns, cap time per page.</td>
+                      <td>Δt<sub>page</sub> &gt; 8 min</td>
+                      <td><strong>Mark ⋆ → Increment Page → Return later</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>🎯 Golden Question of Mastery</strong></td>
+                      <td>Apply Feynman Technique: <em>"Could I reproduce this in an exam environment without any external cues?"</em></td>
+                      <td>Answer ≠ definitive "Yes"</td>
+                      <td><strong>Treat as Blind Spot → Re-study immediately</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- STUDY SUCCESS CRITERIA -->
+            <section class="pipeline-section" id="study-success-criteria">
+              <h3><i class="fas fa-check-double"></i> Study Success Criteria</h3>
+              <div style="padding: 14px 16px;">
+                <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 12px;">
+                  A session is considered <strong style="color: var(--success);">complete</strong> for a specific module if and only if <em>all</em> conditions are met:
+                </p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                  <div style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(40, 167, 69, 0.25); background: rgba(40, 167, 69, 0.07);">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 4px;">Condition 1</div>
+                    <div style="color: var(--text-primary); font-weight: 600; font-size: 0.88rem;">All paragraphs passed Comprehension check</div>
+                  </div>
+                  <div style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(40, 167, 69, 0.25); background: rgba(40, 167, 69, 0.07);">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 4px;">Condition 2</div>
+                    <div style="color: var(--text-primary); font-weight: 600; font-size: 0.88rem;">Self-Explanation in original vernacular</div>
+                  </div>
+                  <div style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(40, 167, 69, 0.25); background: rgba(40, 167, 69, 0.07);">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 4px;">Condition 3</div>
+                    <div style="color: var(--text-primary); font-weight: 600; font-size: 0.88rem;">Active Recall threshold ≥ 80% (book closed)</div>
+                  </div>
+                  <div style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(40, 167, 69, 0.25); background: rgba(40, 167, 69, 0.07);">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 4px;">Condition 4</div>
+                    <div style="color: var(--text-primary); font-weight: 600; font-size: 0.88rem;">All Forgotten items re-studied & recalled immediately</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- MASTER STUDY ALGORITHM — FLOWCHART STAGES                  -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <section class="pipeline-section" id="study-flowchart-stages">
+              <h3><i class="fas fa-project-diagram"></i> Study Pipeline Flowchart — Stage Breakdown</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead>
+                    <tr>
+                      <th style="width:18%">Stage</th>
+                      <th style="width:32%">Steps</th>
+                      <th style="width:25%">Key Decision</th>
+                      <th style="width:25%">Exit Condition</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>🟡 First-Time Study</strong></td>
+                      <td>Read Para → Understand? → Own Words? → Repeat All Paras → Close Book → Total Page Recall → Open & Check</td>
+                      <td><strong>IF Recalled → Remembered</strong><br><strong>ELSE → Forgot → Recall Now</strong></td>
+                      <td>All paras comprehended + self-explained + recalled ≥ 80%</td>
+                    </tr>
+                    <tr>
+                      <td><strong>🔵 Revision 1</strong></td>
+                      <td>Start Page (Book Closed) → Complete Page Recall → Open & Check → Correction Loop for Errors</td>
+                      <td>Errors found? → Re-read point → Close book → Recall again</td>
+                      <td>Full page recalled with zero errors</td>
+                    </tr>
+                    <tr>
+                      <td><strong>🟢 Revision 2+</strong></td>
+                      <td>Start Page (Book Closed) → Rapid Recall → Open & Verify → 20–30s Quick Scan</td>
+                      <td>If NO recall → drop back to Revision 1 flow</td>
+                      <td>Rapid recall passes in under 30 seconds</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <!-- ADVANCED COGNITIVE STRATEGIES                               -->
+            <!-- ═══════════════════════════════════════════════════════════ -->
+            <section class="pipeline-section" id="cognitive-strategies">
+              <h3><i class="fas fa-lightbulb"></i> Advanced Cognitive Strategies</h3>
+              <div class="pipeline-table-wrap">
+                <table class="pipeline-table">
+                  <thead>
+                    <tr>
+                      <th style="width:18%">Strategy</th>
+                      <th style="width:37%">How It Works</th>
+                      <th style="width:25%">Core Principle</th>
+                      <th style="width:20%">Implementation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>🔀 Interleaving<br><small style="color:var(--text-secondary)">(The Shuffle Rule)</small></strong></td>
+                      <td>Avoid "blocked" practice (one topic for hours). Mix related topics to force the brain to distinguish between similar concepts.</td>
+                      <td><code>P(R)<sub>interleaved</sub> &gt; P(R)<sub>blocked</sub></code><br><small style="color:var(--text-secondary)">Long-term retention increases when the brain reloads different retrieval paths</small></td>
+                      <td><strong>Alternate subjects within a session; use Ghost Subject slots for variety</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>🖼️ Dual Coding</strong></td>
+                      <td>Combine <strong>verbal</strong> descriptions with <strong>visual</strong> representations. If a paragraph describes a process, sketch a rough diagram simultaneously.</td>
+                      <td><code>Total Trace = Trace<sub>verbal</sub> + Trace<sub>visual</sub></code><br><small style="color:var(--text-secondary)">Two distinct memory traces ≫ one</small></td>
+                      <td><strong>Always sketch diagrams/flowcharts alongside text notes</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>⏸️ Zeigarnik Effect</strong></td>
+                      <td>Intentionally pause a study session during a <em>difficult</em> (but not impossible) problem. The brain maintains "cognitive tension," processing in the background.</td>
+                      <td>Unfinished tasks stay active in subconscious processing</td>
+                      <td><strong>Pause for Δt ≈ 5–10 min during hard sections, then return</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>🤔 Metacognitive Monitoring<br><small style="color:var(--text-secondary)">(The "Why" Check)</small></strong></td>
+                      <td>After every successful recall, ask: <em>"Why is this fact true?"</em> or <em>"How does this connect to the previous page?"</em></td>
+                      <td><code>Knowledge Depth ∝ Σ(Connections)</code><br><small style="color:var(--text-secondary)">Moves Rote Memorization → Relational Encoding</small></td>
+                      <td><strong>After each recall pass, write 1 "why" sentence per key fact</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>🌙 Sleep-Dependent Consolidation</strong></td>
+                      <td>Review the most difficult <strong>Forgotten (F)</strong> items exactly <strong>30 min before sleep</strong>. During N3 (Slow Wave Sleep), the hippocampus replays neural firing patterns.</td>
+                      <td><code>E<sub>c</sub> = ∫ f(SWS) dt</code><br><small style="color:var(--text-secondary)">SWS = Slow Wave Sleep duration</small></td>
+                      <td><strong>Mark hardest F items during the day → review at 11:00 PM before bed</strong></td>
+                    </tr>
+                    <tr>
+                      <td><strong>📍 Environment Variation</strong></td>
+                      <td>Change physical study location (library → café → home). Prevents "context-dependent forgetting" where recall is tied to one specific room.</td>
+                      <td>Multiple contexts → context-independent retrieval</td>
+                      <td><strong>Aim for n ≥ 2 different environments per module</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 10px 14px 14px; text-align: center; line-height: 1.5;">
+                <i class="fas fa-info-circle" style="margin-right: 4px;"></i>
+                Apply these strategies <strong>within</strong> the study pipeline — they are not separate steps but <em>modifiers</em> that amplify every stage above.
+              </p>
             </section>
 
             <section class="sleep-journal-panel" id="sleep-journal-panel">
