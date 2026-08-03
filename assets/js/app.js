@@ -6258,8 +6258,77 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const source = this.normalizeExternalText(raw);
     if (!source) return [];
 
+    try {
+      const arr = JSON.parse(source);
+      if (Array.isArray(arr) && arr.length > 0) {
+        return arr.map(task => {
+          const topic = task.topic || task.title || "Task";
+          const progress = this.getTopicProgress(topic);
+          const targetMinutes = task.target_minutes || task.durationMins || 0;
+          return {
+            type: "custom",
+            topic,
+            label: task.label || task.title || topic,
+            progress,
+            done: progress.minutes >= targetMinutes,
+            win: task.win || [0, 24],
+            priority: String(task.priority || "MEDIUM").toUpperCase(),
+            discipline_type: String(task.discipline_type || "FLEXIBLE").toUpperCase(),
+            phase: task.phase || task.category || "Core Study",
+            secondary: !!task.secondary,
+            score_weight: task.score_weight || 0,
+            target_minutes: targetMinutes,
+            estimated_minutes: task.estimated_minutes || targetMinutes,
+          };
+        });
+      }
+    } catch(e) {}
+
     const matches = [...source.matchAll(/makeTask\s*\(([\s\S]*?)\)/g)];
     if (!matches.length) return [];
+
+    if (matches[0] && matches[0][1].trim().startsWith('{')) {
+      const parsedTasks = matches.map(match => {
+        let objStr = match[1].trim();
+        try {
+          const obj = new Function("return " + objStr)();
+          if (!obj) return null;
+          
+          const topic = obj.topic || obj.title || "Task";
+          const label = obj.label || obj.title || topic;
+          const progress = this.getTopicProgress(topic);
+          const targetMinutes = obj.target_minutes || obj.durationMins || 0;
+          
+          let win = obj.win;
+          if (!win && obj.startTime && obj.endTime && typeof obj.startTime === 'string' && typeof obj.endTime === 'string') {
+            const parseTime = (t) => {
+               const parts = t.split(':').map(Number);
+               return (parts[0] || 0) + ((parts[1] || 0) / 60);
+            };
+            win = [parseTime(obj.startTime), parseTime(obj.endTime)];
+          }
+          
+          return {
+             type: "custom",
+             topic,
+             label,
+             progress,
+             done: progress.minutes >= targetMinutes,
+             win: win || [0, 24],
+             priority: String(obj.priority || "MEDIUM").toUpperCase(),
+             discipline_type: String(obj.discipline_type || "FLEXIBLE").toUpperCase(),
+             phase: obj.phase || obj.category || "Core Study",
+             secondary: !!obj.secondary,
+             score_weight: obj.score_weight || 0,
+             target_minutes: targetMinutes,
+             estimated_minutes: obj.estimated_minutes || targetMinutes,
+          };
+        } catch(e) {
+          return null;
+        }
+      }).filter(Boolean);
+      if (parsedTasks.length > 0) return parsedTasks;
+    }
 
     let placeholderIndex = 0;
     const parsedTasks = matches.map((match) => {
