@@ -2954,9 +2954,64 @@ class UIManager {
           minute: "2-digit",
           second: "2-digit",
         });
+      this.updateTaskRemaining(now);
     };
     updateTime();
     setInterval(updateTime, 1000);
+  }
+
+  updateTaskRemaining(now) {
+    const el = document.getElementById("task-remaining");
+    if (!el) return;
+
+    // Get mission tasks (each has a .win = [startHour, endHour])
+    const tasks = this.app.trainerEngine?.getDailyMissionTasks?.() || [];
+    if (!tasks.length) { el.style.display = "none"; return; }
+
+    const nowH = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+
+    // Find the currently active task window
+    let active = null;
+    for (const t of tasks) {
+      const win = t.win;
+      if (!Array.isArray(win) || win.length < 2) continue;
+      const [wStart, wEnd] = win;
+      if (nowH >= wStart && nowH < wEnd) { active = { task: t, wEnd }; break; }
+    }
+
+    // If nothing active right now, look for the very next upcoming task
+    if (!active) {
+      let next = null;
+      for (const t of tasks) {
+        const win = t.win;
+        if (!Array.isArray(win) || win.length < 2) continue;
+        if (nowH < win[0]) { next = { task: t, wStart: win[0] }; break; }
+      }
+      if (next) {
+        const minsUntil = Math.round((next.wStart - nowH) * 60);
+        const h = Math.floor(minsUntil / 60);
+        const m = minsUntil % 60;
+        const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+        const label = (next.task.label || next.task.topic || "").replace(/^[A-Z ]+:\s*/, "").slice(0, 28);
+        el.className = "";
+        el.style.display = "flex";
+        el.innerHTML = `<span class="remaining-icon">⏳</span><span class="remaining-label">next in</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>`;
+        return;
+      }
+      el.style.display = "none";
+      return;
+    }
+
+    // Active window found — compute remaining minutes
+    const minsLeft = Math.max(0, Math.round((active.wEnd - nowH) * 60));
+    const h = Math.floor(minsLeft / 60);
+    const m = minsLeft % 60;
+    const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    const label = (active.task.label || active.task.topic || "").replace(/^[A-Z ]+:\s*/, "").slice(0, 28);
+
+    el.className = minsLeft <= 0 ? "overdue" : "";
+    el.style.display = "flex";
+    el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>`;
   }
   startMotivationRotation() {
     this.updateMotivation();

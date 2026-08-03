@@ -287,6 +287,42 @@
         border-radius: 7px;
         border: 1px solid rgba(0, 123, 255, 0.3);
       }
+      /* Remaining time for current task block */
+      #task-remaining {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: rgba(160, 160, 168, 0.75);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 7px;
+        padding: 4px 10px;
+        letter-spacing: 0.2px;
+        user-select: none;
+        transition: opacity 0.4s ease;
+      }
+      #task-remaining .remaining-icon {
+        font-size: 0.72rem;
+        opacity: 0.65;
+      }
+      #task-remaining .remaining-label {
+        opacity: 0.6;
+        font-size: 0.72rem;
+      }
+      #task-remaining .remaining-value {
+        font-family: "Courier New", monospace;
+        font-size: 0.82rem;
+        color: rgba(200, 200, 210, 0.72);
+      }
+      #task-remaining.overdue {
+        color: rgba(220, 100, 100, 0.55);
+        border-color: rgba(220, 100, 100, 0.12);
+      }
+      #task-remaining.overdue .remaining-value {
+        color: rgba(220, 100, 100, 0.6);
+      }
       /* Main Layout */
       .main-content {
         display: grid;
