@@ -1,4 +1,4 @@
-﻿window.AppModule = {
+window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
     if (!services?.auth || typeof services.onAuthStateChanged !== "function") {
@@ -9229,6 +9229,20 @@ class GraphManager {
       const shadow = lockedShadowMap.get(dateStr) || Math.max(0, fallbackTarget - 1);
       const target = targetMap.get(dateStr) || fallbackTarget;
       const isWin = productive >= target;
+      
+      let level = 0;
+      if (hasData) {
+        if (isWin) {
+          level = 5;
+        } else if (target > 0) {
+          const ratio = productive / target;
+          if (ratio > 0.75) level = 4;
+          else if (ratio > 0.5) level = 3;
+          else if (ratio > 0.25) level = 2;
+          else if (ratio > 0) level = 1;
+        }
+      }
+
       const remaining = Math.max(0, target - productive);
       const leftPercent = target > 0 ? remaining / target : 0;
       let nearGoalTier = "";
@@ -9244,6 +9258,7 @@ class GraphManager {
         target,
         hasData,
         isWin,
+        level,
         nearGoalTier,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
       };
@@ -9320,6 +9335,9 @@ class GraphManager {
       cell.className = "github-cell";
       cell.style.gridColumn = String(week + 1);
       cell.style.gridRow = String(row + 1);
+      if (day.level !== undefined) {
+        cell.dataset.level = day.level;
+      }
       cell.dataset.state = day.dateStr === todayDate ? "today" : day.state;
       if (day.nearGoalTier) {
         cell.dataset.near = day.nearGoalTier;
