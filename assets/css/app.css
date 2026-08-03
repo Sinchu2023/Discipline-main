@@ -98,9 +98,9 @@
         justify-content: center;
       }
       .profile-menu {
-        position: fixed;
-        right: 12px;
-        top: 60px;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 10px);
         min-width: 185px;
         background: rgba(22, 22, 22, 0.98);
         border: 1px solid var(--border);
@@ -128,9 +128,9 @@
         z-index: 2000;
       }
       .pipeline-menu {
-        position: fixed;
-        left: 12px;
-        top: 60px;
+        position: absolute;
+        left: 0;
+        top: calc(100% + 10px);
         min-width: 210px;
         background: rgba(22, 22, 22, 0.98);
         border: 1px solid var(--border);
