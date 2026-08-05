@@ -986,17 +986,6 @@
       .github-weeks-col {
         display: contents;
       }
-      .github-cell {
-        width: 8px;
-        height: 8px;
-        border-radius: 1px;
-        background-color: #161b22;
-        transition: transform 0.1s;
-      }
-      .github-cell[data-level="1"] { background-color: #0e4429; }
-      .github-cell[data-level="2"] { background-color: #006d32; }
-      .github-cell[data-level="3"] { background-color: #26a641; }
-      .github-cell[data-level="4"] { background-color: #39d353; }
       .github-cell:hover { opacity: 0.8; transform: scale(1.1); cursor: crosshair; }
       .graph-card {
         background: linear-gradient(
@@ -2862,35 +2851,21 @@
   width: 10px;
   height: 10px;
   border-radius: 1px;
-  background-color: #12161d;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  /* Inactive (0 work): deep dark red – elegant, subtle, not neon */
+  background-color: #2a0a0a;
+  /* Thin white border on every square */
+  border: 1px solid rgba(255, 255, 255, 0.12);
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.github-cell[data-level="0"], .github-cell[data-state="neutral"] {
-  background-color: #161b22;
-  border-color: rgba(255, 255, 255, 0.05);
+/* Neutral / no-data day: same deep dark red */
+.github-cell[data-level="0"],
+.github-cell[data-state="neutral"] {
+  background-color: #2a0a0a;
+  border-color: rgba(255, 255, 255, 0.12);
 }
-.github-cell[data-level="1"] {
-  background-color: #0e4429;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="2"] {
-  background-color: #006d32;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="3"] {
-  background-color: #26a641;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="4"] {
-  background-color: #39d353;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="5"] {
-  background-color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
-}
+/* Active day colors are now applied inline by JS (continuous gradient).
+   These level rules are kept only as a CSS fallback and are intentionally
+   left empty so they cannot override the inline styles. */
 .github-cell[data-state="today"] {
   background-color: #2359c4;
   border-color: rgba(116, 173, 255, 0.75);
@@ -2898,7 +2873,6 @@
 }
 .github-cell[data-streak="active"] {
   border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .github-cell[data-best="broken"] {
   background-color: #ffffff;
@@ -2991,35 +2965,20 @@
   width: 10px;
   height: 10px;
   border-radius: 1px;
-  background-color: var(--border);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Inactive (0 work): deep dark red – elegant, subtle */
+  background-color: #2a0a0a;
+  /* Thin white border on every square */
+  border: 1px solid rgba(255, 255, 255, 0.12);
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.github-cell[data-level="0"], .github-cell[data-state="neutral"] {
-  background-color: #161b22;
-  border-color: rgba(255, 255, 255, 0.05);
+/* Neutral / no-data day */
+.github-cell[data-level="0"],
+.github-cell[data-state="neutral"] {
+  background-color: #2a0a0a;
+  border-color: rgba(255, 255, 255, 0.12);
 }
-.github-cell[data-level="1"] {
-  background-color: #0e4429;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="2"] {
-  background-color: #006d32;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="3"] {
-  background-color: #26a641;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="4"] {
-  background-color: #39d353;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-.github-cell[data-level="5"] {
-  background-color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
-}
+/* Active day colors are applied inline by JS; these level selectors
+   serve only as a CSS fallback and must not override inline styles. */
 .github-cell[data-state="today"] {
   border-color: rgba(116, 173, 255, 0.95);
   box-shadow: 0 0 0 1px rgba(116, 173, 255, 0.5);
@@ -3027,7 +2986,6 @@
 /* Removing near critical/close color overrides to prefer strict github colors */
 .github-cell[data-streak="active"] {
   border-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 .github-cell[data-best="broken"] {
   background-color: #ffffff;

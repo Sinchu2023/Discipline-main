@@ -9388,6 +9388,63 @@ class GraphManager {
       };
     });
 
+    // ── Continuous heatmap color scaling ──────────────────────────────────────
+    // Find the highest productive-minutes value among all active days across
+    // the entire 365-day calendar.  That peak day always gets the richest green.
+    const COLOR_TOLERANCE_MINUTES = 5; // differences ≤ this are treated as equal
+    let maxProductiveMinutes = 0;
+    days.forEach((day) => {
+      if (day.hasData && day.productive > maxProductiveMinutes) {
+        maxProductiveMinutes = day.productive;
+      }
+    });
+
+    /**
+     * Given a productive-minutes value and the calendar-wide maximum, returns
+     * an inline CSS color and optional glow box-shadow for that cell.
+     *
+     * Inactive days (0 work)  → deep dark red, elegant and subtle.
+     * Active days             → glowing green scaled by productive / max.
+     *
+     * ratio is quantised to the nearest COLOR_TOLERANCE_MINUTES bucket so that
+     * differences of ≤ 5 min produce identical shades.
+     */
+    function heatmapCellStyle(productive, hasData, maxMin) {
+      if (!hasData || productive <= 0) {
+        // Deep dark red – inactive day
+        return {
+          bg: "#2a0a0a",
+          border: "rgba(255, 255, 255, 0.12)",
+          glow: "none",
+        };
+      }
+
+      // Quantise to avoid noise from tiny differences
+      const bucketMin = Math.max(1, COLOR_TOLERANCE_MINUTES);
+      const quantised = Math.round(productive / bucketMin) * bucketMin;
+      const maxQuantised = Math.max(quantised, Math.round(maxMin / bucketMin) * bucketMin);
+      const ratio = maxQuantised > 0 ? Math.min(1, quantised / maxQuantised) : 1;
+
+      // Green channel: interpolate between a very pale green (low) and a rich
+      // deep green (high) using HSL so the gradient feels natural.
+      // hue stays at 141°, saturation 70–100%, lightness 14–44%.
+      const hue = 141;
+      const saturation = Math.round(70 + ratio * 30);        // 70 → 100
+      const lightness  = Math.round(14 + ratio * 30);        // 14 → 44
+
+      // Glow intensity also scales with ratio so peak days visibly glow.
+      const glowAlpha  = (0.12 + ratio * 0.52).toFixed(3);  // 0.12 → 0.64
+      const glowSpread = Math.round(1 + ratio * 5);          // 1px → 6px
+      const glowColor  = `hsla(${hue}, 90%, 55%, ${glowAlpha})`;
+
+      return {
+        bg: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        border: `rgba(255, 255, 255, ${(0.08 + ratio * 0.22).toFixed(3)})`,
+        glow: `0 0 ${glowSpread}px ${glowColor}`,
+      };
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     let running = 0;
     days.forEach((day) => {
       if (day.state === "win") {
@@ -9459,10 +9516,9 @@ class GraphManager {
       cell.className = "github-cell";
       cell.style.gridColumn = String(week + 1);
       cell.style.gridRow = String(row + 1);
-      if (day.level !== undefined) {
-        cell.dataset.level = day.level;
-      }
-      cell.dataset.state = day.dateStr === todayDate ? "today" : day.state;
+
+      const isToday = day.dateStr === todayDate;
+      cell.dataset.state = isToday ? "today" : day.state;
       if (day.nearGoalTier) {
         cell.dataset.near = day.nearGoalTier;
       }
@@ -9480,6 +9536,17 @@ class GraphManager {
       ) {
         cell.dataset.best = "broken";
       }
+
+      // Apply continuous color – skip for today (CSS handles that)
+      if (!isToday) {
+        const cs = heatmapCellStyle(day.productive, day.hasData, maxProductiveMinutes);
+        cell.style.backgroundColor = cs.bg;
+        cell.style.borderColor = cs.border;
+        if (cs.glow !== "none") {
+          cell.style.boxShadow = cs.glow;
+        }
+      }
+
       const dateLabel = this.formatCompactBattleDate(day.dateStr);
       const statusLabel =
         day.state === "neutral" ? "No activity" : day.state === "win" ? "Win" : "Loss";
