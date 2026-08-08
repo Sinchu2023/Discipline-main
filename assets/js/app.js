@@ -2356,15 +2356,18 @@ class TaskManager {
         if (byId.delete(id)) changed = true;
         return;
       }
-      const normalized = this.app.normalizeTask({ id, ...(change.data || {}) });
+      // Use raw cloud updatedAt (before normalizeTask stamps a fresh Date.now())
+      // so the staleness guard can actually work.
+      const rawUpdatedAt = Number((change.data || {}).updatedAt || 0);
       const existing = byId.get(id);
       if (
         existing &&
-        Number(existing.updatedAt || 0) >= Number(normalized.updatedAt || 0) &&
-        Number(existing.endTime || 0) === Number(normalized.endTime || 0) &&
-        Number(existing.duration || 0) === Number(normalized.duration || 0)
+        Number(existing.updatedAt || 0) >= rawUpdatedAt &&
+        Number(existing.endTime || 0) === Number((change.data || {}).endTime || 0) &&
+        Number(existing.duration || 0) === Number((change.data || {}).duration || 0)
       )
         return;
+      const normalized = this.app.normalizeTask({ id, ...(change.data || {}) });
       byId.set(id, normalized);
       changed = true;
     });
@@ -2375,15 +2378,25 @@ class TaskManager {
   }
 
   addTask(task) {
-    this.app.state.tasks.push(this.app.normalizeTask(task));
+    const normalized = this.app.normalizeTask(task);
+    // Upsert by ID to prevent duplicate entries if addTask is called
+    // more than once with the same task (e.g. due to remote timer sync).
+    const existingIndex = this.app.state.tasks.findIndex(
+      (t) => String(t.id) === String(normalized.id),
+    );
+    if (existingIndex !== -1) {
+      this.app.state.tasks[existingIndex] = normalized;
+    } else {
+      this.app.state.tasks.push(normalized);
+    }
     this.app.saveToStorage(
       CONFIG.STORAGE_KEYS.TASKS,
       this.app.state.tasks,
     );
-    this.app.cloudManager?.syncTaskUpsert?.(task);
+    this.app.cloudManager?.syncTaskUpsert?.(normalized);
     this.app.syncManager.queue({
       type: "upsert",
-      entry: task,
+      entry: normalized,
       ts: Date.now(),
     });
     this.app.syncManager.flushQueue();
