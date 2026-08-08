@@ -9571,6 +9571,25 @@ class GraphManager {
 
     inner.append(monthsRow, grid);
     wrapper.appendChild(inner);
+
+    // ── Highest Productive Day label ──────────────────────────────────────────
+    if (maxProductiveMinutes > 0) {
+      const bestDay = days.reduce((best, day) =>
+        day.productive > (best ? best.productive : -1) ? day : best, null);
+      if (bestDay) {
+        const bestDateLabel = this.formatCompactBattleDate(bestDay.dateStr);
+        const bestTimeLabel = this.app.formatDuration(bestDay.productive);
+        const bestBar = document.createElement("div");
+        bestBar.className = "heatmap-best-day-bar";
+        bestBar.innerHTML =
+          `<span class="heatmap-best-day-icon">🏆</span>` +
+          `<span class="heatmap-best-day-text">Highest productive day: ` +
+          `<strong>${bestDateLabel}</strong> &ndash; ${bestTimeLabel}</span>`;
+        wrapper.appendChild(bestBar);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     container.appendChild(wrapper);
   }
 }
