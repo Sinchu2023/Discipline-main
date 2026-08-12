@@ -2457,9 +2457,26 @@ class TaskManager {
       const editLabel = isSleep ? "Edit Sleep" : "Edit Task";
       const editClass = isSleep ? "edit-sleep-btn" : "edit-task-btn";
       el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
-      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "[SLEEP]" : "[TASK]"} ${this.app.escapeHtml(task.category)} - ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions"><button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
+      el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "[SLEEP]" : "[TASK]"} ${this.app.escapeHtml(task.category)} - ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions">${!isSleep ? `<button class="btn btn-success restart-task-btn" data-id="${this.app.escapeHtml(task.id)}" title="Start timer for this task"><i class="fas fa-play"></i> Start</button>` : ""}<button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
       c.appendChild(el);
     });
+    document
+      .querySelectorAll(".restart-task-btn")
+      .forEach((btn) =>
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const taskId = e.currentTarget.getAttribute("data-id");
+          const task = this.app.state.tasks.find((t) => String(t.id) === String(taskId));
+          if (!task) return;
+          const label = task.description || `${task.category} - ${task.subcategory}`;
+          this.app.elements["task-input"].value = label;
+          this.app.stopwatch.start(label, {
+            category: task.category,
+            subcategory: task.subcategory,
+            description: task.description || label,
+          });
+        }),
+      );
     document
       .querySelectorAll(".delete-task-btn")
       .forEach((btn) =>
