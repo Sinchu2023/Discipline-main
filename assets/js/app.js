@@ -2154,9 +2154,10 @@ class StopwatchManager {
     this.elapsedBeforePause = totalElapsed;
     this.isRunning = false;
     const endTime = Date.now();
+    const activeTask = this.app.state.activeTask;
     const entry = this.app.normalizeTask({
       id: `${Date.now()}`,
-      ...this.app.state.activeTask,
+      ...activeTask,
       startTime: this.startTime,
       endTime,
       duration: Math.max(
@@ -2179,7 +2180,37 @@ class StopwatchManager {
       }, 0);
     }
     if (this.app.trainerEngine?.syncMissionFromRoadmap) {
-      this.app.trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+      // Check if this was a timed mission task — if so do a full rebuild so the
+      // tick mark appears automatically when target_minutes threshold is met.
+      const trainerEngine = this.app.trainerEngine;
+      const missionCheckId = activeTask?.missionCheckId ||
+        trainerEngine?._activeMissionCheckId || null;
+      const targetMinutes = activeTask?.missionTargetMinutes ||
+        trainerEngine?._activeMissionTargetMinutes || 0;
+      const elapsedMinutes = Math.round(totalElapsed / 60000);
+      // Allow up to 15-minute flexibility below target for auto-completion
+      const FLEX_MINUTES = 15;
+      const meetsTarget = targetMinutes > 0 && elapsedMinutes >= (targetMinutes - FLEX_MINUTES);
+      if (missionCheckId && meetsTarget) {
+        // Full rebuild: this will recompute done=true and render checked checkbox
+        trainerEngine.syncMissionFromRoadmap({ rebuild: true });
+        // Also persist the manual check in case topic matching is loose
+        const checks = trainerEngine.getTodayManualMissionChecks();
+        if (!checks[missionCheckId]) {
+          checks[missionCheckId] = true;
+          localStorage.setItem(CONFIG.STORAGE_KEYS.TRAINER_STATE, JSON.stringify(trainerEngine.state));
+          trainerEngine.updateMissionChecklistScore();
+          const today = this.app.getDateString(new Date());
+          this.app.cloudManager?.syncMissionChecks?.(today, checks);
+        }
+      } else {
+        trainerEngine.syncMissionFromRoadmap({ skipRender: true });
+      }
+      // Clear the active mission task reference
+      if (trainerEngine) {
+        trainerEngine._activeMissionCheckId = null;
+        trainerEngine._activeMissionTargetMinutes = 0;
+      }
     }
     this.reset();
   }
@@ -6699,6 +6730,43 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
         this.app.shadowEngine?.refresh(false);
       }
     }, { passive: true });
+
+    // ── Click-to-start: clicking a task title immediately starts the timer ──
+    document.addEventListener("click", (e) => {
+      // Match clicks on .mission-title span or .mission-copy div (but not checkbox)
+      const titleEl = e.target.closest(".mission-title") || e.target.closest(".mission-copy");
+      if (!titleEl) return;
+      // Don't trigger if the click landed on or inside the checkbox
+      if (e.target.closest(".mission-check") || e.target.type === "checkbox") return;
+      const row = titleEl.closest(".shadow-goal-item");
+      if (!row) return;
+      const checkId = row.dataset.checkId;
+      if (!checkId) return;
+      const cached = this._missionStateCache?.get(checkId);
+      if (!cached) return;
+      const item = cached.item;
+      if (!item) return;
+      // Don't restart a task that's already done
+      if (cached.done) return;
+      // Build meta for the stopwatch with mission tracking fields
+      const taskLabel = item.label || item.topic || "Mission Task";
+      const meta = {
+        category: "Productive Work",
+        subcategory: item.topic || taskLabel,
+        description: taskLabel,
+        missionTopic: item.topic || "",
+        missionCheckId: checkId,
+        missionTargetMinutes: item.target_minutes || 0,
+      };
+      // Track which mission task is active so stop() can auto-complete it
+      this._activeMissionCheckId = checkId;
+      this._activeMissionTargetMinutes = item.target_minutes || 0;
+      // Populate the task input for visibility in the stopwatch area
+      if (this.app.elements["task-input"] && !this.app.stopwatch.isRunning) {
+        this.app.elements["task-input"].value = taskLabel;
+      }
+      this.app.stopwatch.start(taskLabel, meta);
+    });
   }
 
   // â”€â”€ Main sync: rebuilds innerHTML ONLY when task topology changes â”€â”€â”€â”€â”€
