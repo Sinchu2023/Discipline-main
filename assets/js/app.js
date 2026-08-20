@@ -3070,6 +3070,13 @@ class UIManager {
     const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
     const label = (active.task.label || active.task.topic || "").replace(/^[A-Z ]+:\s*/, "").slice(0, 28);
 
+    // --- Lateness variables (shared by all branches below) ---
+    const win = active.task.win;
+    const wStartH = Array.isArray(win) ? win[0] : null;
+    const minsLate = wStartH !== null ? Math.max(0, Math.round((nowH - wStartH) * 60)) : 0;
+    const isRunning = this.app.stopwatch?.isRunning ?? false;
+    const activeTaskStartTime = this.app.state?.activeTask?.startTime ?? null;
+
     // --- Scan for already-logged time in this window (split/multi-session) ---
     // Runs for BOTH running and idle states so both branches share this info.
     let minsAlreadyDone = 0;
