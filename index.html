@@ -4,15 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Discipline Tracker Pro</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='48' x='8' font-size='48'%3E%E2%8F%B1%EF%B8%8F%3C/text%3E%3C/svg%3E"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
-        <link rel="stylesheet" href="assets/css/app.css?v=2026-04-16-shadow-fix" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='48' x='8' font-size='48'%3E%E2%8F%B1%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="assets/css/app.css?v=2026-04-16-shadow-fix" />
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   </head>
   <body>
     <!-- Login Gate (shown by default until auth resolves) -->
@@ -743,6 +739,9 @@
           <!-- Report content will be dynamically inserted -->
         </div>
         <div class="modal-footer">
+          <button class="btn btn-success" id="download-excel-btn">
+            <i class="fas fa-file-excel"></i> Download Excel
+          </button>
           <button class="btn" id="print-report">
             <i class="fas fa-print"></i> Print
           </button>

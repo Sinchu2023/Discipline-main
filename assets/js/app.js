@@ -3070,44 +3070,34 @@ class UIManager {
     const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
     const label = (active.task.label || active.task.topic || "").replace(/^[A-Z ]+:\s*/, "").slice(0, 28);
 
-    // --- Lateness logic ---
-    const win = active.task.win;
-    const wStartH = Array.isArray(win) ? win[0] : null;
-    const minsLate = wStartH !== null ? Math.max(0, Math.round((nowH - wStartH) * 60)) : 0;
-
-    // Check if the stopwatch is currently running (any task active)
-    const isRunning = this.app.stopwatch?.isRunning ?? false;
-    const activeTaskStartTime = this.app.state?.activeTask?.startTime ?? null;
+    // --- Scan for already-logged time in this window (split/multi-session) ---
+    // Runs for BOTH running and idle states so both branches share this info.
+    let minsAlreadyDone = 0;
+    if (wStartH !== null && this.app.state?.tasks) {
+      const today = this.app.getDateString(now);
+      const wStartMs = new Date(now);
+      wStartMs.setHours(Math.floor(wStartH), Math.round((wStartH % 1) * 60), 0, 0);
+      const wEndMs = new Date(now);
+      wEndMs.setHours(Math.floor(active.wEnd), Math.round((active.wEnd % 1) * 60), 0, 0);
+      const wStartTime = wStartMs.getTime();
+      const wEndTime = wEndMs.getTime();
+      this.app.state.tasks.forEach(t => {
+        if (t.date !== today) return;
+        const tStart = Number(t.startTime || 0);
+        const tEnd = Number(t.endTime || tStart);
+        if (tStart < wEndTime && tEnd > wStartTime) {
+          const overlapStart = Math.max(tStart, wStartTime);
+          const overlapEnd = Math.min(tEnd, wEndTime);
+          minsAlreadyDone += Math.round((overlapEnd - overlapStart) / 60000);
+        }
+      });
+    }
 
     if (!isRunning) {
-      // Check if any logged tasks already cover part of this window (split-task scenario)
-      let minsAlreadyDone = 0;
-      if (wStartH !== null && this.app.state?.tasks) {
-        const today = this.app.getDateString(now);
-        const wStartMs = new Date(now);
-        wStartMs.setHours(Math.floor(wStartH), Math.round((wStartH % 1) * 60), 0, 0);
-        const wEndMs = new Date(now);
-        wEndMs.setHours(Math.floor(active.wEnd), Math.round((active.wEnd % 1) * 60), 0, 0);
-        const wStartTime = wStartMs.getTime();
-        const wEndTime = wEndMs.getTime();
-        this.app.state.tasks.forEach(t => {
-          if (t.date !== today) return;
-          const tStart = Number(t.startTime || 0);
-          const tEnd = Number(t.endTime || tStart);
-          // Task overlaps with the window
-          if (tStart < wEndTime && tEnd > wStartTime) {
-            const overlapStart = Math.max(tStart, wStartTime);
-            const overlapEnd = Math.min(tEnd, wEndTime);
-            minsAlreadyDone += Math.round((overlapEnd - overlapStart) / 60000);
-          }
-        });
-      }
-
-      // Not started yet — show how late we are to begin
+      // Idle — check what state this window is in
       if (minsLeft <= 0) {
         // Window ended
         if (minsAlreadyDone > 0) {
-          // They did some work but window closed — show done summary
           const dh = Math.floor(minsAlreadyDone / 60), dm = minsAlreadyDone % 60;
           const doneStr = dh > 0 ? `${dh}h ${dm}m` : `${minsAlreadyDone}m`;
           el.className = "on-track";
@@ -3120,14 +3110,14 @@ class UIManager {
           el.innerHTML = `<span class="remaining-icon">⚠️</span><span class="remaining-label">missed</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
         }
       } else if (minsAlreadyDone > 0) {
-        // Inside window, already did some work, currently on a break — show paused state
+        // Mid-window break after doing some work — show progress + time left
         const dh = Math.floor(minsAlreadyDone / 60), dm = minsAlreadyDone % 60;
         const doneStr = dh > 0 ? `${dh}h ${dm}m` : `${minsAlreadyDone}m`;
         el.className = "on-track";
         el.style.display = "flex";
-        el.innerHTML = `<span class="remaining-icon">⏸</span><span class="remaining-label">paused ·</span><span class="remaining-value">${doneStr} done</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">· ${timeStr} left</span>`;
+        el.innerHTML = `<span class="remaining-icon">⏸</span><span class="remaining-label">break ·</span><span class="remaining-value">${doneStr} done</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">· ${timeStr} left</span>`;
       } else {
-        // Inside window, zero work done — show lateness
+        // No work done yet — show how late we are
         const lateFmtH = Math.floor(minsLate / 60);
         const lateFmtM = minsLate % 60;
         const lateStr = lateFmtH > 0 ? `${lateFmtH}h ${lateFmtM}m` : `${minsLate}m`;
@@ -3140,9 +3130,11 @@ class UIManager {
         }
       }
     } else {
-      // Running — show time left, with optional late-start badge if they started after window began
+      // Stopwatch RUNNING — show time left in window
+      // Only show "late start" if this is truly the first session (no prior logged work in window)
       let lateBadge = "";
-      if (wStartH !== null && activeTaskStartTime) {
+      if (minsAlreadyDone === 0 && wStartH !== null && activeTaskStartTime) {
+        // First and only session — check if they started late
         const actualStartH = new Date(activeTaskStartTime).getHours() + new Date(activeTaskStartTime).getMinutes() / 60;
         const startedLateBy = Math.round((actualStartH - wStartH) * 60);
         if (startedLateBy >= 5) {
@@ -3151,6 +3143,11 @@ class UIManager {
           const slStr = slh > 0 ? `${slh}h ${slm}m` : `${startedLateBy}m`;
           lateBadge = ` <span class="late-start-badge">+${slStr} late start</span>`;
         }
+      } else if (minsAlreadyDone > 0) {
+        // Returning session — show how much was already done in this window
+        const dh = Math.floor(minsAlreadyDone / 60), dm = minsAlreadyDone % 60;
+        const doneStr = dh > 0 ? `${dh}h ${dm}m` : `${minsAlreadyDone}m`;
+        lateBadge = ` <span class="late-start-badge" style="color:#4caf82;background:rgba(76,175,130,0.1);border-color:rgba(76,175,130,0.3);">+${doneStr} prev</span>`;
       }
       el.className = minsLeft <= 0 ? "overdue" : "on-track";
       el.style.display = "flex";
@@ -9943,6 +9940,17 @@ class EventManager {
     this.app.elements["print-report"].addEventListener("click", () =>
       window.print(),
     );
+    const dlBtn = document.getElementById("download-excel-btn");
+    if (dlBtn) {
+      dlBtn.addEventListener("click", () => {
+        try {
+          new ExcelReportGenerator(this.app).generate();
+        } catch (e) {
+          console.error("Excel export failed:", e);
+          alert("Excel export failed: " + e.message);
+        }
+      });
+    }
     this.app.elements["close-trainer"]?.addEventListener("click", () =>
       this.app.trainerEngine.hideWindow(),
     );
@@ -10042,6 +10050,248 @@ class EventManager {
     });
   }
 }
+window.classifyActivity = (userInput) =>
+  ActivityClassifier.classify(userInput);
+
+// =============================================================================
+// Excel Report Generator — 4-sheet .xlsx export
+// =============================================================================
+class ExcelReportGenerator {
+  constructor(app) {
+    this.app = app;
+  }
+
+  // --- helpers ---
+  _fmtH(decH) {
+    if (decH == null || !Number.isFinite(decH)) return "";
+    const norm = ((decH % 24) + 24) % 24;
+    const totalMins = Math.round(norm * 60);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+  }
+
+  _fmtTs(tsMs) {
+    if (!tsMs) return "";
+    const d = new Date(tsMs);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  _dayName(dateStr) {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.toLocaleDateString("en-IN", { weekday: "long" });
+  }
+
+  // Match a task's actual start hour to the nearest timetable window
+  _matchToWindow(taskStartMs, missionTasks) {
+    if (!taskStartMs || !missionTasks?.length) return null;
+    const d = new Date(taskStartMs);
+    const startH = d.getHours() + d.getMinutes() / 60;
+    for (const mt of missionTasks) {
+      const win = mt.win;
+      if (!Array.isArray(win) || win.length < 2) continue;
+      const [wS, wE] = win;
+      if (startH >= wS && startH < wE) {
+        return { slot: mt.label || mt.topic || "", wStart: wS, wEnd: wE, task: mt };
+      }
+    }
+    return null;
+  }
+
+  // --- Sheet 1: Daily Log ---
+  _buildDailyLog(tasks) {
+    const byDate = {};
+    tasks.forEach(t => {
+      const d = t.date;
+      if (!d) return;
+      if (!byDate[d]) byDate[d] = { productive: 0, tracked: 0, sessions: 0, distraction: 0, sleep: 0 };
+      byDate[d].tracked += (t.duration || 0);
+      byDate[d].sessions += 1;
+      if (t.category === "Sleep") byDate[d].sleep += (t.duration || 0);
+      else if (t.category === "Time Waste / Distraction") byDate[d].distraction += (t.duration || 0);
+      else if (["Productive Work", "Physical Training", "Study / Skill Development"].includes(t.category))
+        byDate[d].productive += (t.duration || 0);
+    });
+
+    // Build streak map
+    const streakData = this.app.loadFromStorage?.(CONFIG.STORAGE_KEYS.STREAK) || {};
+
+    const rows = [["Date", "Day", "Productive (min)", "Tracked (min)", "Sessions", "Distraction (min)", "Sleep (min)", "Productive Day?"]];
+    const sorted = Object.keys(byDate).sort();
+    sorted.forEach(d => {
+      const s = byDate[d];
+      rows.push([
+        d,
+        this._dayName(d),
+        s.productive,
+        s.tracked,
+        s.sessions,
+        s.distraction,
+        s.sleep,
+        s.productive >= CONFIG.DAILY_PRODUCTIVITY_THRESHOLD_MINUTES ? "Yes" : "No"
+      ]);
+    });
+    return rows;
+  }
+
+  // --- Sheet 2: Task Punctuality ---
+  _buildPunctualityLog(tasks, missionTasks) {
+    const cutoff90 = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const rows = [["Date", "Day", "Subject / Description", "Category", "Timetable Slot", "Window Start", "Window End", "Actual Start", "Late By (min)", "Duration (min)", "Ended At"]];
+
+    const sorted = [...tasks].sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+    sorted.forEach(t => {
+      const startMs = Number(t.startTime || 0);
+      const endMs = Number(t.endTime || startMs);
+      const isRecent = startMs >= cutoff90;
+      const match = isRecent ? this._matchToWindow(startMs, missionTasks) : null;
+
+      let lateBy = "—";
+      let slotLabel = "—";
+      let winStart = "";
+      let winEnd = "";
+
+      if (match) {
+        slotLabel = match.slot;
+        winStart = this._fmtH(match.wStart);
+        winEnd = this._fmtH(match.wEnd);
+        const actualH = new Date(startMs).getHours() + new Date(startMs).getMinutes() / 60;
+        lateBy = Math.round((actualH - match.wStart) * 60);
+        // Negative = early (ahead of schedule)
+      }
+
+      rows.push([
+        t.date || "",
+        t.date ? this._dayName(t.date) : "",
+        t.description || t.subcategory || "",
+        t.category || "",
+        slotLabel,
+        winStart,
+        winEnd,
+        startMs ? this._fmtTs(startMs) : "",
+        lateBy,
+        t.duration || 0,
+        endMs ? this._fmtTs(endMs) : ""
+      ]);
+    });
+    return rows;
+  }
+
+  // --- Sheet 3: Per-Subject Stats ---
+  _buildSubjectStats(punctualityRows) {
+    // punctualityRows[0] is header
+    const map = {}; // subject → {sessions, totalMins, lateBys, startHours}
+    for (let i = 1; i < punctualityRows.length; i++) {
+      const r = punctualityRows[i];
+      const subj = r[2]; // Subject / Description
+      if (!subj) continue;
+      if (!map[subj]) map[subj] = { sessions: 0, totalMins: 0, lateBys: [], startHours: [] };
+      map[subj].sessions += 1;
+      map[subj].totalMins += Number(r[9]) || 0;
+      if (r[8] !== "—" && r[8] !== "") map[subj].lateBys.push(Number(r[8]));
+      if (r[7]) {
+        // parse "HH:MM AM/PM" back to decimal hours
+        const m = r[7].match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (m) {
+          let h = parseInt(m[1]); const mn = parseInt(m[2]); const ap = m[3].toUpperCase();
+          if (ap === "AM" && h === 12) h = 0;
+          if (ap === "PM" && h !== 12) h += 12;
+          map[subj].startHours.push(h + mn / 60);
+        }
+      }
+    }
+
+    const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+    const rows = [["Subject", "Total Sessions", "Total Time (min)", "Avg Duration (min)", "Avg Start Time", "Avg Late By (min)", "Times On Time (≤5m)", "Times Late (>5m)", "% On Time"]];
+
+    Object.entries(map)
+      .sort((a, b) => b[1].totalMins - a[1].totalMins)
+      .forEach(([subj, s]) => {
+        const avgDur = s.sessions ? Math.round(s.totalMins / s.sessions) : 0;
+        const avgStartH = avg(s.startHours);
+        const avgLate = s.lateBys.length ? Math.round(avg(s.lateBys)) : "—";
+        const onTime = s.lateBys.filter(x => x <= 5).length;
+        const late = s.lateBys.filter(x => x > 5).length;
+        const pct = s.lateBys.length ? Math.round((onTime / s.lateBys.length) * 100) : "—";
+        rows.push([
+          subj,
+          s.sessions,
+          s.totalMins,
+          avgDur,
+          avgStartH != null ? this._fmtH(avgStartH) : "—",
+          avgLate,
+          onTime,
+          late,
+          pct !== "—" ? pct + "%" : "—"
+        ]);
+      });
+    return rows;
+  }
+
+  // --- Sheet 4: Current Timetable ---
+  _buildTimetable(missionTasks) {
+    const rows = [["Slot", "Label", "Topic", "Window Start", "Window End", "Target (min)", "Priority", "Type"]];
+    missionTasks.forEach((t, i) => {
+      const [wS, wE] = Array.isArray(t.win) ? t.win : [null, null];
+      rows.push([
+        i + 1,
+        t.label || "",
+        t.topic || "",
+        wS != null ? this._fmtH(wS) : "",
+        wE != null ? this._fmtH(wE) : "",
+        t.target_minutes || "",
+        t.priority || "",
+        t.discipline_type || ""
+      ]);
+    });
+    return rows;
+  }
+
+  generate() {
+    if (typeof XLSX === "undefined") {
+      alert("Excel library not loaded yet. Please wait a moment and try again.");
+      return;
+    }
+
+    const tasks = (this.app.state?.tasks || []).filter(t => t.startTime);
+    const missionTasks = this.app.trainerEngine?.getDailyMissionTasks?.() || [];
+
+    const dailyRows = this._buildDailyLog(tasks);
+    const punctRows = this._buildPunctualityLog(tasks, missionTasks);
+    const statsRows = this._buildSubjectStats(punctRows);
+    const ttRows = this._buildTimetable(missionTasks);
+
+    const wb = XLSX.utils.book_new();
+
+    const addSheet = (name, rows) => {
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      // Bold header row
+      const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[addr]) continue;
+        ws[addr].s = { font: { bold: true } };
+      }
+      // Auto column widths (approx)
+      ws["!cols"] = rows[0].map((_, ci) => {
+        const maxLen = rows.reduce((m, row) => Math.max(m, String(row[ci] ?? "").length), 0);
+        return { wch: Math.min(40, Math.max(10, maxLen + 2)) };
+      });
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+
+    addSheet("📅 Daily Log", dailyRows);
+    addSheet("⏰ Punctuality", punctRows);
+    addSheet("📊 Subject Stats", statsRows);
+    addSheet("📋 Timetable", ttRows);
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `discipline-report-${today}.xlsx`);
+  }
+}
+
 window.classifyActivity = (userInput) =>
   ActivityClassifier.classify(userInput);
 window.app = new DisciplineTracker();
