@@ -3080,14 +3080,54 @@ class UIManager {
     const activeTaskStartTime = this.app.state?.activeTask?.startTime ?? null;
 
     if (!isRunning) {
+      // Check if any logged tasks already cover part of this window (split-task scenario)
+      let minsAlreadyDone = 0;
+      if (wStartH !== null && this.app.state?.tasks) {
+        const today = this.app.getDateString(now);
+        const wStartMs = new Date(now);
+        wStartMs.setHours(Math.floor(wStartH), Math.round((wStartH % 1) * 60), 0, 0);
+        const wEndMs = new Date(now);
+        wEndMs.setHours(Math.floor(active.wEnd), Math.round((active.wEnd % 1) * 60), 0, 0);
+        const wStartTime = wStartMs.getTime();
+        const wEndTime = wEndMs.getTime();
+        this.app.state.tasks.forEach(t => {
+          if (t.date !== today) return;
+          const tStart = Number(t.startTime || 0);
+          const tEnd = Number(t.endTime || tStart);
+          // Task overlaps with the window
+          if (tStart < wEndTime && tEnd > wStartTime) {
+            const overlapStart = Math.max(tStart, wStartTime);
+            const overlapEnd = Math.min(tEnd, wEndTime);
+            minsAlreadyDone += Math.round((overlapEnd - overlapStart) / 60000);
+          }
+        });
+      }
+
       // Not started yet — show how late we are to begin
       if (minsLeft <= 0) {
-        // Window ended without starting
-        el.className = "overdue";
+        // Window ended
+        if (minsAlreadyDone > 0) {
+          // They did some work but window closed — show done summary
+          const dh = Math.floor(minsAlreadyDone / 60), dm = minsAlreadyDone % 60;
+          const doneStr = dh > 0 ? `${dh}h ${dm}m` : `${minsAlreadyDone}m`;
+          el.className = "on-track";
+          el.style.display = "flex";
+          el.innerHTML = `<span class="remaining-icon">✅</span><span class="remaining-label">done</span><span class="remaining-value">${doneStr}</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
+        } else {
+          // Fully missed
+          el.className = "overdue";
+          el.style.display = "flex";
+          el.innerHTML = `<span class="remaining-icon">⚠️</span><span class="remaining-label">missed</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
+        }
+      } else if (minsAlreadyDone > 0) {
+        // Inside window, already did some work, currently on a break — show paused state
+        const dh = Math.floor(minsAlreadyDone / 60), dm = minsAlreadyDone % 60;
+        const doneStr = dh > 0 ? `${dh}h ${dm}m` : `${minsAlreadyDone}m`;
+        el.className = "on-track";
         el.style.display = "flex";
-        el.innerHTML = `<span class="remaining-icon">⚠️</span><span class="remaining-label">missed</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
+        el.innerHTML = `<span class="remaining-icon">⏸</span><span class="remaining-label">paused ·</span><span class="remaining-value">${doneStr} done</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">· ${timeStr} left</span>`;
       } else {
-        // Inside window but not started — show lateness
+        // Inside window, zero work done — show lateness
         const lateFmtH = Math.floor(minsLate / 60);
         const lateFmtM = minsLate % 60;
         const lateStr = lateFmtH > 0 ? `${lateFmtH}h ${lateFmtM}m` : `${minsLate}m`;
