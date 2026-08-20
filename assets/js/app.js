@@ -3070,9 +3070,52 @@ class UIManager {
     const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
     const label = (active.task.label || active.task.topic || "").replace(/^[A-Z ]+:\s*/, "").slice(0, 28);
 
-    el.className = minsLeft <= 0 ? "overdue" : "";
-    el.style.display = "flex";
-    el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>`;
+    // --- Lateness logic ---
+    const win = active.task.win;
+    const wStartH = Array.isArray(win) ? win[0] : null;
+    const minsLate = wStartH !== null ? Math.max(0, Math.round((nowH - wStartH) * 60)) : 0;
+
+    // Check if the stopwatch is currently running (any task active)
+    const isRunning = this.app.stopwatch?.isRunning ?? false;
+    const activeTaskStartTime = this.app.state?.activeTask?.startTime ?? null;
+
+    if (!isRunning) {
+      // Not started yet — show how late we are to begin
+      if (minsLeft <= 0) {
+        // Window ended without starting
+        el.className = "overdue";
+        el.style.display = "flex";
+        el.innerHTML = `<span class="remaining-icon">⚠️</span><span class="remaining-label">missed</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
+      } else {
+        // Inside window but not started — show lateness
+        const lateFmtH = Math.floor(minsLate / 60);
+        const lateFmtM = minsLate % 60;
+        const lateStr = lateFmtH > 0 ? `${lateFmtH}h ${lateFmtM}m` : `${minsLate}m`;
+        el.className = minsLate >= 5 ? "late" : "on-track";
+        el.style.display = "flex";
+        if (minsLate >= 5) {
+          el.innerHTML = `<span class="remaining-icon">🔴</span><span class="remaining-label">late by</span><span class="remaining-value">${lateStr}</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
+        } else {
+          el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>`;
+        }
+      }
+    } else {
+      // Running — show time left, with optional late-start badge if they started after window began
+      let lateBadge = "";
+      if (wStartH !== null && activeTaskStartTime) {
+        const actualStartH = new Date(activeTaskStartTime).getHours() + new Date(activeTaskStartTime).getMinutes() / 60;
+        const startedLateBy = Math.round((actualStartH - wStartH) * 60);
+        if (startedLateBy >= 5) {
+          const slh = Math.floor(startedLateBy / 60);
+          const slm = startedLateBy % 60;
+          const slStr = slh > 0 ? `${slh}h ${slm}m` : `${startedLateBy}m`;
+          lateBadge = ` <span class="late-start-badge">+${slStr} late start</span>`;
+        }
+      }
+      el.className = minsLeft <= 0 ? "overdue" : "on-track";
+      el.style.display = "flex";
+      el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>${lateBadge}`;
+    }
   }
   startMotivationRotation() {
     this.updateMotivation();
