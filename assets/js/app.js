@@ -3138,10 +3138,17 @@ class UIManager {
       }
     } else {
       // Stopwatch RUNNING — show time left in window
-      // Only show "late start" if this is truly the first session (no prior logged work in window)
+      const currentSessionMins = activeTaskStartTime
+        ? Math.round((Date.now() - activeTaskStartTime) / 60000) : 0;
+      const totalWorkedMins = minsAlreadyDone + currentSessionMins;
+      const timeElapsedInWindow = wStartH !== null
+        ? Math.max(0, Math.round((nowH - wStartH) * 60)) : 0;
+      const idleWasted = Math.max(0, timeElapsedInWindow - totalWorkedMins);
+
+      // Build badges
       let lateBadge = "";
       if (minsAlreadyDone === 0 && wStartH !== null && activeTaskStartTime) {
-        // First and only session — check if they started late
+        // First/only session — show if started late
         const actualStartH = new Date(activeTaskStartTime).getHours() + new Date(activeTaskStartTime).getMinutes() / 60;
         const startedLateBy = Math.round((actualStartH - wStartH) * 60);
         if (startedLateBy >= 5) {
@@ -3151,14 +3158,23 @@ class UIManager {
           lateBadge = ` <span class="late-start-badge">+${slStr} late start</span>`;
         }
       } else if (minsAlreadyDone > 0) {
-        // Returning session — show how much was already done in this window
+        // Returning session — show prior work done
         const dh = Math.floor(minsAlreadyDone / 60), dm = minsAlreadyDone % 60;
         const doneStr = dh > 0 ? `${dh}h ${dm}m` : `${minsAlreadyDone}m`;
         lateBadge = ` <span class="late-start-badge" style="color:#4caf82;background:rgba(76,175,130,0.1);border-color:rgba(76,175,130,0.3);">+${doneStr} prev</span>`;
       }
+
+      // Idle/wasted badge — time in this window that wasn't worked at all
+      let idleBadge = "";
+      if (idleWasted >= 5) {
+        const ih = Math.floor(idleWasted / 60), im = idleWasted % 60;
+        const idleStr = ih > 0 ? `${ih}h ${im}m` : `${idleWasted}m`;
+        idleBadge = ` <span class="late-start-badge" style="color:#ffc107;background:rgba(255,193,7,0.1);border-color:rgba(255,193,7,0.35);">~${idleStr} idle</span>`;
+      }
+
       el.className = minsLeft <= 0 ? "overdue" : "on-track";
       el.style.display = "flex";
-      el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>${lateBadge}`;
+      el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>${lateBadge}${idleBadge}`;
     }
   }
   startMotivationRotation() {
