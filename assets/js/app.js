@@ -3077,27 +3077,14 @@ class UIManager {
     const isRunning = this.app.stopwatch?.isRunning ?? false;
     const activeTaskStartTime = this.app.state?.activeTask?.startTime ?? null;
 
-    // --- Scan for already-logged time in this window (split/multi-session) ---
-    // Runs for BOTH running and idle states so both branches share this info.
+    // --- Count already-logged time for THIS specific topic (subject-aware) ---
+    // Uses getTopicProgress() so only GK logs count for GK window, etc.
     let minsAlreadyDone = 0;
-    if (wStartH !== null && this.app.state?.tasks) {
+    const activeTopic = active.task.topic || "";
+    if (activeTopic && this.app.trainerEngine?.getTopicProgress) {
       const today = this.app.getDateString(now);
-      const wStartMs = new Date(now);
-      wStartMs.setHours(Math.floor(wStartH), Math.round((wStartH % 1) * 60), 0, 0);
-      const wEndMs = new Date(now);
-      wEndMs.setHours(Math.floor(active.wEnd), Math.round((active.wEnd % 1) * 60), 0, 0);
-      const wStartTime = wStartMs.getTime();
-      const wEndTime = wEndMs.getTime();
-      this.app.state.tasks.forEach(t => {
-        if (t.date !== today) return;
-        const tStart = Number(t.startTime || 0);
-        const tEnd = Number(t.endTime || tStart);
-        if (tStart < wEndTime && tEnd > wStartTime) {
-          const overlapStart = Math.max(tStart, wStartTime);
-          const overlapEnd = Math.min(tEnd, wEndTime);
-          minsAlreadyDone += Math.round((overlapEnd - overlapStart) / 60000);
-        }
-      });
+      const progress = this.app.trainerEngine.getTopicProgress(activeTopic, today);
+      minsAlreadyDone = progress.minutes || 0;
     }
 
     if (!isRunning) {
