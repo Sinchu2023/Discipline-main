@@ -1305,9 +1305,7 @@ class DisciplineTracker {
       tasks: (this.loadFromStorage(CONFIG.STORAGE_KEYS.TASKS) || []).map(
         (t) => this.normalizeTask(t),
       ),
-      selectedTaskDate:
-        this.loadFromStorage("discipline_tracker_selected_task_date") ||
-        this.getDateString(),
+      selectedTaskDate: this.getDateString(), // always open on today
       favorites:
         this.loadFromStorage(CONFIG.STORAGE_KEYS.FAVORITES) || [],
       streak:
@@ -8330,7 +8328,7 @@ class GraphManager {
   getColorScheme() {
     return {
       border: "rgb(40, 180, 99)",
-      fill: "rgba(40, 180, 99, 0.16)",
+      fill: "rgba(40, 180, 99, 0.22)",
     };
   }
 
@@ -8393,10 +8391,11 @@ class GraphManager {
         interaction: { mode: "nearest", intersect: false, axis: "x" },
         elements: {
           point: {
-            radius: 0,
-            hoverRadius: 0,
+            radius: 3.5,
+            hoverRadius: 6,
             pointStyle: "circle",
-            hoverBorderWidth: 2,
+            hoverBorderWidth: 2.5,
+            borderWidth: 1.5,
           },
           line: { tension: 0.34, borderWidth: 2.5 },
         },
@@ -8489,6 +8488,8 @@ class GraphManager {
 
     const colors = this.getColorScheme();
     const isLongRange = range === "1y";
+    const pointR = isLongRange ? 0 : 3.5;
+    const pointHoverR = isLongRange ? 0 : 6;
     return {
       labels,
       datasets: [
@@ -8498,9 +8499,10 @@ class GraphManager {
           borderColor: colors.border,
           backgroundColor: colors.fill,
           pointBackgroundColor: colors.border,
-          pointRadius: 0,
-          pointHoverRadius: 0,
+          pointRadius: pointR,
+          pointHoverRadius: pointHoverR,
           pointBorderColor: colors.border,
+          pointBorderWidth: 1.5,
           borderWidth: isLongRange ? 2 : 2.5,
           tension: isLongRange ? 0.22 : 0.34,
           fill: true,
@@ -8509,15 +8511,16 @@ class GraphManager {
           label: this.getShadowDatasetLabel(range),
           data: shadowData,
           borderColor: "rgb(0, 140, 255)",
-          backgroundColor: "rgba(0, 140, 255, 0.14)",
+          backgroundColor: "rgba(0, 140, 255, 0.0)",
           pointBackgroundColor: "rgb(0, 140, 255)",
           pointRadius: 0,
-          pointHoverRadius: 0,
+          pointHoverRadius: 4,
           pointBorderColor: "rgb(0, 140, 255)",
           borderWidth: isLongRange ? 1.8 : 2,
           tension: isLongRange ? 0.14 : 0.2,
           fill: false,
           borderDash: [7, 5],
+          spanGaps: false,
         },
       ],
     };
@@ -8745,9 +8748,17 @@ class GraphManager {
       rangeDates[0],
       rangeDates[rangeDates.length - 1],
     );
-    const shadowHours = rangeDates.map((dateStr) =>
-      parseFloat((((rollingShadowMap.get(dateStr) || 0) / 60)).toFixed(2)),
-    );
+    const firstProductiveDate = this.getFirstProductiveDate();
+    const shadowHours = rangeDates.map((dateStr) => {
+      // Return null for dates before any productive data so the
+      // shadow line doesn't appear as a false flatline at zero.
+      if (this.isBeforeFirstProductiveDate(dateStr, firstProductiveDate)) {
+        return null;
+      }
+      const rawMinutes = rollingShadowMap.get(dateStr);
+      if (rawMinutes == null) return null;
+      return parseFloat((rawMinutes / 60).toFixed(2));
+    });
 
     return shadowHours;
   }
