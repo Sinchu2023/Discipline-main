@@ -3299,20 +3299,6 @@ class UIManager {
           <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Productive Work Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div></details>
           <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Mission Progress</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Mission Topic</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Tracked Time</th></tr></thead><tbody>${missionBreak}</tbody></table></div></details>
           <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Physical Training Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div></details>
-          <!-- Master's Message -->
-          <div class="master-msg-card" id="master-msg-card">
-            <div class="master-msg-header">
-              <div class="master-msg-identity">
-                <div class="master-msg-avatar">⚔️</div>
-                <div>
-                  <div class="master-msg-name">Shadow Master</div>
-                  <div class="master-msg-status"><span class="master-online-dot"></span> Online now</div>
-                </div>
-              </div>
-              <div class="master-msg-time" id="master-msg-time"></div>
-            </div>
-            <div class="master-msg-bubbles" id="master-msg-bubbles"></div>
-          </div>
           <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Daily Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
     this.app.elements["report-modal"].style.display = "flex";
   }
