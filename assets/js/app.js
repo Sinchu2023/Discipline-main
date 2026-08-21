@@ -1890,6 +1890,8 @@ class DisciplineTracker {
     this.flowEngine.initialize();
     this.graphManager.initialize();
     this.eventManager.initialize();
+    this.masterMessage = new MasterMessageManager(this);
+    this.masterMessage.initialize();
     this.startDayBoundaryWatcher();
     this.updateStreak();
     if (this.state.activeTask)
@@ -3297,6 +3299,20 @@ class UIManager {
           <details style="margin-top:1rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Productive Work Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${prodBreak}</tbody></table></div></details>
           <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Mission Progress</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Mission Topic</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Tracked Time</th></tr></thead><tbody>${missionBreak}</tbody></table></div></details>
           <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Physical Training Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Subcategory</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Duration</th></tr></thead><tbody>${trainBreak}</tbody></table></div></details>
+          <!-- Master's Message -->
+          <div class="master-msg-card" id="master-msg-card">
+            <div class="master-msg-header">
+              <div class="master-msg-identity">
+                <div class="master-msg-avatar">⚔️</div>
+                <div>
+                  <div class="master-msg-name">Shadow Master</div>
+                  <div class="master-msg-status"><span class="master-online-dot"></span> Online now</div>
+                </div>
+              </div>
+              <div class="master-msg-time" id="master-msg-time"></div>
+            </div>
+            <div class="master-msg-bubbles" id="master-msg-bubbles"></div>
+          </div>
           <details style="margin-top:0.8rem;"><summary style="cursor:pointer;font-weight:700;color:var(--text-accent);">Daily Breakdown</summary><div style="overflow-x:auto;margin-top:0.65rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background: rgba(30, 30, 30, 0.8);"><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Date</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Productive</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Sleep</th><th style="padding:0.75rem;text-align:left;border-bottom:1px solid var(--border);">Total Waste</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
     this.app.elements["report-modal"].style.display = "flex";
   }
@@ -10310,6 +10326,173 @@ class ExcelReportGenerator {
   }
 }
 
+// ─── Master's Message ────────────────────────────────────────────────────────
+class MasterMessageManager {
+  constructor(app) {
+    this.app = app;
+    this.refreshInterval = null;
+    // Timetable slots — matches your Master Study Pipeline
+    this.SLOTS = [
+      { name: "Morning Study",    start: [5, 30],  end: [8, 30]  },
+      { name: "Midday Block",     start: [9, 0],   end: [12, 0]  },
+      { name: "Afternoon Block",  start: [14, 0],  end: [17, 30] },
+      { name: "Evening Revision", start: [19, 0],  end: [21, 0]  },
+    ];
+  }
+
+  initialize() {
+    this.render();
+    // Refresh every 5 minutes automatically
+    this.refreshInterval = setInterval(() => this.render(), 5 * 60 * 1000);
+  }
+
+  fmt(minutes) {
+    return this.app.formatDuration(Math.max(0, Math.round(Number(minutes) || 0)));
+  }
+
+  toTotalMins(h, m) { return h * 60 + m; }
+
+  getCurrentSlot(nowMins) {
+    return this.SLOTS.find(s =>
+      nowMins >= this.toTotalMins(...s.start) && nowMins < this.toTotalMins(...s.end)
+    ) || null;
+  }
+
+  getNextSlot(nowMins) {
+    return this.SLOTS.find(s => this.toTotalMins(...s.start) > nowMins) || null;
+  }
+
+  // Compose messages purely from live data — no preset strings
+  composeMessages() {
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    const todayStr = this.app.getDateString();
+    const yd = new Date(now); yd.setDate(yd.getDate() - 1);
+    const ydStr = this.app.getDateString(yd);
+
+    const shadowTarget = Math.round(Number(this.app.shadowEngine?.shadowSevenDayAverage || 0));
+    const todayMins = this.app.getProductiveMinutesForDate(todayStr, this.app.state.tasks);
+    const ydMins    = this.app.getProductiveMinutesForDate(ydStr, this.app.state.tasks);
+    const remaining = Math.max(0, shadowTarget - todayMins);
+
+    const currentSlot = this.getCurrentSlot(nowMins);
+    const nextSlot    = this.getNextSlot(nowMins);
+
+    const msgs = [];
+
+    // ── Line 1: Yesterday, raw and specific ──────────────────────────────────
+    if (ydMins === 0) {
+      msgs.push("Yesterday was a zero. That is already locked in the record. It does not change.");
+    } else if (ydMins < 60) {
+      msgs.push(`Yesterday you logged ${this.fmt(ydMins)}. That is less than one hour. Your shadow noticed.`);
+    } else if (ydMins < shadowTarget * 0.8) {
+      msgs.push(`Yesterday you logged ${this.fmt(ydMins)}. You needed ${this.fmt(shadowTarget)} and you fell short.`);
+    } else if (ydMins >= shadowTarget) {
+      msgs.push(`Yesterday you put in ${this.fmt(ydMins)} and crossed your shadow target of ${this.fmt(shadowTarget)}. That was a win.`);
+    } else {
+      msgs.push(`Yesterday you logged ${this.fmt(ydMins)}.`);
+    }
+
+    // ── Line 2: Today's shadow target vs progress ────────────────────────────
+    if (shadowTarget === 0) {
+      msgs.push("Your shadow target is not set yet. Start logging work so the system has something to track.");
+    } else if (todayMins === 0 && now.getHours() >= 6) {
+      msgs.push(`Today your shadow is asking for ${this.fmt(shadowTarget)}. You have not started the timer yet.`);
+    } else if (todayMins === 0) {
+      msgs.push(`Shadow target today is ${this.fmt(shadowTarget)}. The day is just beginning.`);
+    } else if (remaining > 0) {
+      const pct = Math.round((todayMins / shadowTarget) * 100);
+      msgs.push(`You have logged ${this.fmt(todayMins)} today — ${pct}% of your shadow target. ${this.fmt(remaining)} still left to beat it.`);
+    } else {
+      msgs.push(`Shadow target of ${this.fmt(shadowTarget)} is already beaten today. You have logged ${this.fmt(todayMins)}.`);
+    }
+
+    // ── Line 3: Slot urgency — exact numbers, no vague words ────────────────
+    if (currentSlot && remaining > 0) {
+      const slotEndMins = this.toTotalMins(...currentSlot.end);
+      const minsLeft = slotEndMins - nowMins;
+      if (minsLeft <= 20) {
+        msgs.push(`${currentSlot.name} has ${minsLeft} minutes left and you still need ${this.fmt(remaining)}. Start the timer right now.`);
+      } else {
+        msgs.push(`You are inside the ${currentSlot.name} slot. ${minsLeft} minutes remain in this slot. You need ${this.fmt(remaining)} more. Open the timer.`);
+      }
+    } else if (currentSlot && remaining === 0) {
+      msgs.push(`You are inside ${currentSlot.name} and your shadow is already beaten. Use this time to push further or protect recovery.`);
+    } else if (!currentSlot && nextSlot) {
+      const minsUntil = this.toTotalMins(...nextSlot.start) - nowMins;
+      if (remaining > 0) {
+        if (minsUntil <= 15) {
+          msgs.push(`${nextSlot.name} slot starts in ${minsUntil} minutes. Be ready to go the moment it opens.`);
+        } else {
+          msgs.push(`No active slot right now. ${nextSlot.name} opens in ${minsUntil} minutes. You still need ${this.fmt(remaining)}.`);
+        }
+      } else {
+        msgs.push(`Shadow beaten. ${nextSlot.name} starts in ${minsUntil} minutes. You can recover or go further.`);
+      }
+    } else if (!currentSlot && !nextSlot) {
+      if (remaining > 0) {
+        msgs.push(`All timetable slots are done for today. You are still ${this.fmt(remaining)} short of your shadow. Decide now if you will close that gap.`);
+      } else {
+        msgs.push(`All slots done. Shadow beaten. Protect your sleep time and set up tomorrow before you close the app.`);
+      }
+    }
+
+    // ── Line 4: Rank / Training Camp status ─────────────────────────────────
+    const rankProgress = this.app.shadowEngine?.getRankProgressState?.();
+    const rankTiers    = this.app.shadowEngine?.rankTiers || [];
+    if (rankProgress && rankTiers.length) {
+      const rank = rankTiers[rankProgress.unlockedRankIndex] || rankTiers[0];
+      const camp = rankProgress.trainingCamp;
+      if (camp?.active) {
+        const provRank = rankTiers[camp.provisionalRankIndex];
+        msgs.push(`Training Camp for ${provRank?.title || 'next rank'} is active — day ${camp.daysCompleted} of 10, ${camp.successDays} cleared. You need ${this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7} to confirm.`);
+      } else if (rank) {
+        const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
+        if (nextRank && shadowTarget > 0) {
+          msgs.push(`Current rank: ${rank.title}. Next is ${nextRank.title} — keep your shadow rating above ${nextRank.min} consistently to enter Training Camp.`);
+        }
+      }
+    }
+
+    return msgs;
+  }
+
+  render() {
+    const bubblesEl = document.getElementById("master-msg-bubbles");
+    const timeEl    = document.getElementById("master-msg-time");
+    if (!bubblesEl) return;
+
+    if (timeEl) {
+      timeEl.textContent = new Date().toLocaleTimeString("en-IN", {
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      });
+    }
+
+    bubblesEl.innerHTML = "";
+    const messages = this.composeMessages();
+
+    messages.forEach((msg, i) => {
+      // Show typing indicator, then replace with real bubble
+      setTimeout(() => {
+        const typing = document.createElement("div");
+        typing.className = "master-typing";
+        typing.innerHTML = "<span></span><span></span><span></span>";
+        bubblesEl.appendChild(typing);
+
+        setTimeout(() => {
+          typing.remove();
+          const bubble = document.createElement("div");
+          bubble.className = "master-bubble";
+          bubble.textContent = msg;
+          bubblesEl.appendChild(bubble);
+        }, 900);
+      }, i * 1600);
+    });
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 window.classifyActivity = (userInput) =>
   ActivityClassifier.classify(userInput);
 window.app = new DisciplineTracker();
@@ -10325,6 +10508,7 @@ document.addEventListener("visibilitychange", () => {
     if (window.app.trainerEngine)
       window.app.trainerEngine.syncMissionFromRoadmap({ rebuild: true });
     if (window.app.flowEngine) window.app.flowEngine.refresh();
+    if (window.app.masterMessage) window.app.masterMessage.render();
   }
 });
 window.addEventListener("beforeunload", () => {
