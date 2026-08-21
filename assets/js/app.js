@@ -8391,11 +8391,10 @@ class GraphManager {
         interaction: { mode: "nearest", intersect: false, axis: "x" },
         elements: {
           point: {
-            radius: 3.5,
-            hoverRadius: 6,
+            radius: 0,
+            hoverRadius: 0,
             pointStyle: "circle",
-            hoverBorderWidth: 2.5,
-            borderWidth: 1.5,
+            hoverBorderWidth: 2,
           },
           line: { tension: 0.34, borderWidth: 2.5 },
         },
@@ -8488,8 +8487,6 @@ class GraphManager {
 
     const colors = this.getColorScheme();
     const isLongRange = range === "1y";
-    const pointR = isLongRange ? 0 : 3.5;
-    const pointHoverR = isLongRange ? 0 : 6;
     return {
       labels,
       datasets: [
@@ -8499,10 +8496,9 @@ class GraphManager {
           borderColor: colors.border,
           backgroundColor: colors.fill,
           pointBackgroundColor: colors.border,
-          pointRadius: pointR,
-          pointHoverRadius: pointHoverR,
+          pointRadius: 0,
+          pointHoverRadius: 0,
           pointBorderColor: colors.border,
-          pointBorderWidth: 1.5,
           borderWidth: isLongRange ? 2 : 2.5,
           tension: isLongRange ? 0.22 : 0.34,
           fill: true,
