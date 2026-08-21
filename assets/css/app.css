@@ -291,69 +291,84 @@
       #task-remaining {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 5px;
         font-size: 0.78rem;
         font-weight: 500;
-        color: rgba(160, 160, 168, 0.85);
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 8px;
-        padding: 4px 11px;
+        color: rgba(235, 235, 245, 0.9);
+        padding: 2px 4px;
         letter-spacing: 0.2px;
         user-select: none;
-        transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+        transition: color 0.35s ease;
       }
       #task-remaining .remaining-icon {
         font-size: 0.72rem;
-        opacity: 0.7;
+        opacity: 0.85;
       }
       #task-remaining .remaining-label {
-        opacity: 0.6;
+        color: rgba(210, 210, 225, 0.7);
         font-size: 0.72rem;
       }
       #task-remaining .remaining-value {
         font-family: "Courier New", monospace;
-        font-size: 0.82rem;
-        color: rgba(200, 200, 210, 0.85);
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: #e8e8f0;
+      }
+      /* Separator dot between late-by and left */
+      #task-remaining .remaining-sep {
+        color: rgba(255,255,255,0.25);
+        font-size: 0.8rem;
+        line-height: 1;
+      }
+      #task-remaining .remaining-sep.overdue-sep {
+        color: rgba(255, 80, 80, 0.4);
+      }
+      /* Remaining-left portion (time left in window) */
+      #task-remaining .remaining-left {
+        font-family: "Courier New", monospace;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: rgba(210, 210, 225, 0.65);
+      }
+      #task-remaining .remaining-left.overdue-left {
+        color: rgba(255, 80, 80, 0.7);
+        font-size: 0.72rem;
       }
       /* Active window - on track */
-      #task-remaining.on-track {
-        background: rgba(0, 123, 255, 0.08);
-        border-color: rgba(0, 123, 255, 0.25);
-      }
       #task-remaining.on-track .remaining-value {
-        color: #60aaff;
+        color: #7bbfff;
+      }
+      #task-remaining.on-track .remaining-label {
+        color: rgba(120, 180, 255, 0.75);
       }
       /* Late state — not yet started the current window */
       #task-remaining.late {
-        background: rgba(255, 100, 30, 0.1);
-        border-color: rgba(255, 110, 30, 0.45);
-        box-shadow: 0 0 10px rgba(255, 100, 30, 0.12);
-        animation: late-pulse 2s ease-in-out infinite;
+        animation: late-pulse-text 2s ease-in-out infinite;
       }
       #task-remaining.late .remaining-icon { opacity: 1; }
       #task-remaining.late .remaining-label {
-        color: #ff9050;
-        opacity: 0.9;
+        color: rgba(255, 170, 100, 0.95);
       }
       #task-remaining.late .remaining-value {
-        color: #ff6b1a;
-        font-weight: 700;
-        font-size: 0.86rem;
+        color: #ff7a2a;
+        font-weight: 800;
+        font-size: 0.88rem;
+        text-shadow: 0 0 8px rgba(255, 110, 30, 0.5);
       }
-      @keyframes late-pulse {
-        0%, 100% { box-shadow: 0 0 8px rgba(255, 100, 30, 0.12); }
-        50%       { box-shadow: 0 0 16px rgba(255, 100, 30, 0.32); }
+      #task-remaining.late .remaining-left {
+        color: rgba(255, 200, 150, 0.6);
+      }
+      #task-remaining.late .remaining-sep {
+        color: rgba(255, 120, 50, 0.35);
+      }
+      @keyframes late-pulse-text {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.7; }
       }
       /* Overdue (window ended) */
-      #task-remaining.overdue {
-        color: rgba(220, 80, 80, 0.9);
-        border-color: rgba(220, 80, 80, 0.25);
-        background: rgba(220, 60, 60, 0.07);
-      }
       #task-remaining.overdue .remaining-value {
-        color: #f55;
-        font-weight: 700;
+        color: #ff5050;
+        font-weight: 800;
       }
       /* Inline late-start badge shown after "left" text */
       .late-start-badge {
@@ -362,9 +377,9 @@
         gap: 3px;
         font-size: 0.7rem;
         font-weight: 600;
-        color: #ff7b35;
-        background: rgba(255, 110, 30, 0.12);
-        border: 1px solid rgba(255, 110, 30, 0.3);
+        color: #ff8844;
+        background: rgba(200, 80, 0, 0.15);
+        border: 1px solid rgba(255, 110, 30, 0.35);
         border-radius: 5px;
         padding: 1px 6px;
         margin-left: 4px;

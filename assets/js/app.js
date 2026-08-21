@@ -3118,9 +3118,10 @@ class UIManager {
         el.className = minsLate >= 5 ? "late" : "on-track";
         el.style.display = "flex";
         if (minsLate >= 5) {
-          el.innerHTML = `<span class="remaining-icon">🔴</span><span class="remaining-label">late by</span><span class="remaining-value">${lateStr}</span><span class="remaining-label" style="opacity:0.45;margin-left:2px">— ${label}</span>`;
+          const leftPart = minsLeft > 0 ? ` · <span class="remaining-left">${timeStr} left</span>` : ``;
+          el.innerHTML = `<span class="remaining-icon">🔴</span> <span class="remaining-value">${lateStr} late</span>${leftPart} <span class="remaining-label">— ${label}</span>`;
         } else {
-          el.innerHTML = `<span class="remaining-icon">⏱</span><span class="remaining-label">left</span><span class="remaining-value">${timeStr}</span><span class="remaining-label" style="opacity:0.4;margin-left:2px">— ${label}</span>`;
+          el.innerHTML = `<span class="remaining-icon">⏱</span> <span class="remaining-value">${timeStr}</span> <span class="remaining-label">— ${label}</span>`;
         }
       }
     } else {
