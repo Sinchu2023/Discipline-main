@@ -1892,6 +1892,10 @@ class DisciplineTracker {
     this.eventManager.initialize();
     this.masterMessage = new MasterMessageManager(this);
     this.masterMessage.initialize();
+    const beatRecordBtn = document.getElementById("master-beat-record-btn");
+    if (beatRecordBtn) {
+      beatRecordBtn.addEventListener("click", () => this.masterMessage.startRecordChallenge());
+    }
     this.startDayBoundaryWatcher();
     this.updateStreak();
     if (this.state.activeTask)
@@ -10316,8 +10320,9 @@ class ExcelReportGenerator {
 class MasterMessageManager {
   constructor(app) {
     this.app = app;
-    this.refreshInterval = null;
-    // Timetable slots — matches your Master Study Pipeline
+    this._renderVersion = 0;
+    this._msgCyclePos   = 0;
+    this.RECORD_CHALLENGE_KEY = "discipline_tracker_record_challenge";
     this.SLOTS = [
       { name: "Morning Study",    start: [5, 30],  end: [8, 30]  },
       { name: "Midday Block",     start: [9, 0],   end: [12, 0]  },
@@ -10328,8 +10333,7 @@ class MasterMessageManager {
 
   initialize() {
     this.render();
-    // Refresh every 5 minutes automatically
-    this.refreshInterval = setInterval(() => this.render(), 5 * 60 * 1000);
+    setInterval(() => this.render(), 5 * 60 * 1000);
   }
 
   fmt(minutes) {
@@ -10348,96 +10352,278 @@ class MasterMessageManager {
     return this.SLOTS.find(s => this.toTotalMins(...s.start) > nowMins) || null;
   }
 
-  // Compose messages purely from live data — no preset strings
-  composeMessages() {
-    const now = new Date();
-    const nowMins = now.getHours() * 60 + now.getMinutes();
+  // ── Personal best: highest productive day ever ────────────────────────────
+  getPersonalBest() {
+    const tasks = this.app.state?.tasks || [];
+    if (!tasks.length) return 0;
+    const byDate = {};
+    tasks.forEach(t => {
+      if (!t.date || !this.app.isProductiveCategory?.(t.category)) return;
+      if (!this.app.isTaskAfterStatsReset?.(t)) return;
+      byDate[t.date] = (byDate[t.date] || 0) + (t.duration || 0);
+    });
+    const vals = Object.values(byDate);
+    return vals.length ? Math.max(...vals) : 0;
+  }
 
-    const todayStr = this.app.getDateString();
-    const yd = new Date(now); yd.setDate(yd.getDate() - 1);
-    const ydStr = this.app.getDateString(yd);
+  // ── 3-day record challenge ─────────────────────────────────────────────────
+  getRecordChallenge() {
+    try {
+      const raw = localStorage.getItem(this.RECORD_CHALLENGE_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (new Date() > new Date(c.endDate)) {
+        localStorage.removeItem(this.RECORD_CHALLENGE_KEY);
+        return null;
+      }
+      return c;
+    } catch { return null; }
+  }
+
+  startRecordChallenge() {
+    const best = this.getPersonalBest();
+    if (best === 0) {
+      alert("No study data found yet. Log some sessions first so the system has your baseline.");
+      return;
+    }
+    const start = new Date();
+    const end   = new Date(start);
+    end.setDate(end.getDate() + 3);
+    const challenge = {
+      targetMins:   best,
+      startDate:    start.toISOString(),
+      endDate:      end.toISOString(),
+      startDateStr: this.app.getDateString(start),
+    };
+    localStorage.setItem(this.RECORD_CHALLENGE_KEY, JSON.stringify(challenge));
+    this.render();
+  }
+
+  // ── Momentum: 3-day trend ─────────────────────────────────────────────────
+  getMomentum() {
+    const now   = new Date();
+    const tasks = this.app.state?.tasks || [];
+    const mins  = [];
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      mins.push(this.app.getProductiveMinutesForDate(this.app.getDateString(d), tasks));
+    }
+    const trending  = mins[0] >= mins[1] && mins[1] >= mins[2];
+    const dropping  = mins[0] <= mins[1] && mins[1] <= mins[2];
+    const allNonZero = mins.every(v => v > 0);
+    return { mins, trending, dropping, allNonZero };
+  }
+
+  // ── Pick one phrase from a pool, rotating to avoid repetition ────────────
+  pick(pool) {
+    const idx = this._msgCyclePos % pool.length;
+    this._msgCyclePos++;
+    return pool[idx];
+  }
+
+  // ── Compose messages: varied, data-driven, never a duplicate run ──────────
+  composeMessages() {
+    const now      = new Date();
+    const nowMins  = now.getHours() * 60 + now.getMinutes();
+    const hour     = now.getHours();
+    const dow      = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][now.getDay()];
+
+    const todayStr     = this.app.getDateString();
+    const yd           = new Date(now); yd.setDate(yd.getDate() - 1);
+    const ydStr        = this.app.getDateString(yd);
 
     const shadowTarget = Math.round(Number(this.app.shadowEngine?.shadowSevenDayAverage || 0));
-    const todayMins = this.app.getProductiveMinutesForDate(todayStr, this.app.state.tasks);
-    const ydMins    = this.app.getProductiveMinutesForDate(ydStr, this.app.state.tasks);
-    const remaining = Math.max(0, shadowTarget - todayMins);
+    const todayMins    = this.app.getProductiveMinutesForDate(todayStr, this.app.state.tasks);
+    const ydMins       = this.app.getProductiveMinutesForDate(ydStr,    this.app.state.tasks);
+    const remaining    = Math.max(0, shadowTarget - todayMins);
+    const personalBest = this.getPersonalBest();
+    const challenge    = this.getRecordChallenge();
+    const momentum     = this.getMomentum();
 
-    const currentSlot = this.getCurrentSlot(nowMins);
-    const nextSlot    = this.getNextSlot(nowMins);
+    const currentSlot  = this.getCurrentSlot(nowMins);
+    const nextSlot     = this.getNextSlot(nowMins);
 
     const msgs = [];
 
-    // ── Line 1: Yesterday, raw and specific ──────────────────────────────────
-    if (ydMins === 0) {
-      msgs.push("Yesterday was a zero. That is already locked in the record. It does not change.");
+    // ── Line 1: Record challenge (if active) OR yesterday summary ─────────
+    if (challenge) {
+      const gapToRecord   = Math.max(0, challenge.targetMins - todayMins);
+      const daysSinceStart = Math.floor((now - new Date(challenge.startDate)) / 86400000) + 1;
+      const daysLeft       = Math.ceil((new Date(challenge.endDate) - now) / 86400000);
+      if (gapToRecord === 0) {
+        msgs.push(this.pick([
+          `Record BROKEN. ${this.fmt(todayMins)} logged. That is your new personal best.`,
+          `You just crossed ${this.fmt(challenge.targetMins)}. New ceiling set. The old record is gone.`,
+          `${this.fmt(todayMins)} today. Record destroyed. Push further while the session is open.`,
+        ]));
+      } else if (gapToRecord <= 30) {
+        msgs.push(this.pick([
+          `${this.fmt(gapToRecord)} away from breaking your all-time record of ${this.fmt(challenge.targetMins)}. One push closes it.`,
+          `You are ${this.fmt(gapToRecord)} short of your record. This is the window. Do not close the timer.`,
+          `Record in reach — ${this.fmt(gapToRecord)} to go. ${this.fmt(todayMins)} already logged today.`,
+        ]));
+      } else {
+        msgs.push(this.pick([
+          `Day ${daysSinceStart} of your record chase. Target: ${this.fmt(challenge.targetMins)}. Gap today: ${this.fmt(gapToRecord)}.`,
+          `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left to beat your record of ${this.fmt(challenge.targetMins)}. ${this.fmt(todayMins)} so far today.`,
+          `Your all-time best is ${this.fmt(challenge.targetMins)}. ${this.fmt(gapToRecord)} still needed today to crack it.`,
+        ]));
+      }
+    } else if (ydMins === 0) {
+      msgs.push(this.pick([
+        "Yesterday was a zero. That is locked in the record. It does not change.",
+        "Zero hours logged yesterday. Today is the only day left you can write on.",
+        "Yesterday: zero. The log does not lie. Focus on what you do today.",
+      ]));
     } else if (ydMins < 60) {
-      msgs.push(`Yesterday you logged ${this.fmt(ydMins)}. That is less than one hour. Your shadow noticed.`);
-    } else if (ydMins < shadowTarget * 0.8) {
-      msgs.push(`Yesterday you logged ${this.fmt(ydMins)}. You needed ${this.fmt(shadowTarget)} and you fell short.`);
-    } else if (ydMins >= shadowTarget) {
-      msgs.push(`Yesterday you put in ${this.fmt(ydMins)} and crossed your shadow target of ${this.fmt(shadowTarget)}. That was a win.`);
+      msgs.push(this.pick([
+        `Yesterday you logged ${this.fmt(ydMins)}. That is less than one hour. Your shadow noticed.`,
+        `${this.fmt(ydMins)} yesterday. Below one hour. That is a token effort, not a study day.`,
+        `Yesterday: ${this.fmt(ydMins)}. Under 60 minutes. The 7-day average feels every weak day.`,
+      ]));
+    } else if (shadowTarget > 0 && ydMins < shadowTarget * 0.8) {
+      msgs.push(this.pick([
+        `Yesterday you logged ${this.fmt(ydMins)}. You needed ${this.fmt(shadowTarget)} and fell short.`,
+        `${this.fmt(ydMins)} yesterday — shadow target was ${this.fmt(shadowTarget)}. That deficit carries forward.`,
+        `Yesterday: ${this.fmt(ydMins)} vs a shadow of ${this.fmt(shadowTarget)}. The gap is still there.`,
+      ]));
+    } else if (shadowTarget > 0 && ydMins >= shadowTarget) {
+      msgs.push(this.pick([
+        `Yesterday you put in ${this.fmt(ydMins)} and crossed your shadow target of ${this.fmt(shadowTarget)}. That was a win.`,
+        `${this.fmt(ydMins)} logged yesterday — shadow beaten. Now do it again.`,
+        `Good day yesterday: ${this.fmt(ydMins)} vs a target of ${this.fmt(shadowTarget)}. Keep the streak alive.`,
+      ]));
     } else {
-      msgs.push(`Yesterday you logged ${this.fmt(ydMins)}.`);
+      msgs.push(`Yesterday: ${this.fmt(ydMins)} logged.`);
     }
 
-    // ── Line 2: Today's shadow target vs progress ────────────────────────────
+    // ── Line 2: Today's shadow target vs progress ─────────────────────────
     if (shadowTarget === 0) {
-      msgs.push("Your shadow target is not set yet. Start logging work so the system has something to track.");
-    } else if (todayMins === 0 && now.getHours() >= 6) {
-      msgs.push(`Today your shadow is asking for ${this.fmt(shadowTarget)}. You have not started the timer yet.`);
+      msgs.push(this.pick([
+        "Your shadow target is not set yet. Start logging work so the system has something to track.",
+        "No shadow target yet. The system calibrates after you log consistent sessions.",
+      ]));
+    } else if (todayMins === 0 && hour >= 6) {
+      msgs.push(this.pick([
+        `Today your shadow is asking for ${this.fmt(shadowTarget)}. You have not started the timer yet.`,
+        `${this.fmt(shadowTarget)} is today's target. Clock is running. Timer is not.`,
+        `Shadow target: ${this.fmt(shadowTarget)}. Zero logged on ${dow}. Start the timer.`,
+      ]));
     } else if (todayMins === 0) {
-      msgs.push(`Shadow target today is ${this.fmt(shadowTarget)}. The day is just beginning.`);
+      msgs.push(this.pick([
+        `Shadow target today is ${this.fmt(shadowTarget)}. The day is just beginning.`,
+        `Target for today: ${this.fmt(shadowTarget)}. Full window ahead.`,
+      ]));
     } else if (remaining > 0) {
       const pct = Math.round((todayMins / shadowTarget) * 100);
-      msgs.push(`You have logged ${this.fmt(todayMins)} today — ${pct}% of your shadow target. ${this.fmt(remaining)} still left to beat it.`);
+      msgs.push(this.pick([
+        `You have logged ${this.fmt(todayMins)} today — ${pct}% of your shadow target. ${this.fmt(remaining)} still left to beat it.`,
+        `${this.fmt(todayMins)} in. ${pct}% done. ${this.fmt(remaining)} to go before the shadow falls.`,
+        `Today: ${this.fmt(todayMins)} logged, ${this.fmt(remaining)} away from your shadow. Keep the timer running.`,
+      ]));
     } else {
-      msgs.push(`Shadow target of ${this.fmt(shadowTarget)} is already beaten today. You have logged ${this.fmt(todayMins)}.`);
+      msgs.push(this.pick([
+        `Shadow target of ${this.fmt(shadowTarget)} is already beaten today. You have logged ${this.fmt(todayMins)}.`,
+        `Shadow beaten. ${this.fmt(todayMins)} logged — ${this.fmt(todayMins - shadowTarget)} above target. Every minute now is surplus.`,
+        `Done. ${this.fmt(todayMins)} vs a shadow of ${this.fmt(shadowTarget)}. Go further or protect your recovery.`,
+      ]));
     }
 
-    // ── Line 3: Slot urgency — exact numbers, no vague words ────────────────
+    // ── Line 3: Slot urgency ──────────────────────────────────────────────
     if (currentSlot && remaining > 0) {
       const slotEndMins = this.toTotalMins(...currentSlot.end);
-      const minsLeft = slotEndMins - nowMins;
+      const minsLeft    = slotEndMins - nowMins;
       if (minsLeft <= 20) {
-        msgs.push(`${currentSlot.name} has ${minsLeft} minutes left and you still need ${this.fmt(remaining)}. Start the timer right now.`);
+        msgs.push(this.pick([
+          `${currentSlot.name} has ${minsLeft} minutes left and you still need ${this.fmt(remaining)}. Start the timer right now.`,
+          `${minsLeft} minutes left in ${currentSlot.name}. ${this.fmt(remaining)} outstanding. Every second counts.`,
+        ]));
       } else {
-        msgs.push(`You are inside the ${currentSlot.name} slot. ${minsLeft} minutes remain in this slot. You need ${this.fmt(remaining)} more. Open the timer.`);
+        msgs.push(this.pick([
+          `You are inside the ${currentSlot.name} slot. ${minsLeft} minutes remain. You need ${this.fmt(remaining)} more. Open the timer.`,
+          `${currentSlot.name} is active — ${minsLeft} min left. Gap to close: ${this.fmt(remaining)}.`,
+          `${minsLeft} minutes in ${currentSlot.name}. You need ${this.fmt(remaining)} more. Use this slot fully.`,
+        ]));
       }
     } else if (currentSlot && remaining === 0) {
-      msgs.push(`You are inside ${currentSlot.name} and your shadow is already beaten. Use this time to push further or protect recovery.`);
+      msgs.push(this.pick([
+        `You are inside ${currentSlot.name} and your shadow is already beaten. Push further or protect recovery.`,
+        `Shadow done. ${currentSlot.name} is still open. Keep going or wind down intentionally.`,
+      ]));
     } else if (!currentSlot && nextSlot) {
       const minsUntil = this.toTotalMins(...nextSlot.start) - nowMins;
       if (remaining > 0) {
         if (minsUntil <= 15) {
-          msgs.push(`${nextSlot.name} slot starts in ${minsUntil} minutes. Be ready to go the moment it opens.`);
+          msgs.push(this.pick([
+            `${nextSlot.name} slot starts in ${minsUntil} minutes. Be ready the moment it opens.`,
+            `${minsUntil} minutes until ${nextSlot.name}. Prep now. Start at the bell.`,
+          ]));
         } else {
-          msgs.push(`No active slot right now. ${nextSlot.name} opens in ${minsUntil} minutes. You still need ${this.fmt(remaining)}.`);
+          msgs.push(this.pick([
+            `No active slot right now. ${nextSlot.name} opens in ${minsUntil} minutes. You still need ${this.fmt(remaining)}.`,
+            `Gap until ${nextSlot.name}: ${minsUntil} min. Outstanding: ${this.fmt(remaining)}. Plan what you will do the moment it opens.`,
+          ]));
         }
       } else {
-        msgs.push(`Shadow beaten. ${nextSlot.name} starts in ${minsUntil} minutes. You can recover or go further.`);
+        msgs.push(this.pick([
+          `Shadow beaten. ${nextSlot.name} starts in ${minsUntil} minutes. Recover or go further.`,
+          `Target done. ${minsUntil} minutes until ${nextSlot.name}. Use the break well.`,
+        ]));
       }
     } else if (!currentSlot && !nextSlot) {
       if (remaining > 0) {
-        msgs.push(`All timetable slots are done for today. You are still ${this.fmt(remaining)} short of your shadow. Decide now if you will close that gap.`);
+        msgs.push(this.pick([
+          `All timetable slots are done for today. Still ${this.fmt(remaining)} short of your shadow. Decide now if you close that gap.`,
+          `No more scheduled slots. ${this.fmt(remaining)} still outstanding. You have to make that time outside the plan.`,
+        ]));
       } else {
-        msgs.push(`All slots done. Shadow beaten. Protect your sleep time and set up tomorrow before you close the app.`);
+        msgs.push(this.pick([
+          `All slots done. Shadow beaten. Protect your sleep time and set up tomorrow before you close.`,
+          `Day is done. Target is beaten. Lock in the win and sleep on time.`,
+        ]));
       }
     }
 
-    // ── Line 4: Rank / Training Camp status ─────────────────────────────────
-    const rankProgress = this.app.shadowEngine?.getRankProgressState?.();
-    const rankTiers    = this.app.shadowEngine?.rankTiers || [];
-    if (rankProgress && rankTiers.length) {
-      const rank = rankTiers[rankProgress.unlockedRankIndex] || rankTiers[0];
-      const camp = rankProgress.trainingCamp;
-      if (camp?.active) {
-        const provRank = rankTiers[camp.provisionalRankIndex];
-        msgs.push(`Training Camp for ${provRank?.title || 'next rank'} is active — day ${camp.daysCompleted} of 10, ${camp.successDays} cleared. You need ${this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7} to confirm.`);
-      } else if (rank) {
-        const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
-        if (nextRank && shadowTarget > 0) {
-          msgs.push(`Current rank: ${rank.title}. Next is ${nextRank.title} — keep your shadow rating above ${nextRank.min} consistently to enter Training Camp.`);
+    // ── Line 4: Momentum OR Rank / Training Camp OR record nudge ─────────
+    if (momentum.allNonZero && momentum.trending) {
+      msgs.push(this.pick([
+        `Three-day run — ${this.fmt(momentum.mins[2])}, ${this.fmt(momentum.mins[1])}, ${this.fmt(momentum.mins[0])}. Upward momentum. Do not break it today.`,
+        `Your last 3 days are rising. ${this.fmt(momentum.mins[0])} yesterday. Keep the curve climbing.`,
+        `Momentum is positive. Each of the last 3 days stronger than the one before. Protect that.`,
+      ]));
+    } else if (momentum.allNonZero && momentum.dropping) {
+      msgs.push(this.pick([
+        `Output dropping — ${this.fmt(momentum.mins[2])}, ${this.fmt(momentum.mins[1])}, ${this.fmt(momentum.mins[0])}. Today reverses it or confirms a slide.`,
+        `Three declining days. The trend is moving against you. Today must be the floor, not the next step down.`,
+        `Sliding: ${this.fmt(momentum.mins[2])} → ${this.fmt(momentum.mins[1])} → ${this.fmt(momentum.mins[0])}. You know what needs to happen.`,
+      ]));
+    } else {
+      const rankProgress = this.app.shadowEngine?.getRankProgressState?.();
+      const rankTiers    = this.app.shadowEngine?.rankTiers || [];
+      if (rankProgress && rankTiers.length) {
+        const rank = rankTiers[rankProgress.unlockedRankIndex] || rankTiers[0];
+        const camp = rankProgress.trainingCamp;
+        if (camp?.active) {
+          const provRank = rankTiers[camp.provisionalRankIndex];
+          msgs.push(this.pick([
+            `Training Camp for ${provRank?.title || 'next rank'} is active — day ${camp.daysCompleted} of 10, ${camp.successDays} cleared. You need ${this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7} to confirm.`,
+            `Camp is live. ${camp.daysCompleted} days in, ${camp.successDays} wins. ${this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7} required to earn ${provRank?.title || 'the rank'}.`,
+          ]));
+        } else if (rank) {
+          const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
+          if (nextRank && shadowTarget > 0) {
+            msgs.push(this.pick([
+              `Current rank: ${rank.title}. Next is ${nextRank.title} — keep shadow rating above ${nextRank.min} consistently to enter Training Camp.`,
+              `${rank.title} is your floor. ${nextRank.title} is the ceiling to break. Stay above ${nextRank.min}.`,
+            ]));
+          }
         }
+      } else if (personalBest > 0 && !challenge) {
+        msgs.push(this.pick([
+          `Your all-time best study day is ${this.fmt(personalBest)}. Hit ⚡ Beat Record to set a 3-day challenge to surpass it.`,
+          `Personal best on the books: ${this.fmt(personalBest)}. Use the Beat Record button to hunt it down in 3 days.`,
+        ]));
       }
     }
 
@@ -10449,6 +10635,10 @@ class MasterMessageManager {
     const timeEl    = document.getElementById("master-msg-time");
     if (!bubblesEl) return;
 
+    // Stamp this render — stale setTimeout closures will bail out
+    this._renderVersion++;
+    const myVersion = this._renderVersion;
+
     if (timeEl) {
       timeEl.textContent = new Date().toLocaleTimeString("en-IN", {
         hour: "2-digit", minute: "2-digit", hour12: true,
@@ -10459,17 +10649,21 @@ class MasterMessageManager {
     const messages = this.composeMessages();
 
     messages.forEach((msg, i) => {
-      // Show typing indicator, then replace with real bubble
       setTimeout(() => {
+        if (this._renderVersion !== myVersion) return; // stale — drop it
         const typing = document.createElement("div");
         typing.className = "master-typing";
         typing.innerHTML = "<span></span><span></span><span></span>";
         bubblesEl.appendChild(typing);
 
         setTimeout(() => {
+          if (this._renderVersion !== myVersion) return; // stale — drop it
           typing.remove();
           const bubble = document.createElement("div");
           bubble.className = "master-bubble";
+          if (msg.includes("record") || msg.includes("Record") || msg.includes("all-time")) {
+            bubble.classList.add("master-bubble--record");
+          }
           bubble.textContent = msg;
           bubblesEl.appendChild(bubble);
         }, 900);
