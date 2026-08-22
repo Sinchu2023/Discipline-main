@@ -1892,10 +1892,6 @@ class DisciplineTracker {
     this.eventManager.initialize();
     this.masterMessage = new MasterMessageManager(this);
     this.masterMessage.initialize();
-    const beatRecordBtn = document.getElementById("master-beat-record-btn");
-    if (beatRecordBtn) {
-      beatRecordBtn.addEventListener("click", () => this.masterMessage.startRecordChallenge());
-    }
     this.startDayBoundaryWatcher();
     this.updateStreak();
     if (this.state.activeTask)
@@ -10322,7 +10318,6 @@ class MasterMessageManager {
     this.app = app;
     this._renderVersion = 0;
     this._msgCyclePos   = 0;
-    this.RECORD_CHALLENGE_KEY = "discipline_tracker_record_challenge";
     this.SLOTS = [
       { name: "Morning Study",    start: [5, 30],  end: [8, 30]  },
       { name: "Midday Block",     start: [9, 0],   end: [12, 0]  },
@@ -10352,67 +10347,25 @@ class MasterMessageManager {
     return this.SLOTS.find(s => this.toTotalMins(...s.start) > nowMins) || null;
   }
 
-  // ── Personal best: highest productive day ever ────────────────────────────
-  getPersonalBest() {
+  // ── Auto streak: consecutive days shadow target was beaten (ends yesterday) ─
+  getCurrentStreak() {
     const tasks = this.app.state?.tasks || [];
-    if (!tasks.length) return 0;
-    const byDate = {};
-    tasks.forEach(t => {
-      if (!t.date || !this.app.isProductiveCategory?.(t.category)) return;
-      if (!this.app.isTaskAfterStatsReset?.(t)) return;
-      byDate[t.date] = (byDate[t.date] || 0) + (t.duration || 0);
-    });
-    const vals = Object.values(byDate);
-    return vals.length ? Math.max(...vals) : 0;
-  }
-
-  // ── 3-day record challenge ─────────────────────────────────────────────────
-  getRecordChallenge() {
-    try {
-      const raw = localStorage.getItem(this.RECORD_CHALLENGE_KEY);
-      if (!raw) return null;
-      const c = JSON.parse(raw);
-      if (new Date() > new Date(c.endDate)) {
-        localStorage.removeItem(this.RECORD_CHALLENGE_KEY);
-        return null;
-      }
-      return c;
-    } catch { return null; }
-  }
-
-  startRecordChallenge() {
-    const best = this.getPersonalBest();
-    if (best === 0) {
-      alert("No study data found yet. Log some sessions first so the system has your baseline.");
-      return;
-    }
-    const start = new Date();
-    const end   = new Date(start);
-    end.setDate(end.getDate() + 3);
-    const challenge = {
-      targetMins:   best,
-      startDate:    start.toISOString(),
-      endDate:      end.toISOString(),
-      startDateStr: this.app.getDateString(start),
-    };
-    localStorage.setItem(this.RECORD_CHALLENGE_KEY, JSON.stringify(challenge));
-    this.render();
-  }
-
-  // ── Momentum: 3-day trend ─────────────────────────────────────────────────
-  getMomentum() {
-    const now   = new Date();
-    const tasks = this.app.state?.tasks || [];
-    const mins  = [];
-    for (let i = 1; i <= 3; i++) {
+    const shadowTarget = Math.round(Number(this.app.shadowEngine?.shadowSevenDayAverage || 0));
+    if (shadowTarget === 0 || !tasks.length) return 0;
+    let streak = 0;
+    const now = new Date();
+    for (let i = 1; i <= 60; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      mins.push(this.app.getProductiveMinutesForDate(this.app.getDateString(d), tasks));
+      const dateStr = this.app.getDateString(d);
+      const mins = this.app.getProductiveMinutesForDate(dateStr, tasks);
+      if (mins >= shadowTarget) {
+        streak++;
+      } else {
+        break; // consecutive run broken
+      }
     }
-    const trending  = mins[0] >= mins[1] && mins[1] >= mins[2];
-    const dropping  = mins[0] <= mins[1] && mins[1] <= mins[2];
-    const allNonZero = mins.every(v => v > 0);
-    return { mins, trending, dropping, allNonZero };
+    return streak;
   }
 
   // ── Pick one phrase from a pool, rotating to avoid repetition ────────────
@@ -10422,7 +10375,7 @@ class MasterMessageManager {
     return pool[idx];
   }
 
-  // ── Compose messages: varied, data-driven, never a duplicate run ──────────
+  // ── Compose messages: varied, data-driven, 4 bubbles max ─────────────────
   composeMessages() {
     const now      = new Date();
     const nowMins  = now.getHours() * 60 + now.getMinutes();
@@ -10437,40 +10390,15 @@ class MasterMessageManager {
     const todayMins    = this.app.getProductiveMinutesForDate(todayStr, this.app.state.tasks);
     const ydMins       = this.app.getProductiveMinutesForDate(ydStr,    this.app.state.tasks);
     const remaining    = Math.max(0, shadowTarget - todayMins);
-    const personalBest = this.getPersonalBest();
-    const challenge    = this.getRecordChallenge();
-    const momentum     = this.getMomentum();
+    const streak       = this.getCurrentStreak(); // consecutive days before today where shadow was beaten
 
     const currentSlot  = this.getCurrentSlot(nowMins);
     const nextSlot     = this.getNextSlot(nowMins);
 
     const msgs = [];
 
-    // ── Line 1: Record challenge (if active) OR yesterday summary ─────────
-    if (challenge) {
-      const gapToRecord   = Math.max(0, challenge.targetMins - todayMins);
-      const daysSinceStart = Math.floor((now - new Date(challenge.startDate)) / 86400000) + 1;
-      const daysLeft       = Math.ceil((new Date(challenge.endDate) - now) / 86400000);
-      if (gapToRecord === 0) {
-        msgs.push(this.pick([
-          `Record BROKEN. ${this.fmt(todayMins)} logged. That is your new personal best.`,
-          `You just crossed ${this.fmt(challenge.targetMins)}. New ceiling set. The old record is gone.`,
-          `${this.fmt(todayMins)} today. Record destroyed. Push further while the session is open.`,
-        ]));
-      } else if (gapToRecord <= 30) {
-        msgs.push(this.pick([
-          `${this.fmt(gapToRecord)} away from breaking your all-time record of ${this.fmt(challenge.targetMins)}. One push closes it.`,
-          `You are ${this.fmt(gapToRecord)} short of your record. This is the window. Do not close the timer.`,
-          `Record in reach — ${this.fmt(gapToRecord)} to go. ${this.fmt(todayMins)} already logged today.`,
-        ]));
-      } else {
-        msgs.push(this.pick([
-          `Day ${daysSinceStart} of your record chase. Target: ${this.fmt(challenge.targetMins)}. Gap today: ${this.fmt(gapToRecord)}.`,
-          `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left to beat your record of ${this.fmt(challenge.targetMins)}. ${this.fmt(todayMins)} so far today.`,
-          `Your all-time best is ${this.fmt(challenge.targetMins)}. ${this.fmt(gapToRecord)} still needed today to crack it.`,
-        ]));
-      }
-    } else if (ydMins === 0) {
+    // ── Line 1: Yesterday + streak context ───────────────────────────────────
+    if (ydMins === 0) {
       msgs.push(this.pick([
         "Yesterday was a zero. That is locked in the record. It does not change.",
         "Zero hours logged yesterday. Today is the only day left you can write on.",
@@ -10489,11 +10417,18 @@ class MasterMessageManager {
         `Yesterday: ${this.fmt(ydMins)} vs a shadow of ${this.fmt(shadowTarget)}. The gap is still there.`,
       ]));
     } else if (shadowTarget > 0 && ydMins >= shadowTarget) {
-      msgs.push(this.pick([
-        `Yesterday you put in ${this.fmt(ydMins)} and crossed your shadow target of ${this.fmt(shadowTarget)}. That was a win.`,
-        `${this.fmt(ydMins)} logged yesterday — shadow beaten. Now do it again.`,
-        `Good day yesterday: ${this.fmt(ydMins)} vs a target of ${this.fmt(shadowTarget)}. Keep the streak alive.`,
-      ]));
+      if (streak >= 2) {
+        msgs.push(this.pick([
+          `Yesterday: ${this.fmt(ydMins)} — shadow beaten. That is ${streak} days in a row. Do not stop today.`,
+          `${streak}-day streak running. Yesterday was ${this.fmt(ydMins)}. Beat shadow again today to extend it.`,
+        ]));
+      } else {
+        msgs.push(this.pick([
+          `Yesterday you put in ${this.fmt(ydMins)} and crossed your shadow target of ${this.fmt(shadowTarget)}. That was a win.`,
+          `${this.fmt(ydMins)} logged yesterday — shadow beaten. Do it again today.`,
+          `Good day yesterday: ${this.fmt(ydMins)} vs a target of ${this.fmt(shadowTarget)}. Keep the streak alive.`,
+        ]));
+      }
     } else {
       msgs.push(`Yesterday: ${this.fmt(ydMins)} logged.`);
     }
@@ -10523,11 +10458,25 @@ class MasterMessageManager {
         `Today: ${this.fmt(todayMins)} logged, ${this.fmt(remaining)} away from your shadow. Keep the timer running.`,
       ]));
     } else {
-      msgs.push(this.pick([
-        `Shadow target of ${this.fmt(shadowTarget)} is already beaten today. You have logged ${this.fmt(todayMins)}.`,
-        `Shadow beaten. ${this.fmt(todayMins)} logged — ${this.fmt(todayMins - shadowTarget)} above target. Every minute now is surplus.`,
-        `Done. ${this.fmt(todayMins)} vs a shadow of ${this.fmt(shadowTarget)}. Go further or protect your recovery.`,
-      ]));
+      // Shadow beaten today — show streak
+      const todayStreak = streak + 1;
+      if (todayStreak >= 3) {
+        msgs.push(this.pick([
+          `Shadow down. ${this.fmt(todayMins)} logged — ${todayStreak} days straight. That is a streak worth protecting.`,
+          `${todayStreak} consecutive days above shadow. ${this.fmt(todayMins)} today. Keep extending it.`,
+        ]));
+      } else if (todayStreak === 2) {
+        msgs.push(this.pick([
+          `Shadow beaten. ${this.fmt(todayMins)} logged — 2 days in a row. One more tomorrow makes it a streak.`,
+          `Two consecutive wins now. ${this.fmt(todayMins)} today. Beat shadow tomorrow to lock in 3.`,
+        ]));
+      } else {
+        msgs.push(this.pick([
+          `Shadow beaten. ${this.fmt(todayMins)} logged — ${this.fmt(todayMins - shadowTarget)} above target. Beat it again tomorrow to start a streak.`,
+          `Shadow is down. ${this.fmt(todayMins)} on the board. Every minute past this is bonus work.`,
+          `Done. ${this.fmt(todayMins)} vs a shadow of ${this.fmt(shadowTarget)}. Go further or protect your recovery.`,
+        ]));
+      }
     }
 
     // ── Line 3: Slot urgency ──────────────────────────────────────────────
@@ -10585,49 +10534,31 @@ class MasterMessageManager {
       }
     }
 
-    // ── Line 4: Momentum OR Rank / Training Camp OR record nudge ─────────
-    if (momentum.allNonZero && momentum.trending) {
-      msgs.push(this.pick([
-        `Three-day run — ${this.fmt(momentum.mins[2])}, ${this.fmt(momentum.mins[1])}, ${this.fmt(momentum.mins[0])}. Upward momentum. Do not break it today.`,
-        `Your last 3 days are rising. ${this.fmt(momentum.mins[0])} yesterday. Keep the curve climbing.`,
-        `Momentum is positive. Each of the last 3 days stronger than the one before. Protect that.`,
-      ]));
-    } else if (momentum.allNonZero && momentum.dropping) {
-      msgs.push(this.pick([
-        `Output dropping — ${this.fmt(momentum.mins[2])}, ${this.fmt(momentum.mins[1])}, ${this.fmt(momentum.mins[0])}. Today reverses it or confirms a slide.`,
-        `Three declining days. The trend is moving against you. Today must be the floor, not the next step down.`,
-        `Sliding: ${this.fmt(momentum.mins[2])} → ${this.fmt(momentum.mins[1])} → ${this.fmt(momentum.mins[0])}. You know what needs to happen.`,
-      ]));
-    } else {
-      const rankProgress = this.app.shadowEngine?.getRankProgressState?.();
-      const rankTiers    = this.app.shadowEngine?.rankTiers || [];
-      if (rankProgress && rankTiers.length) {
-        const rank = rankTiers[rankProgress.unlockedRankIndex] || rankTiers[0];
-        const camp = rankProgress.trainingCamp;
-        if (camp?.active) {
-          const provRank = rankTiers[camp.provisionalRankIndex];
-          msgs.push(this.pick([
-            `Training Camp for ${provRank?.title || 'next rank'} is active — day ${camp.daysCompleted} of 10, ${camp.successDays} cleared. You need ${this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7} to confirm.`,
-            `Camp is live. ${camp.daysCompleted} days in, ${camp.successDays} wins. ${this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7} required to earn ${provRank?.title || 'the rank'}.`,
-          ]));
-        } else if (rank) {
-          const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
-          if (nextRank && shadowTarget > 0) {
-            msgs.push(this.pick([
-              `Current rank: ${rank.title}. Next is ${nextRank.title} — keep shadow rating above ${nextRank.min} consistently to enter Training Camp.`,
-              `${rank.title} is your floor. ${nextRank.title} is the ceiling to break. Stay above ${nextRank.min}.`,
-            ]));
-          }
-        }
-      } else if (personalBest > 0 && !challenge) {
+    // ── Line 4: Training Camp / rank status ─────────────────────────────────
+    const rankProgress = this.app.shadowEngine?.getRankProgressState?.();
+    const rankTiers    = this.app.shadowEngine?.rankTiers || [];
+    if (rankProgress && rankTiers.length) {
+      const rank = rankTiers[rankProgress.unlockedRankIndex] || rankTiers[0];
+      const camp = rankProgress.trainingCamp;
+      if (camp?.active) {
+        const provRank = rankTiers[camp.provisionalRankIndex];
+        const req = this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7;
         msgs.push(this.pick([
-          `Your all-time best study day is ${this.fmt(personalBest)}. Hit ⚡ Beat Record to set a 3-day challenge to surpass it.`,
-          `Personal best on the books: ${this.fmt(personalBest)}. Use the Beat Record button to hunt it down in 3 days.`,
+          `Camp is live. ${camp.daysCompleted} days in, ${camp.successDays} wins. ${req} required to earn ${provRank?.title || 'the rank'}.`,
+          `Training Camp day ${camp.daysCompleted} of 10. ${camp.successDays} cleared, ${req} needed to confirm ${provRank?.title || 'next rank'}.`,
         ]));
+      } else if (rank) {
+        const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
+        if (nextRank && shadowTarget > 0) {
+          msgs.push(this.pick([
+            `Current rank: ${rank.title}. Next is ${nextRank.title} — stay above ${nextRank.min} to enter Training Camp.`,
+            `${rank.title} is your floor. ${nextRank.title} is next. Keep shadow rating above ${nextRank.min}.`,
+          ]));
+        }
       }
     }
 
-    return msgs;
+    return msgs.slice(0, 4); // max 4 bubbles
   }
 
   render() {
@@ -10661,9 +10592,6 @@ class MasterMessageManager {
           typing.remove();
           const bubble = document.createElement("div");
           bubble.className = "master-bubble";
-          if (msg.includes("record") || msg.includes("Record") || msg.includes("all-time")) {
-            bubble.classList.add("master-bubble--record");
-          }
           bubble.textContent = msg;
           bubblesEl.appendChild(bubble);
         }, 900);

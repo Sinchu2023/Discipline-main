@@ -4060,9 +4060,3 @@ header {
   transform: scale(0.97);
 }
 
-/* --- Gold record-chase bubble --------------------------------------------- */
-.master-bubble--record {
-  border-color: rgba(255, 185, 0, 0.28);
-  background: linear-gradient(135deg, rgba(255, 185, 0, 0.06), rgba(28, 28, 28, 0.95));
-  color: #f0d080;
-}
