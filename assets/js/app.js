@@ -10347,6 +10347,19 @@ class MasterMessageManager {
     return this.SLOTS.find(s => this.toTotalMins(...s.start) > nowMins) || null;
   }
 
+  // ── Personal best: highest productive day ever ────────────────────────────────
+  getPersonalBest() {
+    const tasks = this.app.state?.tasks || [];
+    if (!tasks.length) return 0;
+    const byDate = {};
+    tasks.forEach(t => {
+      if (!t.date || !this.app.isProductiveCategory?.(t.category)) return;
+      byDate[t.date] = (byDate[t.date] || 0) + (t.duration || 0);
+    });
+    const vals = Object.values(byDate);
+    return vals.length ? Math.max(...vals) : 0;
+  }
+
   // ── Auto streak: consecutive days shadow target was beaten (ends yesterday) ─
   getCurrentStreak() {
     const tasks = this.app.state?.tasks || [];
@@ -10397,84 +10410,118 @@ class MasterMessageManager {
 
     const msgs = [];
 
-    // ── Line 1: Yesterday + streak context ───────────────────────────────────
-    if (ydMins === 0) {
+    // ── Line 1: Shadow beaten today → PB chase. Not beaten → yesterday context. ──
+    if (remaining === 0 && todayMins > 0) {
+      // Shadow cleared — upgrade the target to personal best
+      const pb = this.getPersonalBest();
+      if (pb > 0 && todayMins >= pb) {
+        msgs.push(this.pick([
+          `${this.fmt(todayMins)}. Record smashed. You think this is where you stop? Cowards stop at records. Keep the timer running.`,
+          `NEW ALL-TIME BEST. ${this.fmt(todayMins)}. The session is still open and you're thinking about stopping. Seriously?`,
+          `You broke it. ${this.fmt(todayMins)}. Now throw another hour on top. That's what separates the ones who actually make it.`,
+          `${this.fmt(todayMins)} — best day of your life. And the timer is still ticking. Don't you dare waste this moment.`,
+        ]));
+      } else if (pb > 0) {
+        const gapToPB = pb - todayMins;
+        msgs.push(this.pick([
+          `You killed the shadow and your all-time record of ${this.fmt(pb)} is STILL standing there. ${this.fmt(gapToPB)} away. Are you a coward or not?`,
+          `${this.fmt(gapToPB)}. Just ${this.fmt(gapToPB)} between you and the greatest day you have ever had. And you're SITTING THERE doing nothing.`,
+          `Your record is ${this.fmt(pb)} and it hasn't moved. You're ${this.fmt(gapToPB)} away. If you close that app right now I genuinely feel sorry for you.`,
+          `The shadow is dead. Your record is ${this.fmt(pb)} and it's laughing at your face. ${this.fmt(gapToPB)} left. Open the timer before you embarrass yourself.`,
+          `You've done ${this.fmt(todayMins)}. Your personal best is ${this.fmt(pb)}. ${this.fmt(gapToPB)} is ALL that's left. If you stop now you deserve every failure coming your way.`,
+        ]));
+      } else {
+        msgs.push(`Shadow is dead. Every minute from now on is a personal record. You have ZERO excuse to stop. Absolutely zero.`);
+      }
+    } else if (ydMins === 0) {
       msgs.push(this.pick([
-        "Yesterday was a zero. That is locked in the record. It does not change.",
-        "Zero hours logged yesterday. Today is the only day left you can write on.",
-        "Yesterday: zero. The log does not lie. Focus on what you do today.",
+        "ZERO yesterday. Not one second. What were you doing? Scrolling? Sleeping? Whatever it was, it wasn't your future.",
+        "You gave yesterday ZERO minutes. Zero. That day is gone and you wasted it completely. Don't you dare do it again.",
+        "Yesterday: zero. Nothing. Not a single minute logged. That is the behavior of someone who is going to fail. Change it today.",
+        "Zero yesterday. That's not a bad day, that's a surrender. The log has it recorded permanently. Fix it today or it defines you.",
+        "You had 24 hours yesterday and couldn't find even 30 minutes to work. What is actually wrong with you?",
       ]));
     } else if (ydMins < 60) {
       msgs.push(this.pick([
-        `Yesterday you logged ${this.fmt(ydMins)}. That is less than one hour. Your shadow noticed.`,
-        `${this.fmt(ydMins)} yesterday. Below one hour. That is a token effort, not a study day.`,
-        `Yesterday: ${this.fmt(ydMins)}. Under 60 minutes. The 7-day average feels every weak day.`,
+        `${this.fmt(ydMins)} yesterday. Under one hour. That is an absolute joke. You call that a study day? That's an insult to the word.`,
+        `${this.fmt(ydMins)} yesterday — you spent more time in the bathroom than working. Disgusting effort. Fix it today.`,
+        `Under 60 minutes yesterday. A child doing homework puts in more time than that. What is your excuse?`,
+        `${this.fmt(ydMins)} yesterday. That's not studying. That's performing the idea of studying while wasting the entire day.`,
+        `${this.fmt(ydMins)} logged yesterday and you probably felt proud of it. You shouldn't have. That's embarrassing.`,
       ]));
     } else if (shadowTarget > 0 && ydMins < shadowTarget * 0.8) {
       msgs.push(this.pick([
-        `Yesterday you logged ${this.fmt(ydMins)}. You needed ${this.fmt(shadowTarget)} and fell short.`,
-        `${this.fmt(ydMins)} yesterday — shadow target was ${this.fmt(shadowTarget)}. That deficit carries forward.`,
-        `Yesterday: ${this.fmt(ydMins)} vs a shadow of ${this.fmt(shadowTarget)}. The gap is still there.`,
+        `${this.fmt(ydMins)} yesterday when you needed ${this.fmt(shadowTarget)}. You absolutely BOTTLED it. That failure is in the record. Are you going to let it happen again today?`,
+        `You owed ${this.fmt(shadowTarget)} yesterday. You paid ${this.fmt(ydMins)}. That's called underdelivering on your own life. Disgusting. Fix it.`,
+        `${this.fmt(shadowTarget - ydMins)} short yesterday. That's not a small gap, that's you quitting before the finish line. Stop doing that.`,
+        `Shadow demanded ${this.fmt(shadowTarget)} yesterday and you gave ${this.fmt(ydMins)}. You folded under your own target. How does that feel?`,
       ]));
     } else if (shadowTarget > 0 && ydMins >= shadowTarget) {
       if (streak >= 2) {
         msgs.push(this.pick([
-          `Yesterday: ${this.fmt(ydMins)} — shadow beaten. That is ${streak} days in a row. Do not stop today.`,
-          `${streak}-day streak running. Yesterday was ${this.fmt(ydMins)}. Beat shadow again today to extend it.`,
+          `${streak} days straight above shadow. If you break this today for ZERO reason, you are exactly the kind of person who never reaches their goals. Don't be that.`,
+          `${streak}-day streak alive. Yesterday ${this.fmt(ydMins)}. You destroy this today and I promise you'll regret it. Keep it going.`,
+          `${streak} days in a row. You finally built something. Breaking it today would be the dumbest thing you've done all week.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `Yesterday you put in ${this.fmt(ydMins)} and crossed your shadow target of ${this.fmt(shadowTarget)}. That was a win.`,
-          `${this.fmt(ydMins)} logged yesterday — shadow beaten. Do it again today.`,
-          `Good day yesterday: ${this.fmt(ydMins)} vs a target of ${this.fmt(shadowTarget)}. Keep the streak alive.`,
+          `You beat shadow yesterday. ONE day. Cool achievement. Now prove to yourself it wasn't a lucky accident and do it again RIGHT NOW.`,
+          `Yesterday was good — ${this.fmt(ydMins)}. But one day of output means absolutely nothing without the day after it. What are you?`,
+          `You won yesterday. Great. Does winning one day make you a winner, or does showing up every single day? Prove it today.`,
         ]));
       }
     } else {
-      msgs.push(`Yesterday: ${this.fmt(ydMins)} logged.`);
+      msgs.push(`${this.fmt(ydMins)} yesterday. Barely acceptable. Today that number goes up. No discussion.`);
     }
 
     // ── Line 2: Today's shadow target vs progress ─────────────────────────
     if (shadowTarget === 0) {
       msgs.push(this.pick([
-        "Your shadow target is not set yet. Start logging work so the system has something to track.",
-        "No shadow target yet. The system calibrates after you log consistent sessions.",
+        "The system has no target because you haven't logged enough sessions. You can't complain about lack of direction when you haven't shown up consistently.",
+        "No shadow target set. That means no data. That means you're inconsistent. Stop reading this and go log something real.",
       ]));
     } else if (todayMins === 0 && hour >= 6) {
       msgs.push(this.pick([
-        `Today your shadow is asking for ${this.fmt(shadowTarget)}. You have not started the timer yet.`,
-        `${this.fmt(shadowTarget)} is today's target. Clock is running. Timer is not.`,
-        `Shadow target: ${this.fmt(shadowTarget)}. Zero logged on ${dow}. Start the timer.`,
+        `${this.fmt(shadowTarget)} needed today. ZERO done. The day is bleeding out and you haven't even opened the timer. What are you actually doing with your life?`,
+        `It's ${hour > 12 ? 'the afternoon' : 'the morning'} and you have logged NOTHING. ${this.fmt(shadowTarget)} is sitting there untouched. This is not a drill. START NOW.`,
+        `Zero minutes. On a day you need ${this.fmt(shadowTarget)}. The audacity to sit there doing nothing is unreal. Open the timer.`,
+        `Hours wasted. Zero logged. ${this.fmt(shadowTarget)} needed. You are actively destroying your own future by sitting there. GET UP.`,
+        `${dow} is being murdered right in front of you and you're the one doing it. ${this.fmt(shadowTarget)} needed. Not one minute done. Open the timer RIGHT NOW.`,
       ]));
     } else if (todayMins === 0) {
       msgs.push(this.pick([
-        `Shadow target today is ${this.fmt(shadowTarget)}. The day is just beginning.`,
-        `Target for today: ${this.fmt(shadowTarget)}. Full window ahead.`,
+        `Day is starting and ${this.fmt(shadowTarget)} is waiting. Don't be the person who plans to start "in a bit" and then it's 11pm. Open the timer NOW.`,
+        `${this.fmt(shadowTarget)} needed. Zero done. The ONLY acceptable next move is opening the timer. Everything else is an excuse.`,
       ]));
     } else if (remaining > 0) {
       const pct = Math.round((todayMins / shadowTarget) * 100);
       msgs.push(this.pick([
-        `You have logged ${this.fmt(todayMins)} today — ${pct}% of your shadow target. ${this.fmt(remaining)} still left to beat it.`,
-        `${this.fmt(todayMins)} in. ${pct}% done. ${this.fmt(remaining)} to go before the shadow falls.`,
-        `Today: ${this.fmt(todayMins)} logged, ${this.fmt(remaining)} away from your shadow. Keep the timer running.`,
+        `${pct}% done and you're thinking about stopping? ${this.fmt(remaining)} left. Finish the job or admit you have no discipline.`,
+        `${this.fmt(todayMins)} in, ${this.fmt(remaining)} still owed. The shadow doesn't care that you're tired. The exam doesn't either. PUSH.`,
+        `${this.fmt(remaining)} left and you're slowing down? This is EXACTLY how you end up short every single day of your life. Stop it.`,
+        `${pct}% done means ${100 - pct}% undone. Stop patting yourself on the back for half a job. Finish it.`,
+        `${this.fmt(remaining)} standing between you and beating your shadow. Not a mountain. Not impossible. ${this.fmt(remaining)}. Go.`,
       ]));
     } else {
       // Shadow beaten today — show streak
       const todayStreak = streak + 1;
       if (todayStreak >= 3) {
         msgs.push(this.pick([
-          `Shadow down. ${this.fmt(todayMins)} logged — ${todayStreak} days straight. That is a streak worth protecting.`,
-          `${todayStreak} consecutive days above shadow. ${this.fmt(todayMins)} today. Keep extending it.`,
+          `${todayStreak} days STRAIGHT above shadow. ${this.fmt(todayMins)} today. You kill this streak right now and I don't want to hear another word about your goals.`,
+          `${todayStreak} consecutive wins. That's not luck, that took work. Throwing it away today for no reason would be pathetic.`,
+          `${todayStreak} days running. ${this.fmt(todayMins)} logged. You stop now and the whole streak resets. Was it even worth building?`,
         ]));
       } else if (todayStreak === 2) {
         msgs.push(this.pick([
-          `Shadow beaten. ${this.fmt(todayMins)} logged — 2 days in a row. One more tomorrow makes it a streak.`,
-          `Two consecutive wins now. ${this.fmt(todayMins)} today. Beat shadow tomorrow to lock in 3.`,
+          `Two days in a row beating shadow. ${this.fmt(todayMins)} today. One more tomorrow and you have a real streak. Don't be someone who quits at two.`,
+          `Back to back. ${this.fmt(todayMins)} done. Tomorrow is the third. If you don't show up tomorrow this entire two-day run was meaningless.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `Shadow beaten. ${this.fmt(todayMins)} logged — ${this.fmt(todayMins - shadowTarget)} above target. Beat it again tomorrow to start a streak.`,
-          `Shadow is down. ${this.fmt(todayMins)} on the board. Every minute past this is bonus work.`,
-          `Done. ${this.fmt(todayMins)} vs a shadow of ${this.fmt(shadowTarget)}. Go further or protect your recovery.`,
+          `Shadow dead. ${this.fmt(todayMins)} on board. ONE day. You want a trophy? Show up tomorrow. That's the only reward that matters.`,
+          `${this.fmt(todayMins)} done, shadow buried. Now use this open session to go after your personal best or get out of the chair. Sitting there scrolling is a waste of the win you just earned.`,
+          `Target cleared. ${this.fmt(todayMins)} logged. This is bonus time and you're wasting it. Either chase the record or sleep. Pick one.`,
+          `${this.fmt(todayMins)} on board. Shadow is dead. Every minute you keep the timer running now is extra. Are you going to take it or waste it?`,
         ]));
       }
     }
@@ -10485,51 +10532,56 @@ class MasterMessageManager {
       const minsLeft    = slotEndMins - nowMins;
       if (minsLeft <= 20) {
         msgs.push(this.pick([
-          `${currentSlot.name} has ${minsLeft} minutes left and you still need ${this.fmt(remaining)}. Start the timer right now.`,
-          `${minsLeft} minutes left in ${currentSlot.name}. ${this.fmt(remaining)} outstanding. Every second counts.`,
+          `${currentSlot.name} dies in ${minsLeft} minutes and ${this.fmt(remaining)} is STILL missing. If you don't open the timer this second you are throwing this slot straight in the bin.`,
+          `${minsLeft} minutes left. ${this.fmt(remaining)} unpaid. ${currentSlot.name} is almost gone. Stop reading this message and START.`,
+          `${currentSlot.name} is closing. ${minsLeft} min left. You owe ${this.fmt(remaining)}. Every second you spend not working right now is stolen from your own future.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `You are inside the ${currentSlot.name} slot. ${minsLeft} minutes remain. You need ${this.fmt(remaining)} more. Open the timer.`,
-          `${currentSlot.name} is active — ${minsLeft} min left. Gap to close: ${this.fmt(remaining)}.`,
-          `${minsLeft} minutes in ${currentSlot.name}. You need ${this.fmt(remaining)} more. Use this slot fully.`,
+          `${currentSlot.name} is LIVE. ${minsLeft} minutes on the clock. ${this.fmt(remaining)} still missing. WHY is the timer not running?`,
+          `You're sitting inside ${currentSlot.name} with ${minsLeft} minutes available and ${this.fmt(remaining)} still to do. This is not thinking time. OPEN THE TIMER.`,
+          `${minsLeft} minutes in ${currentSlot.name} and you still need ${this.fmt(remaining)}. Use this slot or admit out loud that you're not serious about any of this.`,
+          `${currentSlot.name}: ${minsLeft} min left. Gap: ${this.fmt(remaining)}. Timer not running. What is your actual plan here?`,
         ]));
       }
     } else if (currentSlot && remaining === 0) {
       msgs.push(this.pick([
-        `You are inside ${currentSlot.name} and your shadow is already beaten. Push further or protect recovery.`,
-        `Shadow done. ${currentSlot.name} is still open. Keep going or wind down intentionally.`,
+        `Shadow is dead and ${currentSlot.name} is STILL open. You are sitting on free bonus time. Go destroy your personal record right now or get out of the chair and properly rest. Scrolling is not rest and it's not work.`,
+        `${currentSlot.name} running, target gone. Chase the all-time best or commit to real recovery. Sitting there half-checking your phone is a waste of both.`,
+        `Target done. ${currentSlot.name} still open. You have a choice: go further or rest properly. Doing nothing is the worst option and you know it.`,
       ]));
     } else if (!currentSlot && nextSlot) {
       const minsUntil = this.toTotalMins(...nextSlot.start) - nowMins;
       if (remaining > 0) {
         if (minsUntil <= 15) {
           msgs.push(this.pick([
-            `${nextSlot.name} slot starts in ${minsUntil} minutes. Be ready the moment it opens.`,
-            `${minsUntil} minutes until ${nextSlot.name}. Prep now. Start at the bell.`,
+            `${nextSlot.name} opens in ${minsUntil} minutes and ${this.fmt(remaining)} is still due. The second that slot starts, the timer goes on. No warmup. No settling in. STRAIGHT in.`,
+            `${minsUntil} minutes until ${nextSlot.name}. Don't you dare use this gap as an excuse to delay again. Be ready before it opens.`,
           ]));
         } else {
           msgs.push(this.pick([
-            `No active slot right now. ${nextSlot.name} opens in ${minsUntil} minutes. You still need ${this.fmt(remaining)}.`,
-            `Gap until ${nextSlot.name}: ${minsUntil} min. Outstanding: ${this.fmt(remaining)}. Plan what you will do the moment it opens.`,
+            `No slot right now but ${this.fmt(remaining)} is still hanging over you. ${nextSlot.name} opens in ${minsUntil} min. The moment it does — timer on. No delays, no excuses.`,
+            `${minsUntil} minutes until ${nextSlot.name}. ${this.fmt(remaining)} still owed. Don't waste the break AND fumble the next slot. That would be pathetic.`,
+            `Break. Fine. But ${this.fmt(remaining)} is still your problem and ${nextSlot.name} opens in ${minsUntil} min. You better be ready to run the second the slot opens.`,
           ]));
         }
       } else {
         msgs.push(this.pick([
-          `Shadow beaten. ${nextSlot.name} starts in ${minsUntil} minutes. Recover or go further.`,
-          `Target done. ${minsUntil} minutes until ${nextSlot.name}. Use the break well.`,
+          `Shadow beaten. ${nextSlot.name} opens in ${minsUntil} min. Rest hard — then come back and go after the personal record.`,
+          `Target done. ${minsUntil} minutes free. Recover properly or keep going. But don't waste this time doing nothing, that's the worst of both worlds.`,
         ]));
       }
     } else if (!currentSlot && !nextSlot) {
       if (remaining > 0) {
         msgs.push(this.pick([
-          `All timetable slots are done for today. Still ${this.fmt(remaining)} short of your shadow. Decide now if you close that gap.`,
-          `No more scheduled slots. ${this.fmt(remaining)} still outstanding. You have to make that time outside the plan.`,
+          `Every single slot is gone and you're STILL ${this.fmt(remaining)} short. You find that time right now outside the plan, or you write today off as a loss. Which are you choosing?`,
+          `Timetable finished. Shadow still wants ${this.fmt(remaining)}. Are you going to be someone who finds a way, or someone who says "the schedule didn't allow it"? Pick.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `All slots done. Shadow beaten. Protect your sleep time and set up tomorrow before you close.`,
-          `Day is done. Target is beaten. Lock in the win and sleep on time.`,
+          `Day done. Shadow beaten. Go to sleep on time. Your performance tomorrow is being decided in the next hour.`,
+          `All slots done, target destroyed. Put the phone down, set tomorrow, sleep. Don't sabotage a good day with a stupid night.`,
+          `You won today. Don't ruin it by staying up until 2am rotting. Sleep is part of the system. Use it.`,
         ]));
       }
     }
@@ -10543,16 +10595,21 @@ class MasterMessageManager {
       if (camp?.active) {
         const provRank = rankTiers[camp.provisionalRankIndex];
         const req = this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7;
+        const daysLeft = req - camp.successDays;
+        const failsLeft = 10 - camp.daysCompleted - daysLeft;
         msgs.push(this.pick([
-          `Camp is live. ${camp.daysCompleted} days in, ${camp.successDays} wins. ${req} required to earn ${provRank?.title || 'the rank'}.`,
-          `Training Camp day ${camp.daysCompleted} of 10. ${camp.successDays} cleared, ${req} needed to confirm ${provRank?.title || 'next rank'}.`,
+          `Training Camp. Day ${camp.daysCompleted} of 10. ${camp.successDays} wins. Need ${req} to confirm ${provRank?.title || 'the rank'}. ${daysLeft} more wins needed. Fail today and you make the math brutal. Don't.`,
+          `Camp is live. ${camp.successDays}/${req} wins. ${daysLeft} left. One wasted day now and you might not recover the numbers in time. Beat the shadow today. No excuses.`,
+          `Day ${camp.daysCompleted} of 10 in Camp. ${camp.successDays} cleared out of ${req}. You cannot afford to throw a single day away right now. WIN TODAY.`,
+          `${daysLeft} wins still needed for ${provRank?.title || 'the rank'}. ${10 - camp.daysCompleted} days left. One unnecessary loss here could end the entire camp. Don't be that stupid.`,
         ]));
       } else if (rank) {
         const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
         if (nextRank && shadowTarget > 0) {
           msgs.push(this.pick([
-            `Current rank: ${rank.title}. Next is ${nextRank.title} — stay above ${nextRank.min} to enter Training Camp.`,
-            `${rank.title} is your floor. ${nextRank.title} is next. Keep shadow rating above ${nextRank.min}.`,
+            `You're stuck at ${rank.title} and it shows. ${nextRank.title} needs ${nextRank.min} rating. Right now you're performing like someone comfortable staying exactly where they are.`,
+            `${rank.title} is your current ceiling. ${nextRank.title} is above it and it needs ${nextRank.min} rating. You want it? Then stop underperforming and go get it.`,
+            `${nextRank.title} unlocks at ${nextRank.min} rating. You're sitting at ${rank.title} going nowhere. Either chase the next rank or admit this is your limit.`,
           ]));
         }
       }
