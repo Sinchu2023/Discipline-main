@@ -267,11 +267,15 @@
                   <option value="15davg">15-Day Avg</option>
                   <option value="monthlyavg">Monthly Avg</option>
                   <option value="7d">7 Days</option>
+                  <option value="14d">14 Days</option>
                   <option value="30d">30 Days</option>
+                  <option value="3m">3 Months</option>
                   <option value="1y">1 Year</option>
                 </select>
-                <select class="range-select" id="prod-filter" disabled>
+                <select class="range-select" id="prod-filter">
                   <option value="productivity" selected>Productivity</option>
+                  <option value="total_distraction">Total Distraction</option>
+                  <option value="logged_distraction">Logged Distraction</option>
                 </select>
                 <span class="prod-total-counter" id="prod-filter-total"
                   >0h 00m</span
@@ -301,6 +305,45 @@
             <div class="graph-canvas-container" id="productivity-chart-container">
               <div class="graph-canvas-track" id="productivity-chart-track">
                 <canvas id="productivity-chart"></canvas>
+              </div>
+            </div>
+            <!-- Year Insights Panel (shown only for 1y range) -->
+            <div class="year-insights-panel" id="year-insights-panel" style="display:none">
+              <div class="yi-card" id="yi-best-day">
+                <div class="yi-icon">🏆</div>
+                <div class="yi-label">Best Day</div>
+                <div class="yi-value" id="yi-best-day-val">—</div>
+                <div class="yi-sub" id="yi-best-day-sub">0h 00m</div>
+              </div>
+              <div class="yi-card" id="yi-avg-day">
+                <div class="yi-icon">📊</div>
+                <div class="yi-label">Daily Average</div>
+                <div class="yi-value" id="yi-avg-day-val">0h 00m</div>
+                <div class="yi-sub" id="yi-avg-day-sub">per active day</div>
+              </div>
+              <div class="yi-card" id="yi-consistency">
+                <div class="yi-icon">🔥</div>
+                <div class="yi-label">Consistency</div>
+                <div class="yi-value" id="yi-consistency-val">0%</div>
+                <div class="yi-sub" id="yi-consistency-sub">active days / year</div>
+              </div>
+              <div class="yi-card" id="yi-streak">
+                <div class="yi-icon">⚡</div>
+                <div class="yi-label">Longest Streak</div>
+                <div class="yi-value" id="yi-streak-val">0 days</div>
+                <div class="yi-sub" id="yi-streak-sub">consecutive days</div>
+              </div>
+              <div class="yi-card" id="yi-top-month">
+                <div class="yi-icon">📅</div>
+                <div class="yi-label">Top Month</div>
+                <div class="yi-value" id="yi-top-month-val">—</div>
+                <div class="yi-sub" id="yi-top-month-sub">0h 00m total</div>
+              </div>
+              <div class="yi-card yi-trend-card" id="yi-trend">
+                <div class="yi-icon">📈</div>
+                <div class="yi-label">Year Trend</div>
+                <div class="yi-value" id="yi-trend-val">—</div>
+                <div class="yi-sub" id="yi-trend-sub">vs previous 6 months</div>
               </div>
             </div>
           </div>

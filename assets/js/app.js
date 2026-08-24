@@ -73,7 +73,7 @@ const CONFIG = {
     STATS_RESET_AT: "discipline_tracker_stats_reset_at",
   },
   MOTIVATION_INTERVAL: 15000,
-  CHART_RANGES: { "7d": 7, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
+  CHART_RANGES: { "7d": 7, "14d": 14, "30d": 30, "3m": 90, "6m": 180, "1y": 365 },
   FIREBASE_PROTECTION: {
     MAX_WRITES_PER_MINUTE: 60,
     WRITE_DEBOUNCE_MS: 1200,
@@ -7918,6 +7918,7 @@ class GraphManager {
     );
     this.updateGraphKpis();
     this.renderGithubHeatmap();
+    this.updateYearInsightsVisibility();
   }
 
   getRangeDates(range) {
@@ -7979,11 +7980,11 @@ class GraphManager {
   }
 
   isScrollableProductivityRange(range = "7d") {
-    return range === "1y";
+    // 1y is now shown as a single non-scrollable view (all 365 days fit in one chart)
+    return false;
   }
 
   getVisibleProductivityPointCount(range = "7d") {
-    if (range === "1y") return 31;
     return this.getProductivityPointCount(range);
   }
 
@@ -8334,6 +8335,25 @@ class GraphManager {
     };
   }
 
+  getFilterColorScheme(filter = "productivity") {
+    if (filter === "total_distraction") {
+      return {
+        border: "rgb(220, 53, 69)",
+        fill: "rgba(220, 53, 69, 0.18)",
+      };
+    }
+    if (filter === "logged_distraction") {
+      return {
+        border: "rgb(255, 193, 7)",
+        fill: "rgba(255, 193, 7, 0.15)",
+      };
+    }
+    return {
+      border: "rgb(40, 180, 99)",
+      fill: "rgba(40, 180, 99, 0.22)",
+    };
+  }
+
   getProductivityDatasetLabel(range = "7d") {
     return this.rangeUsesAverageSummaries(range)
       ? "Avg Productivity / Day"
@@ -8487,8 +8507,8 @@ class GraphManager {
       shadowData = this.buildShadowSeries(rangeDates, range);
     }
 
-    const colors = this.getColorScheme();
-    const isLongRange = range === "1y";
+    const colors = this.getFilterColorScheme(this.getCurrentFilter());
+    const isLongRange = range === "1y" || range === "3m";
     return {
       labels,
       datasets: [
@@ -8840,15 +8860,107 @@ class GraphManager {
   }
 
   setupChartControls() {
-    this.app.elements["prod-range"].addEventListener("change", () =>
-      this.updateCharts(),
-    );
-    this.app.elements["prod-filter"]?.addEventListener("change", () =>
-      this.updateCharts(),
-    );
+    this.app.elements["prod-range"].addEventListener("change", () => {
+      this.updateCharts();
+      this.updateYearInsightsVisibility();
+    });
+    this.app.elements["prod-filter"]?.addEventListener("change", () => {
+      this.updateCharts();
+      this.updateYearInsightsVisibility();
+    });
     this.app.elements["sleep-range"]?.addEventListener("change", () =>
       this.updateCharts(),
     );
+  }
+
+  updateYearInsightsVisibility() {
+    const range = this.app.elements["prod-range"]?.value || "7d";
+    const panel = document.getElementById("year-insights-panel");
+    if (!panel) return;
+    if (range === "1y") {
+      panel.style.display = "grid";
+      this.renderYearInsights();
+    } else {
+      panel.style.display = "none";
+    }
+  }
+
+  renderYearInsights() {
+    const filter = this.getCurrentFilter();
+    const today = this.app.getActiveDate();
+    const rangeDates = this.getRangeDates("1y");
+
+    // --- Best Day ---
+    let bestDate = null, bestMins = 0;
+    for (const dateStr of rangeDates) {
+      const m = this.getFilteredMinutesForDate(dateStr, filter);
+      if (m > bestMins) { bestMins = m; bestDate = dateStr; }
+    }
+    const bdEl = document.getElementById("yi-best-day-val");
+    const bdSub = document.getElementById("yi-best-day-sub");
+    if (bdEl) bdEl.textContent = bestDate ? this.formatDateLabel(this.app.parseDateKey(bestDate) || new Date(bestDate + "T12:00:00")) : "—";
+    if (bdSub) bdSub.textContent = this.app.formatDuration(Math.round(bestMins));
+
+    // --- Daily Average (over active days only) ---
+    const activeDates = rangeDates.filter(d => this.getFilteredMinutesForDate(d, filter) > 0);
+    const totalMins = rangeDates.reduce((s, d) => s + this.getFilteredMinutesForDate(d, filter), 0);
+    const avgMins = activeDates.length > 0 ? totalMins / activeDates.length : 0;
+    const avgEl = document.getElementById("yi-avg-day-val");
+    const avgSub = document.getElementById("yi-avg-day-sub");
+    if (avgEl) avgEl.textContent = this.app.formatDuration(Math.round(avgMins));
+    if (avgSub) avgSub.textContent = `${activeDates.length} active days`;
+
+    // --- Consistency % ---
+    const consistencyPct = rangeDates.length > 0 ? Math.round((activeDates.length / rangeDates.length) * 100) : 0;
+    const consEl = document.getElementById("yi-consistency-val");
+    const consSub = document.getElementById("yi-consistency-sub");
+    if (consEl) consEl.textContent = `${consistencyPct}%`;
+    if (consSub) consSub.textContent = `${activeDates.length} / ${rangeDates.length} days`;
+
+    // --- Longest Streak ---
+    let longestStreak = 0, currentStreak = 0;
+    for (const dateStr of rangeDates) {
+      if (this.getFilteredMinutesForDate(dateStr, filter) > 0) {
+        currentStreak++;
+        longestStreak = Math.max(longestStreak, currentStreak);
+      } else {
+        currentStreak = 0;
+      }
+    }
+    const strEl = document.getElementById("yi-streak-val");
+    const strSub = document.getElementById("yi-streak-sub");
+    if (strEl) strEl.textContent = `${longestStreak} day${longestStreak !== 1 ? "s" : ""}`;
+    if (strSub) strSub.textContent = longestStreak > 0 ? "consecutive days" : "No streak yet";
+
+    // --- Top Month ---
+    const monthMap = {};
+    for (const dateStr of rangeDates) {
+      const monthKey = dateStr.slice(0, 7);
+      monthMap[monthKey] = (monthMap[monthKey] || 0) + this.getFilteredMinutesForDate(dateStr, filter);
+    }
+    let topMonth = null, topMonthMins = 0;
+    for (const [k, v] of Object.entries(monthMap)) {
+      if (v > topMonthMins) { topMonthMins = v; topMonth = k; }
+    }
+    const tmEl = document.getElementById("yi-top-month-val");
+    const tmSub = document.getElementById("yi-top-month-sub");
+    if (tmEl) tmEl.textContent = topMonth ? new Date(topMonth + "-15T12:00:00").toLocaleDateString("en-US", { month: "long", year: "2-digit" }) : "—";
+    if (tmSub) tmSub.textContent = this.app.formatDuration(Math.round(topMonthMins));
+
+    // --- Year Trend (H1 vs H2) ---
+    const midpoint = rangeDates[Math.floor(rangeDates.length / 2)];
+    const firstHalf = rangeDates.filter(d => d < midpoint);
+    const secondHalf = rangeDates.filter(d => d >= midpoint);
+    const firstAvg = firstHalf.length ? firstHalf.reduce((s, d) => s + this.getFilteredMinutesForDate(d, filter), 0) / firstHalf.length : 0;
+    const secondAvg = secondHalf.length ? secondHalf.reduce((s, d) => s + this.getFilteredMinutesForDate(d, filter), 0) / secondHalf.length : 0;
+    const trendPct = firstAvg > 0 ? Math.round(((secondAvg - firstAvg) / firstAvg) * 100) : 0;
+    const trendEl = document.getElementById("yi-trend-val");
+    const trendSub = document.getElementById("yi-trend-sub");
+    if (trendEl) {
+      trendEl.textContent = trendPct >= 0 ? `↑ +${trendPct}%` : `↓ ${trendPct}%`;
+      trendEl.style.color = trendPct >= 0 ? "#28b463" : "#dc3545";
+    }
+    if (trendSub) trendSub.textContent = "2nd half vs 1st half";
   }
 
   formatCompactBattleDate(dateStr) {
