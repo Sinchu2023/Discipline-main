@@ -190,28 +190,203 @@ const PRODUCTIVE_CATEGORIES = new Set([
 //   id, category, subcategory, startTime, endTime, duration, date,
 //   description(optional), sourceDevice, createdAt, updatedAt
 // }
+// ── MOTIVATION POOL ──────────────────────────────────────────────────────────
+// 150+ quotes across four themes: Never Give Up | Level Up | Discipline | Mindset
+// getRandomMotivation() returns a fresh random quote every call (no repeats until
+// the whole pool is cycled – Fisher-Yates shuffle on an internal index).
 const MOTIVATION_LINES = [
+  // ── NEVER GIVE UP ──────────────────────────────────────────────────────────
+  "The comeback is always stronger than the setback. Keep grinding.",
+  "Pain is temporary. Quitting lasts forever. Choose your hard.",
+  "Fall seven times, stand up eight. That's the discipline that wins.",
+  "You didn't come this far just to come this far. Keep pushing.",
+  "Every champion was once a contender that refused to give up.",
+  "It's not whether you get knocked down — it's whether you get back up.",
+  "Failure is only permanent if you stop trying.",
+  "The moment you want to quit is the moment you need to keep going.",
+  "You are closer than you think. Don't you dare stop now.",
+  "Rock bottom is the most solid foundation you'll ever build on.",
+  "Your only competition is who you were yesterday.",
+  "The wall you keep hitting is the door you haven't opened yet.",
+  "Hard days are the fuel. Quit days are the poison.",
+  "Resilience isn't just bouncing back — it's bouncing forward.",
+  "Every setback is a setup for a legendary comeback.",
+  "When you feel like giving up, remember why you started.",
+  "Storms make trees take deeper roots. Stay grounded.",
+  "The darkest hour is just before the dawn. Stay.",
+  "You were built for this. Don't let the struggle convince you otherwise.",
+  "Quitting is a permanent solution to a temporary problem.",
+  "Pressure creates diamonds. Lean into it.",
+  "The fighter who gets up one more time always wins.",
+  "A river cuts through rock not by power, but by persistence.",
+  "Success is stumbling from failure to failure with no loss of enthusiasm.",
+  "What the mind can conceive and believe, the body can achieve.",
+  "One more rep. One more page. One more hour. Then another.",
+  "The biggest risk is not taking one. Keep going.",
+  "Endurance is not just the ability to bear a hard thing — it's the ability to turn it into glory.",
+  "Your struggle is proof you haven't given up. Honor it.",
+  "Tough times never last. Tough people always do.",
+
+  // ── LEVEL UP ──────────────────────────────────────────────────────────────
+  "You're not the person you were a year ago. Keep evolving.",
+  "Level up your mind and your life will follow.",
+  "Stop waiting for the perfect moment. Level up now.",
+  "The only version of you that matters is the one you're becoming.",
+  "Upgrade your habits and you upgrade your destiny.",
+  "Growth is uncomfortable. Comfort is stunted growth.",
+  "Every day is a new XP gain. Stack them ruthlessly.",
+  "You either level up or you level out. There is no pause button.",
+  "Your current situation is not your final destination.",
+  "Outgrow your old self with every sunrise.",
+  "Iron sharpens iron. Surround yourself with people who challenge you.",
+  "New level, new devil. You're ready for both.",
+  "Mastery is not born — it is built, one deliberate rep at a time.",
+  "The best time to plant a tree was 10 years ago. The next best time is now.",
+  "You are the architect of your own evolution.",
+  "Leveling up means leaving behind who you used to be without apology.",
+  "Chase skill, not status. Skill brings everything else.",
+  "Skills pay bills and build empires. Stack them daily.",
+  "Your next chapter is greater than your last. Turn the page.",
+  "Progress is a locked door — discipline is the key.",
+  "Invest in yourself. The ROI is unmatched.",
+  "Champions aren't born in gyms. They're born in the quiet hours before dawn.",
+  "Every expert was once a beginner who refused to quit.",
+  "Sharpen the axe more than you swing it. Preparation is power.",
+  "The person who says 'I can't' and the person who says 'I can' are both right.",
+  "Your potential is not a ceiling — it's a horizon. Keep walking toward it.",
+  "You can't go back and change the beginning, but you can start where you are and change the ending.",
+  "The grind never stops because the vision never dies.",
+  "Ordinary people think about how to spend time. Extraordinary people think about how to invest it.",
+  "Each rep, each page, each line of code — all compound interest in your future self.",
+
+  // ── DISCIPLINE & EXECUTION ─────────────────────────────────────────────────
   "Excellence is not a singular act, but a habit. You are what you repeatedly do.",
   "Discipline is the bridge between goals and accomplishment.",
-  "The comeback is always stronger than the setback. Keep grinding.",
   "No shortcuts. No excuses. Just relentless execution.",
   "Consistency beats intensity every single time. Show up daily.",
-  "Pain is temporary. Quitting lasts forever. Choose your hard.",
   "Your discipline today is your freedom tomorrow.",
   "Grind in silence, let success make the noise.",
-  "Fall seven times, stand up eight. This is discipline.",
   "Small daily improvements lead to staggering long-term results.",
   "The only limit is the one you set yourself. Break it.",
   "Action is the antidote to anxiety. Keep moving forward.",
   "Don't stop when you're tired. Stop when you're done.",
-  "The only bad workout is the one that didn't happen.",
   "Success is the sum of small efforts, repeated day in and day out.",
   "Your future is created by what you do today, not tomorrow.",
-  "The harder you work for something, the greater you'll feel when you achieve it.",
-  "Discipline is doing what needs to be done even when you don't want to.",
+  "Discipline is doing what needs to be done even when you don't feel like it.",
   "Be so good they can't ignore you. Master your craft.",
+  "Motivation gets you started. Discipline keeps you going.",
+  "You don't need to be extreme — just be consistent.",
+  "Stop thinking. Start doing. Perfection is the enemy of progress.",
+  "The clock doesn't care about your mood. Neither does your goal.",
+  "Execution without excuses. That's the formula.",
+  "Hard work beats talent when talent doesn't work hard.",
+  "Winners embrace hard work. They love the discipline of it.",
+  "Self-discipline is the magic power that makes you virtually unstoppable.",
+  "Doing the work is not optional. Loving it is not required.",
+  "The standard is the standard. Don't negotiate with yourself.",
+  "Control what you can control: your effort, your attitude, your focus.",
+  "Two types of pain: the pain of discipline and the pain of regret. Choose wisely.",
+  "Track the reps, not just the results. The results follow the reps.",
+  "Routine is the scaffold on which greatness is built.",
+  "Do it for future you. That person is counting on today's you.",
+  "Log it. Track it. Review it. Improve it. Repeat.",
+
+  // ── MINDSET & MENTAL TOUGHNESS ─────────────────────────────────────────────
+  "The mind is the athlete. The body is simply the means it travels in.",
+  "You are not your thoughts. You are the action you take despite them.",
+  "Mental toughness is trained, not inherited. Train yours daily.",
+  "Fear is just excitement without permission. Breathe and go.",
+  "Your mind will quit 1000 times before your body does.",
+  "A strong mind is your most powerful weapon. Forge it.",
+  "The quality of your thoughts determines the quality of your life.",
+  "Doubt kills more dreams than failure ever will.",
+  "Think big. Start small. Act now.",
+  "Stillness is not weakness — it is the eye of the storm.",
+  "The greatest battle is the one that happens between your ears.",
+  "Energy flows where attention goes. Point your focus wisely.",
+  "Your self-talk is a script your life follows. Rewrite it.",
+  "Ego is the enemy of progress. Stay humble. Stay hungry.",
+  "Silence the noise. Listen to the signal. Execute.",
+  "Focus is the force multiplier. One target, all energy.",
+  "A ship in harbor is safe, but that's not what ships are built for.",
+  "You are always one decision away from a completely different life.",
+  "Clarity over busyness. Purposeful action beats frantic motion.",
+  "Own your morning. Own your day. Own your future.",
+  "You don't rise to the level of your goals. You fall to the level of your systems.",
+  "Identity is behavior. Be the person who shows up.",
+  "The body achieves what the mind believes.",
+  "Your beliefs shape your reality. Choose them carefully.",
+  "Comparison is the thief of joy and the killer of momentum.",
+  "Compete with your yesterday self. That's the only fair race.",
+  "Vision without execution is hallucination. Execute daily.",
+  "Obsession beats talent. Be obsessed with the process.",
+  "Problems are just goals in disguise. Solve them and level up.",
+  "Gratitude and drive are not opposites — they are fuel.",
+
+  // ── GRIND & HUSTLE ────────────────────────────────────────────────────────
+  "While they sleep, you sharpen. That's the edge.",
+  "Nobody is coming to save you. Rise and do it yourself.",
+  "The grind is the goal. Fall in love with the process.",
+  "Those hours in the dark are the hours that build legacies.",
+  "Talent is overrated. Showing up every single day is not.",
+  "The secret? There is no secret. Just work. Relentlessly.",
+  "Outwork everyone. Out-improve everyone. Outlast everyone.",
+  "You want results? Put in the reps nobody sees.",
+  "Every day you don't practice, someone else is. Remember that.",
+  "The late nights and early mornings — that's where legends are made.",
+  "Do more than is required. That's what separates good from great.",
+  "Champions train when they don't feel like it. That's the point.",
+  "The harder you work today, the easier tomorrow gets.",
+  "Success isn't owned. It's rented — and rent is due every day.",
+  "Show up. Suit up. Never give up.",
+  "When it gets hard, that's when others quit. That's your advantage.",
+  "Your strongest muscle is your will. Exercise it relentlessly.",
+  "Stack the hours. Stack the reps. The compound interest is real.",
+  "Execute like it's urgent. Because it is.",
+  "You were built for the grind. This is exactly where you belong.",
+
+  // ── WISDOM & PURPOSE ──────────────────────────────────────────────────────
+  "The harder you work for something, the greater you'll feel when you achieve it.",
+  "Be so good they can't ignore you.",
   "The only way to achieve the impossible is to believe it is possible.",
+  "Purpose is the engine. Discipline is the fuel.",
+  "A life lived on purpose is never wasted.",
+  "Know your 'why' and the 'how' will find you.",
+  "The goal isn't to be the best. It's to be better than you were.",
+  "Legacy is built in the hours no one applauds.",
+  "Sacrifice now. Celebrate later. That's the order.",
+  "You are writing your story every single hour. Make it worth reading.",
+  "Make today so productive that tomorrow says thank you.",
+  "Regret is the heaviest weight. Lift discipline instead.",
+  "Your potential is the ceiling you've never touched yet.",
+  "Do one brave thing today and your future self will remember it.",
+  "Earn today. Rest on your deathbed.",
 ];
+
+// ── Random quote engine ────────────────────────────────────────────────────
+// Uses Fisher-Yates shuffle so every quote appears before repeating.
+(function () {
+  let _pool = [];
+  let _idx = 0;
+
+  function _shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function _refill() {
+    _pool = _shuffle([...MOTIVATION_LINES]);
+    _idx = 0;
+  }
+
+  window.getRandomMotivation = function () {
+    if (_idx >= _pool.length) _refill();
+    return _pool[_idx++];
+  };
+})();
 const STREAK_MESSAGES = {
   1: "Day one. This is where it begins.",
   3: "Three days strong. Momentum is building.",
@@ -3176,15 +3351,11 @@ class UIManager {
     const e = this.app.elements["motivation-line"];
     e.style.opacity = "0";
     setTimeout(() => {
-      let n;
-      do {
-        n = Math.floor(Math.random() * MOTIVATION_LINES.length);
-      } while (
-        n === this.currentMotivationIndex &&
-        MOTIVATION_LINES.length > 1
-      );
-      this.currentMotivationIndex = n;
-      e.textContent = MOTIVATION_LINES[n];
+      // getRandomMotivation() cycles through all 150+ quotes (Fisher-Yates)
+      // before any quote repeats — guaranteed fresh every rotation.
+      e.textContent = window.getRandomMotivation
+        ? window.getRandomMotivation()
+        : MOTIVATION_LINES[Math.floor(Math.random() * MOTIVATION_LINES.length)];
       e.style.opacity = "1";
     }, 500);
   }
