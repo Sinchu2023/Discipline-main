@@ -10093,9 +10093,9 @@ class GraphManager {
         level,
         nearGoalTier,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
-        state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
         timetableGold: goldDatesSet.has(dateStr),
-    });
+      };
+    })
 
     // ── Continuous heatmap color scaling ──────────────────────────────────────
     // Find the highest productive-minutes value among all active days across
