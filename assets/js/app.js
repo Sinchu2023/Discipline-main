@@ -3291,6 +3291,18 @@ class UIManager {
 
     // Start the idle timer on init
     idleTimer = setTimeout(showScreensaver, IDLE_TIMEOUT);
+
+    // Expose a global trigger so the button can fire it instantly
+    window._triggerScreensaver = showScreensaver;
+
+    // Wire up the manual trigger button
+    const ssBtn = document.getElementById("ss-trigger-btn");
+    if (ssBtn) {
+      ssBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showScreensaver();
+      });
+    }
   }
 
   updateDateTime() {
