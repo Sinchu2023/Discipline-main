@@ -4114,3 +4114,121 @@ header {
   transform: scale(0.97);
 }
 
+/* ── Year Trend Expanded Card ───────────────────────────────────────────── */
+#yi-trend.yi-card {
+  padding: 14px 16px 16px;
+}
+.yi-trend-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.yi-trend-header .yi-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.yi-trend-header .yi-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.yi-trend-h2-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.9);
+}
+.yi-trend-tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 600px) {
+  .yi-trend-tables { grid-template-columns: 1fr; }
+}
+.yi-trend-section-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+/* Table */
+.yi-trend-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.yi-trend-table thead th {
+  text-align: left;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.yi-trend-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.12s;
+}
+.yi-trend-table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+.yi-trend-table tbody td {
+  padding: 4px 4px;
+  color: rgba(255,255,255,0.82);
+  vertical-align: middle;
+}
+.yi-trend-table tbody td:first-child {
+  font-weight: 500;
+  color: rgba(255,255,255,0.9);
+}
+.yi-trend-table tbody td:last-child {
+  text-align: right;
+}
+/* Current month highlight */
+.yi-trend-table tbody tr.yi-row-current {
+  background: rgba(255,255,255,0.06);
+}
+.yi-trend-table tbody tr.yi-row-current td:first-child {
+  color: #7dd3fc;
+  font-weight: 700;
+}
+/* Empty rows (no data) */
+.yi-trend-table tbody tr.yi-row-empty td {
+  color: rgba(255,255,255,0.25);
+}
+/* Delta badges */
+.yi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.yi-delta-up {
+  color: #28b463;
+  background: rgba(40,180,99,0.12);
+}
+.yi-delta-down {
+  color: #e74c3c;
+  background: rgba(231,76,60,0.12);
+}
+.yi-delta-none {
+  color: rgba(255,255,255,0.25);
+  background: transparent;
+  font-weight: 400;
+}

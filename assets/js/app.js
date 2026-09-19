@@ -9166,7 +9166,7 @@ class GraphManager {
     if (tmEl) tmEl.textContent = topMonth ? new Date(topMonth + "-15T12:00:00").toLocaleDateString("en-US", { month: "long", year: "2-digit" }) : "—";
     if (tmSub) tmSub.textContent = this.app.formatDuration(Math.round(topMonthMins));
 
-    // --- Year Trend (H1 vs H2) ---
+    // --- Year Trend: H1 vs H2 badge ---
     const midpoint = rangeDates[Math.floor(rangeDates.length / 2)];
     const firstHalf = rangeDates.filter(d => d < midpoint);
     const secondHalf = rangeDates.filter(d => d >= midpoint);
@@ -9180,6 +9180,64 @@ class GraphManager {
       trendEl.style.color = trendPct >= 0 ? "#28b463" : "#dc3545";
     }
     if (trendSub) trendSub.textContent = "2nd half vs 1st half";
+
+    // --- Monthly breakdown table ---
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const currentYearStr = String(new Date().getFullYear());
+    // Build month totals for the year in view
+    const monthTotals = MONTHS.map((name, mi) => {
+      const key = `${currentYearStr}-${String(mi + 1).padStart(2, "0")}`;
+      const mins = rangeDates
+        .filter(d => d.startsWith(key))
+        .reduce((s, d) => s + this.getFilteredMinutesForDate(d, filter), 0);
+      return { name, key, mins };
+    });
+
+    const monthlyTbody = document.getElementById("yi-monthly-tbody");
+    if (monthlyTbody) {
+      monthlyTbody.innerHTML = monthTotals.map((m, i) => {
+        const prev = i > 0 ? monthTotals[i - 1].mins : null;
+        let deltaBadge = `<span class="yi-delta yi-delta-none">—</span>`;
+        if (prev !== null && prev > 0 && m.mins > 0) {
+          const d = Math.round(((m.mins - prev) / prev) * 100);
+          const cls = d >= 0 ? "yi-delta-up" : "yi-delta-down";
+          const arrow = d >= 0 ? "↑" : "↓";
+          deltaBadge = `<span class="yi-delta ${cls}">${arrow} ${d >= 0 ? "+" : ""}${d}%</span>`;
+        } else if (m.mins === 0) {
+          deltaBadge = `<span class="yi-delta yi-delta-none">—</span>`;
+        }
+        const isCurrentMonth = m.key === this.app.getActiveDate().slice(0, 7);
+        const rowCls = isCurrentMonth ? " class=\"yi-row-current\"" : (m.mins === 0 ? " class=\"yi-row-empty\"" : "");
+        return `<tr${rowCls}><td>${m.name}</td><td>${m.mins > 0 ? this.app.formatDuration(Math.round(m.mins)) : "—"}</td><td>${deltaBadge}</td></tr>`;
+      }).join("");
+    }
+
+    // --- Quarterly breakdown table ---
+    const quarters = [
+      { label: "Q1 (Jan–Mar)", months: [0,1,2] },
+      { label: "Q2 (Apr–Jun)", months: [3,4,5] },
+      { label: "Q3 (Jul–Sep)", months: [6,7,8] },
+      { label: "Q4 (Oct–Dec)", months: [9,10,11] },
+    ];
+    const quarterTotals = quarters.map(q => ({
+      label: q.label,
+      mins: q.months.reduce((s, mi) => s + monthTotals[mi].mins, 0),
+    }));
+
+    const quarterlyTbody = document.getElementById("yi-quarterly-tbody");
+    if (quarterlyTbody) {
+      quarterlyTbody.innerHTML = quarterTotals.map((q, i) => {
+        const prev = i > 0 ? quarterTotals[i - 1].mins : null;
+        let deltaBadge = `<span class="yi-delta yi-delta-none">—</span>`;
+        if (prev !== null && prev > 0 && q.mins > 0) {
+          const d = Math.round(((q.mins - prev) / prev) * 100);
+          const cls = d >= 0 ? "yi-delta-up" : "yi-delta-down";
+          const arrow = d >= 0 ? "↑" : "↓";
+          deltaBadge = `<span class="yi-delta ${cls}">${arrow} ${d >= 0 ? "+" : ""}${d}%</span>`;
+        }
+        return `<tr${q.mins === 0 ? " class=\"yi-row-empty\"" : ""}><td>${q.label}</td><td>${q.mins > 0 ? this.app.formatDuration(Math.round(q.mins)) : "—"}</td><td>${deltaBadge}</td></tr>`;
+      }).join("");
+    }
   }
 
   formatCompactBattleDate(dateStr) {

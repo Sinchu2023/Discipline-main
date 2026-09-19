@@ -339,11 +339,31 @@
                 <div class="yi-value" id="yi-top-month-val">—</div>
                 <div class="yi-sub" id="yi-top-month-sub">0h 00m total</div>
               </div>
-              <div class="yi-card yi-trend-card" id="yi-trend">
-                <div class="yi-icon">📈</div>
-                <div class="yi-label">Year Trend</div>
-                <div class="yi-value" id="yi-trend-val">—</div>
-                <div class="yi-sub" id="yi-trend-sub">vs previous 6 months</div>
+              <div class="yi-card yi-trend-card" id="yi-trend" style="grid-column: 1 / -1;">
+                <div class="yi-trend-header">
+                  <span class="yi-icon">📈</span>
+                  <span class="yi-label">Year Trend</span>
+                  <span class="yi-trend-h2-badge" id="yi-trend-val">—</span>
+                  <span class="yi-sub" id="yi-trend-sub" style="margin-left:auto;font-size:0.72rem;opacity:0.6;">2nd half vs 1st half</span>
+                </div>
+                <div class="yi-trend-tables">
+                  <!-- Monthly Table -->
+                  <div class="yi-trend-section">
+                    <div class="yi-trend-section-title">📅 Monthly</div>
+                    <table class="yi-trend-table" id="yi-monthly-table">
+                      <thead><tr><th>Month</th><th>Total</th><th>vs Prev</th></tr></thead>
+                      <tbody id="yi-monthly-tbody"></tbody>
+                    </table>
+                  </div>
+                  <!-- Quarterly Table -->
+                  <div class="yi-trend-section">
+                    <div class="yi-trend-section-title">📊 Quarterly</div>
+                    <table class="yi-trend-table" id="yi-quarterly-table">
+                      <thead><tr><th>Quarter</th><th>Total</th><th>vs Prev</th></tr></thead>
+                      <tbody id="yi-quarterly-tbody"></tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
