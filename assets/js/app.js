@@ -388,16 +388,27 @@ const MOTIVATION_LINES = [
   };
 })();
 const STREAK_MESSAGES = {
-  1: "Day one. This is where it begins.",
-  3: "Three days strong. Momentum is building.",
-  7: "One week! Discipline is becoming a habit.",
-  14: "Two weeks. You're building something real.",
-  21: "Three weeks. This is who you are now.",
-  30: "One month of discipline. Elite status.",
-  60: "Two months. You've transformed.",
-  90: "Three months. Unstoppable.",
-  100: "Century streak. This is your identity.",
-  365: "One year. You've mastered yourself.",
+  1:   "Day one. The journey starts NOW. Don't stop.",
+  2:   "Two days down. Prove it wasn't a fluke — show up again.",
+  3:   "Three days strong. Momentum is building.",
+  4:   "Four days. Most people quit before this. You didn't.",
+  5:   "Five-day run. You're forming something real here.",
+  6:   "Six days straight. Tomorrow makes a full week. Do NOT stop.",
+  7:   "One full week! Discipline is becoming a habit.",
+  8:   "Eight days. You've outlasted a week AND kept going.",
+  9:   "Nine days. One more for double digits. Make it happen.",
+  10:  "Ten days! Double digits. The compound effect is kicking in.",
+  14:  "Two weeks. You're building something real.",
+  21:  "Three weeks. The habit is wired in. This is who you are now.",
+  30:  "One month of discipline. That's elite-level consistency.",
+  45:  "45 days. Six weeks of showing up. You are not the same person who started.",
+  60:  "Two months straight. You've transformed your identity.",
+  75:  "75 days. You've entered territory most people only dream about.",
+  90:  "Three months. Unstoppable. You've proven it to yourself.",
+  100: "Century streak. This discipline is your identity now.",
+  150: "150 days straight. You're operating at a level most people will never reach.",
+  180: "Six months of consecutive discipline. Half a year. Legendary.",
+  365: "365 days. One full year. You have mastered yourself.",
 };
 
 class ActivityClassifier {
@@ -2166,6 +2177,8 @@ class StopwatchManager {
     this.pendingMeta = null;
     this.lastRenderedTime = null;
     this.startGuardInFlight = false;
+    // Prevents onSnapshot from restarting timer after user explicitly stops it
+    this._stoppedLocally = false;
   }
   formatElapsed(ms) {
     const h = Math.floor(ms / 3600000);
@@ -2249,6 +2262,8 @@ class StopwatchManager {
     if (this.isRunning)
       return alert("A task is already running. Stop it first.");
     this.startGuardInFlight = true;
+    // User is intentionally starting — allow cloud restores again
+    this._stoppedLocally = false;
     try {
       const remoteTimerState =
         await this.app.cloudManager?.getTimerState?.();
@@ -2324,6 +2339,8 @@ class StopwatchManager {
   }
   stop() {
     if (!this.isRunning) return;
+    // Mark as explicitly stopped so cloud snapshots don't restart it
+    this._stoppedLocally = true;
     this.stopTicking();
     const totalElapsed = this.getElapsedNow();
     this.elapsedBeforePause = totalElapsed;
@@ -2451,6 +2468,9 @@ class StopwatchManager {
   }
 
   restoreFromCloud(timerState) {
+    // If the user stopped locally, ignore any stale "running" snapshots from
+    // Firestore until they explicitly start a new task.
+    if (this._stoppedLocally) return;
     if (this.isRunning || !timerState || timerState.status !== "running")
       return;
     const activeTask = timerState.activeTask;
@@ -3362,8 +3382,13 @@ class UIManager {
   showStreakPopup() {
     const streak = this.app.state.streak;
     this.app.elements["streak-count"].textContent = streak;
+    // Find the closest milestone message at or below the current streak
+    const milestones = Object.keys(STREAK_MESSAGES).map(Number).sort((a, b) => b - a);
+    const matchedMilestone = milestones.find(m => streak >= m);
     this.app.elements["streak-message"].textContent =
-      STREAK_MESSAGES[streak] || `${streak} days strong. Keep going.`;
+      STREAK_MESSAGES[streak] ||
+      (matchedMilestone ? STREAK_MESSAGES[matchedMilestone] : null) ||
+      `${streak} days straight. Elite-level discipline. Don't stop now.`;
     this.app.elements["streak-popup"].style.display = "flex";
   }
   hideStreakPopup() {
@@ -6856,11 +6881,13 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const autoDone = !!item.done;
       const manualDone = !!checks[checkId] || !!checks[legacyId];
       const done = autoDone || manualDone;
+      // Read persisted on-time gold flag (set when task was checked within ±20 min of its window)
+      const gold = done && !!(checks[checkId + "__gold"] || checks[legacyId + "__gold"]);
       const win = this.getMissionTimeWindow(item);
       const [startH, endH] = win;
       const expired = !done && nowH > endH;
       const activeNow = !done && !expired && nowH >= startH && nowH <= endH;
-      cache.set(checkId, { idx, item, checkId, done, win, startH, endH, expired, activeNow });
+      cache.set(checkId, { idx, item, checkId, done, gold, win, startH, endH, expired, activeNow });
     });
     return cache;
   }
@@ -6878,10 +6905,12 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     const score = totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0;
     scoreEl.textContent = `${score}/100`;
   }
-  _applyRowState(row, done, expired, activeNow) {
+  _applyRowState(row, done, expired, activeNow, gold = false) {
     row.classList.toggle("shadow-goal-done", done);
     row.classList.toggle("mission-expired", expired && !done);
     row.classList.toggle("mission-active-now", activeNow && !done && !expired);
+    // Golden box: task completed on-time (within ±20 min of its scheduled window)
+    row.classList.toggle("mission-gold-ontime", done && !!gold);
   }
 
   // â”€â”€ Phase 0.4: live expiry ticker â€” only CSS toggles, never innerHTML â”€
@@ -6894,7 +6923,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const startH = parseFloat(el.dataset.winStart);
       const endH = parseFloat(el.dataset.winEnd);
       const done = el.classList.contains("shadow-goal-done");
-      this._applyRowState(el, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH);
+      const gold = el.dataset.gold === "1";
+      this._applyRowState(el, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH, gold);
     });
   }
 
@@ -6966,20 +6996,34 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const cached = this._missionStateCache?.get(checkId);
       if (cached) cached.done = !!e.target.checked;
 
-      // Phase 0.3: update only THIS row â€” no innerHTML, no loop
+      // Phase 0.3: update only THIS row - no innerHTML, no loop
       const row = e.target.closest(".shadow-goal-item");
+      let goldForRow = false;
       if (row) {
         let nowH = new Date().getHours() + new Date().getMinutes() / 60;
         if (nowH < 5) nowH += 24;
         const endH = parseFloat(row.dataset.winEnd || "22");
         const startH = parseFloat(row.dataset.winStart || "8");
         const done = !!e.target.checked;
-        this._applyRowState(row, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH);
+        // Detect on-time: checked while current time is within +/-20 min of the window
+        const ON_TIME_BUFFER = 20 / 60;
+        const isOnTime = done && nowH >= (startH - ON_TIME_BUFFER) && nowH <= (endH + ON_TIME_BUFFER);
+        const existingGold = row.dataset.gold === "1";
+        goldForRow = (existingGold && done) || isOnTime;
+        row.dataset.gold = goldForRow ? "1" : "0";
+        if (cached) cached.gold = goldForRow;
+        this._applyRowState(row, done, !done && nowH > endH, !done && nowH >= startH && nowH <= endH, goldForRow);
       }
 
-      // Persist manual check state locally + sync tiny missionChecks doc only
+      // Persist manual check state + gold flag locally, sync to cloud
       const checks = this.getTodayManualMissionChecks();
       checks[checkId] = !!e.target.checked;
+      // Persist the gold flag: set if on-time, clear if unchecked
+      if (goldForRow) {
+        checks[checkId + "__gold"] = true;
+      } else if (!e.target.checked) {
+        delete checks[checkId + "__gold"];
+      }
       localStorage.setItem(CONFIG.STORAGE_KEYS.TRAINER_STATE, JSON.stringify(this.state));
       this.updateMissionChecklistScore();
       const today = this.app.getDateString(new Date());
@@ -7081,10 +7125,13 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       if (state.done) cls += " shadow-goal-done";
       if (state.expired) cls += " mission-expired";
       if (state.activeNow) cls += " mission-active-now";
+      // Golden box: completed on-time (within ±20 min of scheduled window)
+      if (state.done && state.gold) cls += " mission-gold-ontime";
+      const goldData = state.gold ? " data-gold=\"1\"" : " data-gold=\"0\"";
       const badge = `<span class="mission-time-badge"${timeId}>${this.formatTimeWindow(state.win)}</span>`;
       const labelledBy = idx < 7 ? `${taskIds[idx]} ${timeIds[idx]}` : "";
       const ariaLabel = labelledBy ? ` aria-labelledby="${labelledBy}"` : ` aria-label="${this.escapeHtml(item.label || item.topic)} ${this.formatTimeWindow(state.win)}"`;
-      return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}"${ariaLabel}>` +
+      return `<div class="${cls}" data-win-start="${state.startH}" data-win-end="${state.endH}" data-check-id="${this.escapeHtml(checkId)}"${goldData}${ariaLabel}>` +
         `<div class="mission-copy">${badge}<span class="mission-title"${labelId}>${idx + 1}. ${this.escapeHtml(item.label || item.topic)}</span></div>` +
         `<input class="mission-check" type="checkbox" data-mission-check-id="${this.escapeHtml(checkId)}" ${state.done ? "checked" : ""} />` +
         `</div>`;
@@ -9100,7 +9147,8 @@ class GraphManager {
     }
     const strEl = document.getElementById("yi-streak-val");
     const strSub = document.getElementById("yi-streak-sub");
-    if (strEl) strEl.textContent = `${longestStreak} day${longestStreak !== 1 ? "s" : ""}`;
+    // Show "—" instead of "0 days" when there is no streak data yet
+    if (strEl) strEl.textContent = longestStreak > 0 ? `${longestStreak} day${longestStreak !== 1 ? "s" : ""}` : "—";
     if (strSub) strSub.textContent = longestStreak > 0 ? "consecutive days" : "No streak yet";
 
     // --- Top Month ---
@@ -9779,6 +9827,28 @@ class GraphManager {
       );
     });
 
+
+    // -- Golden Day Detection: date had ALL primary timetable tasks completed on-time --
+    // A date is 'gold' if every non-secondary mission task has both a check AND a __gold flag
+    const allMissionChecks = this.app.trainerEngine?.state?.manualMissionChecks || {};
+    const goldDatesSet = new Set();
+    Object.entries(allMissionChecks).forEach(([dateKey, checks]) => {
+      if (!checks || typeof checks !== 'object') return;
+      // Get mission tasks for this date to know which checkIds are primary
+      const missionTasks = this.app.trainerEngine?.getDailyMissionTasks?.() || [];
+      // Primary tasks = not secondary; we only require those to be gold
+      const primaryIds = missionTasks
+        .map((item, idx) => ({
+          id: this.app.trainerEngine.getMissionCheckId(item.topic, idx),
+          secondary: !!item.secondary
+        }))
+        .filter(t => !t.secondary)
+        .map(t => t.id);
+      if (primaryIds.length === 0) return;
+      // All primary tasks must be checked AND have a __gold flag
+      const allGold = primaryIds.every(id => !!checks[id] && !!checks[id + '__gold']);
+      if (allGold) goldDatesSet.add(dateKey);
+    });
     const yearsWithData = Array.from(yearDataMap.keys()).sort((a, b) => a - b);
     const currentYear = year || new Date().getFullYear();
     this.app.uiManager.currentHeatmapYear = currentYear;
@@ -9866,7 +9936,8 @@ class GraphManager {
         level,
         nearGoalTier,
         state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
-      };
+        state: !hasData ? "neutral" : (isWin ? "win" : "loss"),
+        timetableGold: goldDatesSet.has(dateStr),
     });
 
     // ── Continuous heatmap color scaling ──────────────────────────────────────
@@ -10018,22 +10089,32 @@ class GraphManager {
         cell.dataset.best = "broken";
       }
 
-      // Apply continuous color – skip for today (CSS handles that)
+      // Apply continuous color - skip for today (CSS handles that)
+      // Golden day overrides: whole timetable completed on-time -> gold cell
       if (!isToday) {
-        const cs = heatmapCellStyle(day.productive, day.hasData, maxProductiveMinutes);
-        cell.style.backgroundColor = cs.bg;
-        cell.style.borderColor = cs.border;
-        if (cs.glow !== "none") {
-          cell.style.boxShadow = cs.glow;
+        if (day.timetableGold) {
+          // Full golden day - override green with rich amber/gold
+          cell.style.backgroundColor = '#c8860a';
+          cell.style.borderColor = 'rgba(255, 210, 60, 0.80)';
+          cell.style.boxShadow = '0 0 7px rgba(212, 160, 23, 0.85), 0 0 2px rgba(255, 220, 80, 0.6)';
+          cell.dataset.gold = '1';
+        } else {
+          const cs = heatmapCellStyle(day.productive, day.hasData, maxProductiveMinutes);
+          cell.style.backgroundColor = cs.bg;
+          cell.style.borderColor = cs.border;
+          if (cs.glow !== 'none') {
+            cell.style.boxShadow = cs.glow;
+          }
         }
       }
 
       const dateLabel = this.formatCompactBattleDate(day.dateStr);
       const statusLabel =
-        day.state === "neutral" ? "No activity" : day.state === "win" ? "Win" : "Loss";
+        day.state === 'neutral' ? 'No activity' : day.state === 'win' ? 'Win' : 'Loss';
       const productiveLabel =
         day.productive > 0 ? ` - ${this.app.formatDuration(day.productive)} productive` : "";
-      cell.title = `${statusLabel} on ${dateLabel}${productiveLabel}`;
+      const goldLabel = day.timetableGold ? " 🏆 Perfect Timetable Day!" : "";
+      cell.title = `${statusLabel} on ${dateLabel}${productiveLabel}${goldLabel}`;
       grid.appendChild(cell);
     });
 

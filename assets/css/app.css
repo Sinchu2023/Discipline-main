@@ -846,6 +846,45 @@
         50%       { opacity: 0.3; }
       }
 
+      /* ── Golden Box: on-time completion reward ─────────────────────────── */
+      /* Applied when a task is checked within ±20 min of its scheduled window */
+      .shadow-goal-item.mission-gold-ontime {
+        background: linear-gradient(
+          135deg,
+          rgba(212, 160, 23, 0.18) 0%,
+          rgba(255, 200, 50, 0.10) 50%,
+          rgba(212, 160, 23, 0.18) 100%
+        ) !important;
+        border: 1px solid rgba(255, 196, 35, 0.55) !important;
+        box-shadow:
+          0 0 0 1px rgba(255, 196, 35, 0.18),
+          0 2px 14px rgba(212, 160, 23, 0.25),
+          inset 0 1px 0 rgba(255, 220, 80, 0.15) !important;
+        animation: gold-shimmer 3s ease-in-out infinite;
+      }
+      @keyframes gold-shimmer {
+        0%, 100% { box-shadow: 0 0 0 1px rgba(255,196,35,0.18), 0 2px 14px rgba(212,160,23,0.25), inset 0 1px 0 rgba(255,220,80,0.15); }
+        50%       { box-shadow: 0 0 0 1px rgba(255,196,35,0.35), 0 4px 22px rgba(212,160,23,0.45), inset 0 1px 0 rgba(255,220,80,0.28); }
+      }
+      /* Golden time badge */
+      .shadow-goal-item.mission-gold-ontime .mission-time-badge {
+        background: rgba(212, 160, 23, 0.22) !important;
+        border-color: rgba(255, 196, 35, 0.50) !important;
+        color: #ffd84f !important;
+      }
+      /* Crown icon prefix on task title */
+      .shadow-goal-item.mission-gold-ontime .mission-title::before {
+        content: "👑 ";
+        animation: none;
+        display: inline;
+        margin-right: 2px;
+      }
+      /* Golden text tint */
+      .shadow-goal-item.mission-gold-ontime .mission-title {
+        color: #ffe680 !important;
+        font-weight: 500;
+      }
+
       .shadow-gap-positive {
         color: var(--danger);
       }
@@ -2944,6 +2983,21 @@
 .github-cell:hover {
   transform: scale(1.12);
   cursor: crosshair;
+}
+/* ── Golden heatmap cell: entire timetable completed on-time ── */
+.github-cell[data-gold="1"] {
+  background-color: #c8860a !important;
+  border-color: rgba(255, 210, 60, 0.80) !important;
+  box-shadow: 0 0 7px rgba(212, 160, 23, 0.85), 0 0 2px rgba(255, 220, 80, 0.6) !important;
+  animation: heatmap-gold-pulse 2.8s ease-in-out infinite;
+}
+@keyframes heatmap-gold-pulse {
+  0%, 100% { box-shadow: 0 0 7px rgba(212, 160, 23, 0.85), 0 0 2px rgba(255, 220, 80, 0.6); }
+  50%       { box-shadow: 0 0 12px rgba(212, 160, 23, 1.0), 0 0 5px rgba(255, 220, 80, 0.9); }
+}
+.github-cell[data-gold="1"]:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 16px rgba(255, 190, 30, 1.0) !important;
 }
 .github-heatmap-legend {
   display: flex;
