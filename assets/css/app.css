@@ -4232,3 +4232,136 @@ header {
   background: transparent;
   font-weight: 400;
 }
+/* ── Idle Screensaver Overlay ───────────────────────────────────────────── */
+#discipline-screensaver {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #080c12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+#discipline-screensaver.ss-visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Ambient background glows that slowly drift */
+.ss-bg-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+}
+.ss-bg-glow-1 {
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, rgba(30, 60, 200, 0.18) 0%, transparent 70%);
+  top: -10%;
+  left: -5%;
+  animation: ss-drift-1 22s ease-in-out infinite alternate;
+}
+.ss-bg-glow-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(100, 30, 180, 0.14) 0%, transparent 70%);
+  bottom: -5%;
+  right: 5%;
+  animation: ss-drift-2 28s ease-in-out infinite alternate;
+}
+@keyframes ss-drift-1 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(60px, 40px) scale(1.12); }
+}
+@keyframes ss-drift-2 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(-50px, -30px) scale(0.9); }
+}
+
+/* Main content block — slowly drifts up-down */
+.ss-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  animation: ss-float 12s ease-in-out infinite alternate;
+  max-width: 640px;
+  padding: 0 24px;
+}
+@keyframes ss-float {
+  0%   { transform: translateY(0px); }
+  100% { transform: translateY(-18px); }
+}
+
+/* Giant clock */
+.ss-clock {
+  font-size: clamp(4rem, 12vw, 9rem);
+  font-weight: 200;
+  letter-spacing: -0.04em;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Date line */
+.ss-date {
+  font-size: clamp(0.85rem, 2vw, 1.1rem);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Task status pill */
+.ss-status {
+  margin-top: 6px;
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 40px;
+  padding: 8px 24px;
+  letter-spacing: 0.03em;
+  min-height: 2.2rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.4s, border-color 0.4s, background 0.4s;
+}
+/* Late state — red tint */
+.ss-status[data-state="late"] {
+  color: #ff6b6b;
+  border-color: rgba(255, 80, 80, 0.3);
+  background: rgba(255, 60, 60, 0.08);
+}
+/* On-track state — green tint */
+.ss-status[data-state="ok"] {
+  color: #5af0a0;
+  border-color: rgba(60, 220, 120, 0.3);
+  background: rgba(40, 200, 100, 0.07);
+}
+
+/* Motivational quote */
+.ss-motivation {
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.28);
+  max-width: 480px;
+  line-height: 1.6;
+  margin-top: 4px;
+}
+
+/* Dismiss hint */
+.ss-hint {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.13);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 24px;
+}

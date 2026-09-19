@@ -3193,7 +3193,106 @@ class UIManager {
     this.updateDateTime();
     this.startMotivationRotation();
     this.renderSleepJournal();
+    this.initScreensaver();
   }
+
+  // ── Idle Screensaver ──────────────────────────────────────────────────────
+  // Activates after IDLE_TIMEOUT ms of no mouse/keyboard/touch activity.
+  // Shows current task status + large clock. Dismissed on any interaction.
+  initScreensaver() {
+    const IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+    let idleTimer = null;
+    let ssActive = false;
+
+    // Build the overlay DOM (once)
+    const overlay = document.createElement("div");
+    overlay.id = "discipline-screensaver";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.innerHTML = `
+      <div class="ss-bg-glow ss-bg-glow-1"></div>
+      <div class="ss-bg-glow ss-bg-glow-2"></div>
+      <div class="ss-content">
+        <div class="ss-clock" id="ss-clock">--:--</div>
+        <div class="ss-date" id="ss-date"></div>
+        <div class="ss-status" id="ss-status"></div>
+        <div class="ss-motivation" id="ss-motivation"></div>
+        <div class="ss-hint">Move mouse or press any key to continue</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // ── Tick: update screensaver content every second while active ──
+    const updateSS = () => {
+      if (!ssActive) return;
+      const now = new Date();
+      const clockEl = document.getElementById("ss-clock");
+      const dateEl = document.getElementById("ss-date");
+      const statusEl = document.getElementById("ss-status");
+      const motivEl = document.getElementById("ss-motivation");
+
+      if (clockEl) {
+        clockEl.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+      if (dateEl) {
+        dateEl.textContent = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      }
+
+      // Mirror the task-remaining element's text into the screensaver
+      if (statusEl) {
+        const trEl = document.getElementById("task-remaining");
+        if (trEl && trEl.style.display !== "none") {
+          statusEl.textContent = trEl.innerText.replace(/\s+/g, " ").trim();
+          const cls = trEl.className;
+          statusEl.dataset.state = cls.includes("late") || cls.includes("overdue") ? "late" :
+                                   cls.includes("on-track") ? "ok" : "neutral";
+        } else {
+          statusEl.textContent = "";
+          statusEl.dataset.state = "neutral";
+        }
+      }
+
+      // Show a random motivation line
+      if (motivEl && !motivEl.textContent) {
+        motivEl.textContent = window.getRandomMotivation ? window.getRandomMotivation() :
+          "Every minute counts. Stay disciplined.";
+      }
+    };
+
+    let ssTickInterval = null;
+
+    const showScreensaver = () => {
+      if (ssActive) return;
+      ssActive = true;
+      overlay.classList.add("ss-visible");
+      updateSS();
+      ssTickInterval = setInterval(updateSS, 1000);
+    };
+
+    const hideScreensaver = () => {
+      if (!ssActive) return;
+      ssActive = false;
+      overlay.classList.remove("ss-visible");
+      clearInterval(ssTickInterval);
+      // Refresh a motivation line for next time
+      const motivEl = document.getElementById("ss-motivation");
+      if (motivEl) motivEl.textContent = "";
+    };
+
+    const resetIdle = () => {
+      if (ssActive) { hideScreensaver(); return; }
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(showScreensaver, IDLE_TIMEOUT);
+    };
+
+    // Listen for any activity
+    ["mousemove", "mousedown", "keydown", "touchstart", "wheel", "scroll"].forEach(evt => {
+      document.addEventListener(evt, resetIdle, { passive: true });
+    });
+
+    // Start the idle timer on init
+    idleTimer = setTimeout(showScreensaver, IDLE_TIMEOUT);
+  }
+
   updateDateTime() {
     const updateTime = () => {
       const now = new Date();
