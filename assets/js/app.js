@@ -191,176 +191,77 @@ const PRODUCTIVE_CATEGORIES = new Set([
 //   description(optional), sourceDevice, createdAt, updatedAt
 // }
 // ── MOTIVATION POOL ──────────────────────────────────────────────────────────
-// 150+ quotes across four themes: Never Give Up | Level Up | Discipline | Mindset
-// getRandomMotivation() returns a fresh random quote every call (no repeats until
-// the whole pool is cycled – Fisher-Yates shuffle on an internal index).
+// Raw, personal, SSC-specific lines. No poster quotes. No generic hustle.
+// These should feel like a real person who knows your actual struggle.
 const MOTIVATION_LINES = [
-  // ── NEVER GIVE UP ──────────────────────────────────────────────────────────
-  "The comeback is always stronger than the setback. Keep grinding.",
-  "Pain is temporary. Quitting lasts forever. Choose your hard.",
-  "Fall seven times, stand up eight. That's the discipline that wins.",
-  "You didn't come this far just to come this far. Keep pushing.",
-  "Every champion was once a contender that refused to give up.",
-  "It's not whether you get knocked down — it's whether you get back up.",
-  "Failure is only permanent if you stop trying.",
-  "The moment you want to quit is the moment you need to keep going.",
-  "You are closer than you think. Don't you dare stop now.",
-  "Rock bottom is the most solid foundation you'll ever build on.",
-  "Your only competition is who you were yesterday.",
-  "The wall you keep hitting is the door you haven't opened yet.",
-  "Hard days are the fuel. Quit days are the poison.",
-  "Resilience isn't just bouncing back — it's bouncing forward.",
-  "Every setback is a setup for a legendary comeback.",
-  "When you feel like giving up, remember why you started.",
-  "Storms make trees take deeper roots. Stay grounded.",
-  "The darkest hour is just before the dawn. Stay.",
-  "You were built for this. Don't let the struggle convince you otherwise.",
-  "Quitting is a permanent solution to a temporary problem.",
-  "Pressure creates diamonds. Lean into it.",
-  "The fighter who gets up one more time always wins.",
-  "A river cuts through rock not by power, but by persistence.",
-  "Success is stumbling from failure to failure with no loss of enthusiasm.",
-  "What the mind can conceive and believe, the body can achieve.",
-  "One more rep. One more page. One more hour. Then another.",
-  "The biggest risk is not taking one. Keep going.",
-  "Endurance is not just the ability to bear a hard thing — it's the ability to turn it into glory.",
-  "Your struggle is proof you haven't given up. Honor it.",
-  "Tough times never last. Tough people always do.",
 
-  // ── LEVEL UP ──────────────────────────────────────────────────────────────
-  "You're not the person you were a year ago. Keep evolving.",
-  "Level up your mind and your life will follow.",
-  "Stop waiting for the perfect moment. Level up now.",
-  "The only version of you that matters is the one you're becoming.",
-  "Upgrade your habits and you upgrade your destiny.",
-  "Growth is uncomfortable. Comfort is stunted growth.",
-  "Every day is a new XP gain. Stack them ruthlessly.",
-  "You either level up or you level out. There is no pause button.",
-  "Your current situation is not your final destination.",
-  "Outgrow your old self with every sunrise.",
-  "Iron sharpens iron. Surround yourself with people who challenge you.",
-  "New level, new devil. You're ready for both.",
-  "Mastery is not born — it is built, one deliberate rep at a time.",
-  "The best time to plant a tree was 10 years ago. The next best time is now.",
-  "You are the architect of your own evolution.",
-  "Leveling up means leaving behind who you used to be without apology.",
-  "Chase skill, not status. Skill brings everything else.",
-  "Skills pay bills and build empires. Stack them daily.",
-  "Your next chapter is greater than your last. Turn the page.",
-  "Progress is a locked door — discipline is the key.",
-  "Invest in yourself. The ROI is unmatched.",
-  "Champions aren't born in gyms. They're born in the quiet hours before dawn.",
-  "Every expert was once a beginner who refused to quit.",
-  "Sharpen the axe more than you swing it. Preparation is power.",
-  "The person who says 'I can't' and the person who says 'I can' are both right.",
-  "Your potential is not a ceiling — it's a horizon. Keep walking toward it.",
-  "You can't go back and change the beginning, but you can start where you are and change the ending.",
-  "The grind never stops because the vision never dies.",
-  "Ordinary people think about how to spend time. Extraordinary people think about how to invest it.",
-  "Each rep, each page, each line of code — all compound interest in your future self.",
+  // ── THE REAL GRIND ─────────────────────────────────────────────────────────
+  "The Pinnacle book is open. The questions are waiting. What are you doing?",
+  "Gagan Pratap didn't make those videos so you could watch them twice and move on without practicing.",
+  "SSC CGL doesn't care how smart you are. It cares how many questions you've solved.",
+  "One more topic left in the chapter. Close it before you close the tab.",
+  "The person who gets selected isn't the one who worked the hardest once. It's the one who showed up every day.",
+  "You're building something. It doesn't look like much yet. That's how all real things start.",
+  "The exam date is fixed. Your preparation time is not infinite. Act accordingly.",
+  "Every PYQ you skip is a question you might face in the exam hall with no answer.",
+  "You already know what to do. The problem is you're waiting to feel like doing it.",
+  "5:30 AM is brutal. The result is not. That's the trade.",
+  "Active recall, not re-reading. You know this. Apply it now.",
+  "Someone with fewer resources than you is outworking you right now. Think about that.",
+  "The selection ratio is brutal. Your daily input needs to match that.",
+  "You've already invested months into this. Today's session protects that investment.",
+  "Close social media. Open the book. These two things cannot happen at the same time.",
 
-  // ── DISCIPLINE & EXECUTION ─────────────────────────────────────────────────
-  "Excellence is not a singular act, but a habit. You are what you repeatedly do.",
-  "Discipline is the bridge between goals and accomplishment.",
-  "No shortcuts. No excuses. Just relentless execution.",
-  "Consistency beats intensity every single time. Show up daily.",
-  "Your discipline today is your freedom tomorrow.",
-  "Grind in silence, let success make the noise.",
-  "Small daily improvements lead to staggering long-term results.",
-  "The only limit is the one you set yourself. Break it.",
-  "Action is the antidote to anxiety. Keep moving forward.",
-  "Don't stop when you're tired. Stop when you're done.",
-  "Success is the sum of small efforts, repeated day in and day out.",
-  "Your future is created by what you do today, not tomorrow.",
-  "Discipline is doing what needs to be done even when you don't feel like it.",
-  "Be so good they can't ignore you. Master your craft.",
-  "Motivation gets you started. Discipline keeps you going.",
-  "You don't need to be extreme — just be consistent.",
-  "Stop thinking. Start doing. Perfection is the enemy of progress.",
-  "The clock doesn't care about your mood. Neither does your goal.",
-  "Execution without excuses. That's the formula.",
-  "Hard work beats talent when talent doesn't work hard.",
-  "Winners embrace hard work. They love the discipline of it.",
-  "Self-discipline is the magic power that makes you virtually unstoppable.",
-  "Doing the work is not optional. Loving it is not required.",
-  "The standard is the standard. Don't negotiate with yourself.",
-  "Control what you can control: your effort, your attitude, your focus.",
-  "Two types of pain: the pain of discipline and the pain of regret. Choose wisely.",
-  "Track the reps, not just the results. The results follow the reps.",
-  "Routine is the scaffold on which greatness is built.",
-  "Do it for future you. That person is counting on today's you.",
-  "Log it. Track it. Review it. Improve it. Repeat.",
+  // ── HONEST AND DIRECT ──────────────────────────────────────────────────────
+  "Feeling tired is normal. Stopping because of it is a choice.",
+  "The gap between you and selection is mostly just logged hours. Start logging.",
+  "You don't need a perfect study plan. You need to execute the one you already have.",
+  "A bad session is worth ten times more than a session you skipped.",
+  "Consistency over intensity. Ten hours spread across ten days beats one ten-hour binge.",
+  "The brain needs repetition, not inspiration. Repeat the work.",
+  "Every concept you understand deeply today is one less mark you lose in the exam.",
+  "You are not behind. You are exactly where your actions have put you. Change the actions.",
+  "Distraction is the default. Focus is a choice you make every few minutes.",
+  "The question you found hard today is the one you'll thank yourself for studying tomorrow.",
+  "Your score doesn't care about your intentions. Only your output matters.",
+  "Keep the timer running a little longer than feels comfortable. That's where growth is.",
+  "Hard chapters don't get easier by avoiding them. They only get harder to face later.",
+  "You've been studying for this. Trust the hours you've put in. Keep adding to them.",
+  "An hour now, before you feel ready, is worth more than two hours later when you do.",
 
-  // ── MINDSET & MENTAL TOUGHNESS ─────────────────────────────────────────────
-  "The mind is the athlete. The body is simply the means it travels in.",
-  "You are not your thoughts. You are the action you take despite them.",
-  "Mental toughness is trained, not inherited. Train yours daily.",
-  "Fear is just excitement without permission. Breathe and go.",
-  "Your mind will quit 1000 times before your body does.",
-  "A strong mind is your most powerful weapon. Forge it.",
-  "The quality of your thoughts determines the quality of your life.",
-  "Doubt kills more dreams than failure ever will.",
-  "Think big. Start small. Act now.",
-  "Stillness is not weakness — it is the eye of the storm.",
-  "The greatest battle is the one that happens between your ears.",
-  "Energy flows where attention goes. Point your focus wisely.",
-  "Your self-talk is a script your life follows. Rewrite it.",
-  "Ego is the enemy of progress. Stay humble. Stay hungry.",
-  "Silence the noise. Listen to the signal. Execute.",
-  "Focus is the force multiplier. One target, all energy.",
-  "A ship in harbor is safe, but that's not what ships are built for.",
-  "You are always one decision away from a completely different life.",
-  "Clarity over busyness. Purposeful action beats frantic motion.",
-  "Own your morning. Own your day. Own your future.",
-  "You don't rise to the level of your goals. You fall to the level of your systems.",
-  "Identity is behavior. Be the person who shows up.",
-  "The body achieves what the mind believes.",
-  "Your beliefs shape your reality. Choose them carefully.",
-  "Comparison is the thief of joy and the killer of momentum.",
-  "Compete with your yesterday self. That's the only fair race.",
-  "Vision without execution is hallucination. Execute daily.",
-  "Obsession beats talent. Be obsessed with the process.",
-  "Problems are just goals in disguise. Solve them and level up.",
-  "Gratitude and drive are not opposites — they are fuel.",
+  // ── QUIET RESILIENCE ───────────────────────────────────────────────────────
+  "Nobody else can sit in the exam hall for you. That seat is yours to earn.",
+  "The people who made it didn't have better resources. They just kept going longer.",
+  "This phase of your life is temporary. The habit of discipline is not.",
+  "Missing one day is a stumble. Missing three days is a pattern. Don't build a pattern.",
+  "You started this for a reason that mattered. That reason still holds.",
+  "The difficulty is proof you're in the right zone. Stay there a little longer.",
+  "Every attempt you review and learn from is preparation. Every one you ignore is a wasted shot.",
+  "The 3-read rule exists because your brain needs time, not more staring. Trust the process.",
+  "Small, honest progress every day. That's the entire formula.",
+  "The day you feel least like opening the book is often the day the session matters most.",
+  "Your revision schedule exists so your future self doesn't blank in the exam. Follow it.",
+  "Real preparation happens in the quiet hours when no one is watching. Log those hours.",
+  "The session doesn't have to be perfect. It has to happen.",
+  "You're further along than you think. Don't measure against the finish line — measure against yesterday.",
+  "Brick by brick. Chapter by chapter. That's how it gets built.",
 
-  // ── GRIND & HUSTLE ────────────────────────────────────────────────────────
-  "While they sleep, you sharpen. That's the edge.",
-  "Nobody is coming to save you. Rise and do it yourself.",
-  "The grind is the goal. Fall in love with the process.",
-  "Those hours in the dark are the hours that build legacies.",
-  "Talent is overrated. Showing up every single day is not.",
-  "The secret? There is no secret. Just work. Relentlessly.",
-  "Outwork everyone. Out-improve everyone. Outlast everyone.",
-  "You want results? Put in the reps nobody sees.",
-  "Every day you don't practice, someone else is. Remember that.",
-  "The late nights and early mornings — that's where legends are made.",
-  "Do more than is required. That's what separates good from great.",
-  "Champions train when they don't feel like it. That's the point.",
-  "The harder you work today, the easier tomorrow gets.",
-  "Success isn't owned. It's rented — and rent is due every day.",
-  "Show up. Suit up. Never give up.",
-  "When it gets hard, that's when others quit. That's your advantage.",
-  "Your strongest muscle is your will. Exercise it relentlessly.",
-  "Stack the hours. Stack the reps. The compound interest is real.",
-  "Execute like it's urgent. Because it is.",
-  "You were built for the grind. This is exactly where you belong.",
-
-  // ── WISDOM & PURPOSE ──────────────────────────────────────────────────────
-  "The harder you work for something, the greater you'll feel when you achieve it.",
-  "Be so good they can't ignore you.",
-  "The only way to achieve the impossible is to believe it is possible.",
-  "Purpose is the engine. Discipline is the fuel.",
-  "A life lived on purpose is never wasted.",
-  "Know your 'why' and the 'how' will find you.",
-  "The goal isn't to be the best. It's to be better than you were.",
-  "Legacy is built in the hours no one applauds.",
-  "Sacrifice now. Celebrate later. That's the order.",
-  "You are writing your story every single hour. Make it worth reading.",
-  "Make today so productive that tomorrow says thank you.",
-  "Regret is the heaviest weight. Lift discipline instead.",
-  "Your potential is the ceiling you've never touched yet.",
-  "Do one brave thing today and your future self will remember it.",
-  "Earn today. Rest on your deathbed.",
+  // ── PERSPECTIVE ────────────────────────────────────────────────────────────
+  "The Blackbook is sitting there. Vocabulary doesn't learn itself.",
+  "Current Affairs from last month still matter. Review them before you forget.",
+  "Your error notebook has answers. Go read them.",
+  "Ghost subject slot: 30 minutes. You have 30 minutes. Use them.",
+  "The 6-day revision tonight exists so exam-day you isn't staring at a blank page.",
+  "Mixed PYQs late at night aren't optional. That's where exam speed comes from.",
+  "The night routine is boring. So is being unprepared in the exam hall.",
+  "You know the difference between recognition and recall. Stop fooling yourself with re-reading.",
+  "Golden Question: Could you reproduce this in the exam without cues? If not — relearn it now.",
+  "8 minutes per page. Not because it's comfortable. Because after that, you're diminishing returns.",
+  "Mark the hard ones. Return to them. That loop is the entire secret to retention.",
+  "Comprehension check, self-explanation, active recall. In order. Every time.",
+  "Your weakest subject is the one that needs the most time today, not the least.",
+  "The slot you're in right now is either used or wasted. There's no middle ground.",
+  "Sleep is part of the system. Protect it like you protect your study time.",
 ];
 
 // ── Random quote engine ────────────────────────────────────────────────────
@@ -10924,7 +10825,7 @@ class MasterMessageManager {
     return pool[idx];
   }
 
-  // ── Compose messages: varied, data-driven, 4 bubbles max ─────────────────
+  // ── Compose messages: grounded, data-driven, mentor tone ────────────────
   composeMessages() {
     const now      = new Date();
     const nowMins  = now.getHours() * 60 + now.getMinutes();
@@ -10939,190 +10840,179 @@ class MasterMessageManager {
     const todayMins    = this.app.getProductiveMinutesForDate(todayStr, this.app.state.tasks);
     const ydMins       = this.app.getProductiveMinutesForDate(ydStr,    this.app.state.tasks);
     const remaining    = Math.max(0, shadowTarget - todayMins);
-    const streak       = this.getCurrentStreak(); // consecutive days before today where shadow was beaten
+    const streak       = this.getCurrentStreak();
 
     const currentSlot  = this.getCurrentSlot(nowMins);
     const nextSlot     = this.getNextSlot(nowMins);
 
     const msgs = [];
 
-    // ── Line 1: Shadow beaten today → PB chase. Not beaten → yesterday context. ──
+    // ── Line 1: Yesterday's context — honest, not theatrical ─────────────────
     if (remaining === 0 && todayMins > 0) {
-      // Shadow cleared — upgrade the target to personal best
       const pb = this.getPersonalBest();
       if (pb > 0 && todayMins >= pb) {
         msgs.push(this.pick([
-          `${this.fmt(todayMins)}. Record smashed. You think this is where you stop? Cowards stop at records. Keep the timer running.`,
-          `NEW ALL-TIME BEST. ${this.fmt(todayMins)}. The session is still open and you're thinking about stopping. Seriously?`,
-          `You broke it. ${this.fmt(todayMins)}. Now throw another hour on top. That's what separates the ones who actually make it.`,
-          `${this.fmt(todayMins)} — best day of your life. And the timer is still ticking. Don't you dare waste this moment.`,
+          `${this.fmt(todayMins)} — that's your best day ever. The session's still open. Up to you what you do with that.`,
+          `Personal best. ${this.fmt(todayMins)}. You can stop here — you've genuinely earned it. Or you can find out what one more hour looks like.`,
+          `New all-time record: ${this.fmt(todayMins)}. Whatever you did today, remember it. That's the standard now.`,
         ]));
       } else if (pb > 0) {
         const gapToPB = pb - todayMins;
         msgs.push(this.pick([
-          `You killed the shadow and your all-time record of ${this.fmt(pb)} is STILL standing there. ${this.fmt(gapToPB)} away. Are you a coward or not?`,
-          `${this.fmt(gapToPB)}. Just ${this.fmt(gapToPB)} between you and the greatest day you have ever had. And you're SITTING THERE doing nothing.`,
-          `Your record is ${this.fmt(pb)} and it hasn't moved. You're ${this.fmt(gapToPB)} away. If you close that app right now I genuinely feel sorry for you.`,
-          `The shadow is dead. Your record is ${this.fmt(pb)} and it's laughing at your face. ${this.fmt(gapToPB)} left. Open the timer before you embarrass yourself.`,
-          `You've done ${this.fmt(todayMins)}. Your personal best is ${this.fmt(pb)}. ${this.fmt(gapToPB)} is ALL that's left. If you stop now you deserve every failure coming your way.`,
+          `Target's done. Your all-time best is ${this.fmt(pb)} — you're ${this.fmt(gapToPB)} away. Worth going for if you have it in you.`,
+          `Shadow is clear. Personal best is ${this.fmt(pb)}. ${this.fmt(gapToPB)} separates today from your best day ever. That's your call.`,
+          `${this.fmt(todayMins)} on the board. Your record is ${this.fmt(pb)}. The gap is ${this.fmt(gapToPB)}. Timer's still open.`,
         ]));
       } else {
-        msgs.push(`Shadow is dead. Every minute from now on is a personal record. You have ZERO excuse to stop. Absolutely zero.`);
+        msgs.push(this.pick([
+          `You beat the target. Every minute from here is building your baseline higher. Keep it going if you have more in you.`,
+          `Shadow's dead. The timer's still open — no pressure, but this is how personal bests get set.`,
+        ]));
       }
     } else if (ydMins === 0) {
       msgs.push(this.pick([
-        "ZERO yesterday. Not one second. What were you doing? Scrolling? Sleeping? Whatever it was, it wasn't your future.",
-        "You gave yesterday ZERO minutes. Zero. That day is gone and you wasted it completely. Don't you dare do it again.",
-        "Yesterday: zero. Nothing. Not a single minute logged. That is the behavior of someone who is going to fail. Change it today.",
-        "Zero yesterday. That's not a bad day, that's a surrender. The log has it recorded permanently. Fix it today or it defines you.",
-        "You had 24 hours yesterday and couldn't find even 30 minutes to work. What is actually wrong with you?",
+        `Nothing logged yesterday. That happens. The question is what today looks like.`,
+        `Yesterday was a zero. That's already gone — you can't change it. Today you can. Start now.`,
+        `Zero yesterday. I'm not going to pretend that's fine — it's not. But dwelling on it doesn't help either. Open the timer.`,
+        `Yesterday didn't happen, in terms of the log. Today needs to count.`,
       ]));
     } else if (ydMins < 60) {
       msgs.push(this.pick([
-        `${this.fmt(ydMins)} yesterday. Under one hour. That is an absolute joke. You call that a study day? That's an insult to the word.`,
-        `${this.fmt(ydMins)} yesterday — you spent more time in the bathroom than working. Disgusting effort. Fix it today.`,
-        `Under 60 minutes yesterday. A child doing homework puts in more time than that. What is your excuse?`,
-        `${this.fmt(ydMins)} yesterday. That's not studying. That's performing the idea of studying while wasting the entire day.`,
-        `${this.fmt(ydMins)} logged yesterday and you probably felt proud of it. You shouldn't have. That's embarrassing.`,
+        `${this.fmt(ydMins)} yesterday. Under an hour. You and I both know that's not a real session. Today needs to be different.`,
+        `Yesterday was ${this.fmt(ydMins)}. That's not enough, and you already know that. Let's correct it today.`,
+        `${this.fmt(ydMins)} logged yesterday. Less than an hour. The selection process will not be impressed. Today has to be more.`,
       ]));
     } else if (shadowTarget > 0 && ydMins < shadowTarget * 0.8) {
       msgs.push(this.pick([
-        `${this.fmt(ydMins)} yesterday when you needed ${this.fmt(shadowTarget)}. You absolutely BOTTLED it. That failure is in the record. Are you going to let it happen again today?`,
-        `You owed ${this.fmt(shadowTarget)} yesterday. You paid ${this.fmt(ydMins)}. That's called underdelivering on your own life. Disgusting. Fix it.`,
-        `${this.fmt(shadowTarget - ydMins)} short yesterday. That's not a small gap, that's you quitting before the finish line. Stop doing that.`,
-        `Shadow demanded ${this.fmt(shadowTarget)} yesterday and you gave ${this.fmt(ydMins)}. You folded under your own target. How does that feel?`,
+        `You needed ${this.fmt(shadowTarget)} yesterday and put in ${this.fmt(ydMins)}. That gap matters. Don't let it happen again today.`,
+        `Yesterday was ${this.fmt(ydMins)} against a target of ${this.fmt(shadowTarget)}. ${this.fmt(shadowTarget - ydMins)} short. Let's close that kind of gap today, not repeat it.`,
+        `${this.fmt(ydMins)} yesterday when the shadow asked for ${this.fmt(shadowTarget)}. You fell short. The only thing that fixes that is today.`,
       ]));
     } else if (shadowTarget > 0 && ydMins >= shadowTarget) {
       if (streak >= 2) {
         msgs.push(this.pick([
-          `${streak} days straight above shadow. If you break this today for ZERO reason, you are exactly the kind of person who never reaches their goals. Don't be that.`,
-          `${streak}-day streak alive. Yesterday ${this.fmt(ydMins)}. You destroy this today and I promise you'll regret it. Keep it going.`,
-          `${streak} days in a row. You finally built something. Breaking it today would be the dumbest thing you've done all week.`,
+          `${streak} days straight above the shadow target. Yesterday was ${this.fmt(ydMins)}. That's a real run — protect it.`,
+          `${streak}-day streak. You've been genuinely consistent. Don't let today be the day that breaks it for a bad reason.`,
+          `${streak} days in a row. Most people don't make it this far. You did. Keep the streak alive.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `You beat shadow yesterday. ONE day. Cool achievement. Now prove to yourself it wasn't a lucky accident and do it again RIGHT NOW.`,
-          `Yesterday was good — ${this.fmt(ydMins)}. But one day of output means absolutely nothing without the day after it. What are you?`,
-          `You won yesterday. Great. Does winning one day make you a winner, or does showing up every single day? Prove it today.`,
+          `Good day yesterday — ${this.fmt(ydMins)}. Now back it up with another one.`,
+          `Yesterday worked. ${this.fmt(ydMins)} logged. The habit only forms when you make it two days in a row.`,
+          `You beat the shadow yesterday. That's one. It means nothing without the follow-through today.`,
         ]));
       }
     } else {
-      msgs.push(`${this.fmt(ydMins)} yesterday. Barely acceptable. Today that number goes up. No discussion.`);
+      msgs.push(`${this.fmt(ydMins)} yesterday. Decent, not great. Today, a little more.`);
     }
 
-    // ── Line 2: Today's shadow target vs progress ─────────────────────────
+    // ── Line 2: Today's target — clear, real, no dramatics ───────────────────
     if (shadowTarget === 0) {
       msgs.push(this.pick([
-        "The system has no target because you haven't logged enough sessions. You can't complain about lack of direction when you haven't shown up consistently.",
-        "No shadow target set. That means no data. That means you're inconsistent. Stop reading this and go log something real.",
+        `No shadow target yet — not enough data. Log consistent sessions and the system will calibrate. Until then, just show up.`,
+        `The shadow can't track you if you're not logging. Put something real on the board today.`,
       ]));
     } else if (todayMins === 0 && hour >= 6) {
       msgs.push(this.pick([
-        `${this.fmt(shadowTarget)} needed today. ZERO done. The day is bleeding out and you haven't even opened the timer. What are you actually doing with your life?`,
-        `It's ${hour > 12 ? 'the afternoon' : 'the morning'} and you have logged NOTHING. ${this.fmt(shadowTarget)} is sitting there untouched. This is not a drill. START NOW.`,
-        `Zero minutes. On a day you need ${this.fmt(shadowTarget)}. The audacity to sit there doing nothing is unreal. Open the timer.`,
-        `Hours wasted. Zero logged. ${this.fmt(shadowTarget)} needed. You are actively destroying your own future by sitting there. GET UP.`,
-        `${dow} is being murdered right in front of you and you're the one doing it. ${this.fmt(shadowTarget)} needed. Not one minute done. Open the timer RIGHT NOW.`,
+        `${this.fmt(shadowTarget)} is today's target. Nothing's been logged yet. The day's not over — but it's moving. Open the timer.`,
+        `It's ${hour > 12 ? 'the afternoon' : 'the morning'} and the counter's at zero. ${this.fmt(shadowTarget)} needed. First session starts the momentum — get it going.`,
+        `Zero minutes today. Target is ${this.fmt(shadowTarget)}. You're not behind yet — you're just not started. Fix that.`,
+        `${dow}'s target: ${this.fmt(shadowTarget)}. Nothing logged. The first 15 minutes are the hardest to start. After that it gets easier.`,
       ]));
     } else if (todayMins === 0) {
       msgs.push(this.pick([
-        `Day is starting and ${this.fmt(shadowTarget)} is waiting. Don't be the person who plans to start "in a bit" and then it's 11pm. Open the timer NOW.`,
-        `${this.fmt(shadowTarget)} needed. Zero done. The ONLY acceptable next move is opening the timer. Everything else is an excuse.`,
+        `${this.fmt(shadowTarget)} to get through today. Early still — start before the day gets away from you.`,
+        `Target is ${this.fmt(shadowTarget)}. Day's just beginning. Get the first session in before the morning slips.`,
       ]));
     } else if (remaining > 0) {
       const pct = Math.round((todayMins / shadowTarget) * 100);
       msgs.push(this.pick([
-        `${pct}% done and you're thinking about stopping? ${this.fmt(remaining)} left. Finish the job or admit you have no discipline.`,
-        `${this.fmt(todayMins)} in, ${this.fmt(remaining)} still owed. The shadow doesn't care that you're tired. The exam doesn't either. PUSH.`,
-        `${this.fmt(remaining)} left and you're slowing down? This is EXACTLY how you end up short every single day of your life. Stop it.`,
-        `${pct}% done means ${100 - pct}% undone. Stop patting yourself on the back for half a job. Finish it.`,
-        `${this.fmt(remaining)} standing between you and beating your shadow. Not a mountain. Not impossible. ${this.fmt(remaining)}. Go.`,
+        `${this.fmt(todayMins)} done, ${this.fmt(remaining)} left. ${pct}% of the way there. Keep it moving.`,
+        `${pct}% complete. ${this.fmt(remaining)} still to go. You're inside the work — that's the right place to be.`,
+        `${this.fmt(remaining)} between you and the shadow target. Not far. Keep the timer running.`,
+        `${this.fmt(todayMins)} logged so far. Shadow needs ${this.fmt(shadowTarget)}. ${this.fmt(remaining)} is the gap — close it.`,
       ]));
     } else {
-      // Shadow beaten today — show streak
       const todayStreak = streak + 1;
       if (todayStreak >= 3) {
         msgs.push(this.pick([
-          `${todayStreak} days STRAIGHT above shadow. ${this.fmt(todayMins)} today. You kill this streak right now and I don't want to hear another word about your goals.`,
-          `${todayStreak} consecutive wins. That's not luck, that took work. Throwing it away today for no reason would be pathetic.`,
-          `${todayStreak} days running. ${this.fmt(todayMins)} logged. You stop now and the whole streak resets. Was it even worth building?`,
+          `${this.fmt(todayMins)} done. Shadow is dead. ${todayStreak} days in a row — you've built something real here.`,
+          `${todayStreak} consecutive days above target. ${this.fmt(todayMins)} today. This is what consistency looks like.`,
+          `${todayStreak} days running and the target's already down. Whatever time's left is yours to use or rest — you've earned it.`,
         ]));
       } else if (todayStreak === 2) {
         msgs.push(this.pick([
-          `Two days in a row beating shadow. ${this.fmt(todayMins)} today. One more tomorrow and you have a real streak. Don't be someone who quits at two.`,
-          `Back to back. ${this.fmt(todayMins)} done. Tomorrow is the third. If you don't show up tomorrow this entire two-day run was meaningless.`,
+          `Two days in a row above shadow. ${this.fmt(todayMins)} today. One more tomorrow builds the streak into something.`,
+          `${this.fmt(todayMins)} done, target cleared. Back it up tomorrow and you've got a streak worth keeping.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `Shadow dead. ${this.fmt(todayMins)} on board. ONE day. You want a trophy? Show up tomorrow. That's the only reward that matters.`,
-          `${this.fmt(todayMins)} done, shadow buried. Now use this open session to go after your personal best or get out of the chair. Sitting there scrolling is a waste of the win you just earned.`,
-          `Target cleared. ${this.fmt(todayMins)} logged. This is bonus time and you're wasting it. Either chase the record or sleep. Pick one.`,
-          `${this.fmt(todayMins)} on board. Shadow is dead. Every minute you keep the timer running now is extra. Are you going to take it or waste it?`,
+          `Target cleared. ${this.fmt(todayMins)} on the board. Rest if you need it — or keep going. Either works.`,
+          `${this.fmt(todayMins)} done. Shadow's behind you. Good session. Do the same tomorrow.`,
+          `You hit the target. ${this.fmt(todayMins)} logged. The extra time is yours — use it well or genuinely rest. Both are valid.`,
         ]));
       }
     }
 
-    // ── Line 3: Slot urgency ──────────────────────────────────────────────
+    // ── Line 3: Slot context — practical, no theatrics ────────────────────────
     if (currentSlot && remaining > 0) {
       const slotEndMins = this.toTotalMins(...currentSlot.end);
       const minsLeft    = slotEndMins - nowMins;
       if (minsLeft <= 20) {
         msgs.push(this.pick([
-          `${currentSlot.name} dies in ${minsLeft} minutes and ${this.fmt(remaining)} is STILL missing. If you don't open the timer this second you are throwing this slot straight in the bin.`,
-          `${minsLeft} minutes left. ${this.fmt(remaining)} unpaid. ${currentSlot.name} is almost gone. Stop reading this message and START.`,
-          `${currentSlot.name} is closing. ${minsLeft} min left. You owe ${this.fmt(remaining)}. Every second you spend not working right now is stolen from your own future.`,
+          `${currentSlot.name} has ${minsLeft} minutes left and ${this.fmt(remaining)} is still unpaid. Use what's left — don't let the slot close empty.`,
+          `${minsLeft} minutes in ${currentSlot.name}. ${this.fmt(remaining)} still needed. Get what you can from this window.`,
+          `Slot's nearly over. ${minsLeft} min left. ${this.fmt(remaining)} remaining. Whatever you can add now matters.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `${currentSlot.name} is LIVE. ${minsLeft} minutes on the clock. ${this.fmt(remaining)} still missing. WHY is the timer not running?`,
-          `You're sitting inside ${currentSlot.name} with ${minsLeft} minutes available and ${this.fmt(remaining)} still to do. This is not thinking time. OPEN THE TIMER.`,
-          `${minsLeft} minutes in ${currentSlot.name} and you still need ${this.fmt(remaining)}. Use this slot or admit out loud that you're not serious about any of this.`,
-          `${currentSlot.name}: ${minsLeft} min left. Gap: ${this.fmt(remaining)}. Timer not running. What is your actual plan here?`,
+          `${currentSlot.name} is open — ${minsLeft} minutes left, ${this.fmt(remaining)} still to go. This slot is the opportunity. Use it.`,
+          `${minsLeft} minutes in ${currentSlot.name}. ${this.fmt(remaining)} needed. The time is there — just needs to be used.`,
+          `Inside ${currentSlot.name}: ${minsLeft} min available, ${this.fmt(remaining)} to close. Open the timer.`,
         ]));
       }
     } else if (currentSlot && remaining === 0) {
       msgs.push(this.pick([
-        `Shadow is dead and ${currentSlot.name} is STILL open. You are sitting on free bonus time. Go destroy your personal record right now or get out of the chair and properly rest. Scrolling is not rest and it's not work.`,
-        `${currentSlot.name} running, target gone. Chase the all-time best or commit to real recovery. Sitting there half-checking your phone is a waste of both.`,
-        `Target done. ${currentSlot.name} still open. You have a choice: go further or rest properly. Doing nothing is the worst option and you know it.`,
+        `Shadow's done and ${currentSlot.name} is still running. Bonus time — go after the personal best or take real rest. Scrolling is neither.`,
+        `Target's clear, slot's still open. Either push further or step away properly. Half-resting doesn't help anything.`,
+        `${currentSlot.name} is still live and you've hit the target. Make a decision — more work or genuine recovery.`,
       ]));
     } else if (!currentSlot && nextSlot) {
       const minsUntil = this.toTotalMins(...nextSlot.start) - nowMins;
       if (remaining > 0) {
         if (minsUntil <= 15) {
           msgs.push(this.pick([
-            `${nextSlot.name} opens in ${minsUntil} minutes and ${this.fmt(remaining)} is still due. The second that slot starts, the timer goes on. No warmup. No settling in. STRAIGHT in.`,
-            `${minsUntil} minutes until ${nextSlot.name}. Don't you dare use this gap as an excuse to delay again. Be ready before it opens.`,
+            `${nextSlot.name} starts in ${minsUntil} minutes. ${this.fmt(remaining)} still due. Be ready to go the second it opens.`,
+            `${minsUntil} min until ${nextSlot.name}. ${this.fmt(remaining)} outstanding. Don't use the gap to coast — use it to prepare.`,
           ]));
         } else {
           msgs.push(this.pick([
-            `No slot right now but ${this.fmt(remaining)} is still hanging over you. ${nextSlot.name} opens in ${minsUntil} min. The moment it does — timer on. No delays, no excuses.`,
-            `${minsUntil} minutes until ${nextSlot.name}. ${this.fmt(remaining)} still owed. Don't waste the break AND fumble the next slot. That would be pathetic.`,
-            `Break. Fine. But ${this.fmt(remaining)} is still your problem and ${nextSlot.name} opens in ${minsUntil} min. You better be ready to run the second the slot opens.`,
+            `Between slots. ${this.fmt(remaining)} still needed today. ${nextSlot.name} opens in ${minsUntil} min. Rest if you need to, but be ready.`,
+            `${minsUntil} minutes until ${nextSlot.name}. ${this.fmt(remaining)} left on the target. Use the break deliberately — don't drift.`,
           ]));
         }
       } else {
         msgs.push(this.pick([
-          `Shadow beaten. ${nextSlot.name} opens in ${minsUntil} min. Rest hard — then come back and go after the personal record.`,
-          `Target done. ${minsUntil} minutes free. Recover properly or keep going. But don't waste this time doing nothing, that's the worst of both worlds.`,
+          `Shadow's beaten. ${nextSlot.name} is in ${minsUntil} min. Rest properly or go after the personal best — but make a choice.`,
+          `Target done. ${minsUntil} minutes until ${nextSlot.name}. Decompress, then come back sharp.`,
         ]));
       }
     } else if (!currentSlot && !nextSlot) {
       if (remaining > 0) {
         msgs.push(this.pick([
-          `Every single slot is gone and you're STILL ${this.fmt(remaining)} short. You find that time right now outside the plan, or you write today off as a loss. Which are you choosing?`,
-          `Timetable finished. Shadow still wants ${this.fmt(remaining)}. Are you going to be someone who finds a way, or someone who says "the schedule didn't allow it"? Pick.`,
+          `Timetable's done and ${this.fmt(remaining)} is still outstanding. You can still find the time — or accept today was short. What do you choose?`,
+          `All slots are gone but ${this.fmt(remaining)} is still owed. It's not impossible to make it up — but it requires deciding to right now.`,
         ]));
       } else {
         msgs.push(this.pick([
-          `Day done. Shadow beaten. Go to sleep on time. Your performance tomorrow is being decided in the next hour.`,
-          `All slots done, target destroyed. Put the phone down, set tomorrow, sleep. Don't sabotage a good day with a stupid night.`,
-          `You won today. Don't ruin it by staying up until 2am rotting. Sleep is part of the system. Use it.`,
+          `Day's done. Shadow's beaten. Sleep on time — tomorrow's performance is built on tonight's recovery.`,
+          `All slots done, target cleared. Wind down properly. A good night means a better morning.`,
+          `Good day. Now protect it by sleeping when you said you would. Staying up late undoes more than it adds.`,
         ]));
       }
     }
 
-    // ── Line 4: Training Camp / rank status ─────────────────────────────────
+    // ── Line 4: Rank / Training Camp — factual update ──────────────────────
     const rankProgress = this.app.shadowEngine?.getRankProgressState?.();
     const rankTiers    = this.app.shadowEngine?.rankTiers || [];
     if (rankProgress && rankTiers.length) {
@@ -11132,26 +11022,24 @@ class MasterMessageManager {
         const provRank = rankTiers[camp.provisionalRankIndex];
         const req = this.app.shadowEngine.getTrainingCampSuccessRequirement?.() || 7;
         const daysLeft = req - camp.successDays;
-        const failsLeft = 10 - camp.daysCompleted - daysLeft;
         msgs.push(this.pick([
-          `Training Camp. Day ${camp.daysCompleted} of 10. ${camp.successDays} wins. Need ${req} to confirm ${provRank?.title || 'the rank'}. ${daysLeft} more wins needed. Fail today and you make the math brutal. Don't.`,
-          `Camp is live. ${camp.successDays}/${req} wins. ${daysLeft} left. One wasted day now and you might not recover the numbers in time. Beat the shadow today. No excuses.`,
-          `Day ${camp.daysCompleted} of 10 in Camp. ${camp.successDays} cleared out of ${req}. You cannot afford to throw a single day away right now. WIN TODAY.`,
-          `${daysLeft} wins still needed for ${provRank?.title || 'the rank'}. ${10 - camp.daysCompleted} days left. One unnecessary loss here could end the entire camp. Don't be that stupid.`,
+          `Training Camp — Day ${camp.daysCompleted} of 10. ${camp.successDays} wins, ${daysLeft} more needed to confirm ${provRank?.title || 'the rank'}. Every day counts.`,
+          `Camp update: ${camp.successDays} of ${req} wins completed. ${daysLeft} to go. Beat the shadow today and the math stays in your favour.`,
+          `Day ${camp.daysCompleted} of 10. ${camp.successDays} cleared. ${daysLeft} wins left for ${provRank?.title || 'the next rank'}. Keep the run going.`,
         ]));
       } else if (rank) {
         const nextRank = rankTiers[rankProgress.unlockedRankIndex + 1];
         if (nextRank && shadowTarget > 0) {
           msgs.push(this.pick([
-            `You're stuck at ${rank.title} and it shows. ${nextRank.title} needs ${nextRank.min} rating. Right now you're performing like someone comfortable staying exactly where they are.`,
-            `${rank.title} is your current ceiling. ${nextRank.title} is above it and it needs ${nextRank.min} rating. You want it? Then stop underperforming and go get it.`,
-            `${nextRank.title} unlocks at ${nextRank.min} rating. You're sitting at ${rank.title} going nowhere. Either chase the next rank or admit this is your limit.`,
+            `Current rank: ${rank.title}. Next is ${nextRank.title} at ${nextRank.min} rating. Consistent days above shadow is the path there.`,
+            `You're at ${rank.title}. ${nextRank.title} is the next step — needs ${nextRank.min} rating. Keep the daily output up.`,
+            `${nextRank.title} is above you at ${nextRank.min} rating. You're at ${rank.title}. Close the gap one consistent day at a time.`,
           ]));
         }
       }
     }
 
-    return msgs.slice(0, 4); // max 4 bubbles
+    return msgs.slice(0, 4);
   }
 
   render() {
