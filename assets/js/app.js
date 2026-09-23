@@ -2302,6 +2302,8 @@ class StopwatchManager {
       this.app.elements["stop-btn"].disabled = false;
       this.app.elements["task-input"].disabled = true;
       this.app.elements["active-task-name"].textContent =
+        this.app.state.activeTask.name ||
+        this.app.state.activeTask.description ||
         `${this.app.state.activeTask.category} - ${this.app.state.activeTask.subcategory}`;
       this.app.elements["active-task-start"].textContent =
         this.app.formatTime(this.startTime);
@@ -7163,7 +7165,8 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       if (!cached) return;
       const item = cached.item;
       if (!item) return;
-      // Don't restart a task that's already done
+      // Don't restart a task that's already running or done
+      if (this.app.stopwatch.isRunning) return;
       if (cached.done) return;
       // Build meta for the stopwatch with mission tracking fields
       const taskLabel = item.label || item.topic || "Mission Task";
