@@ -1,4 +1,4 @@
-﻿/**
+/**
  * modules/parser.js
  * Calls Ollama qwen2.5:3b to parse a natural-language message into a
  * structured intent object. Runs the model 3× and uses majority-vote:
@@ -76,6 +76,10 @@ function resolveDate(raw, refDate) {
 /**
  * Resolve natural time strings to "HH:MM" 24-h.
  * Handles "3pm", "3:00 pm", "15:00", "3 to 5 pm" (returns start).
+ *
+ * Ambiguity rule: if no AM/PM is given and hour is 1–6, default to PM.
+ * Rationale: the schedule runs 05:00–22:30; social events at 3am are implausible.
+ * Hours 7–11 with no indicator are kept as-is (morning study blocks).
  */
 function resolveTime(raw) {
   if (!raw) return '';
@@ -87,8 +91,11 @@ function resolveTime(raw) {
   let h = parseInt(m[1]);
   const min = parseInt(m[2] || '0');
   const period = m[3];
+
   if (period === 'pm' && h !== 12) h += 12;
-  if (period === 'am' && h === 12) h = 0;
+  else if (period === 'am' && h === 12) h = 0;
+  else if (!period && h >= 1 && h <= 6) h += 12; // no indicator + 1-6 → assume PM
+
   if (h > 23 || min > 59) return raw;
   return String(h).padStart(2,'0') + ':' + String(min).padStart(2,'0');
 }
@@ -227,7 +234,11 @@ async function parseMessage(text, refDate) {
   result.start_text = resolveTime(result.start_text);
   result.end_text   = resolveTime(result.end_text);
 
-  return { ...result, confidence, label, raw: runs };
+  // If all runs agreed on 'unknown', the model is confidently refusing —
+  // that IS the right answer, but the label must be ❌ not ✅.
+  const finalLabel = result.type === 'unknown' ? '❌' : label;
+
+  return { ...result, confidence, label: finalLabel, raw: runs };
 }
 
 window.Parser = { parseMessage };
