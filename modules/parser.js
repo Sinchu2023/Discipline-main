@@ -75,16 +75,25 @@ function resolveDate(raw, refDate) {
 
 /**
  * Resolve natural time strings to "HH:MM" 24-h.
- * Handles "3pm", "3:00 pm", "15:00", "3 to 5 pm" (returns start).
+ * Handles "3pm", "3:00 pm", "15:00", "03:00" (model-formatted), "3 to 5 pm".
  *
  * Ambiguity rule: if no AM/PM is given and hour is 1–6, default to PM.
- * Rationale: the schedule runs 05:00–22:30; social events at 3am are implausible.
+ * This also covers already-formatted HH:MM strings like "03:00" that the
+ * model outputs — those are bumped to 15:00 by the same heuristic.
  * Hours 7–11 with no indicator are kept as-is (morning study blocks).
  */
 function resolveTime(raw) {
   if (!raw) return '';
   const s = raw.trim().toLowerCase();
-  if (/^\d{2}:\d{2}$/.test(s)) return s;
+
+  // Already-formatted HH:MM — still apply the PM heuristic
+  if (/^\d{2}:\d{2}$/.test(s)) {
+    const h = parseInt(s.slice(0, 2));
+    const min = s.slice(3);
+    // 01:xx – 06:xx with no explicit AM context → assume PM
+    if (h >= 1 && h <= 6) return String(h + 12).padStart(2,'0') + ':' + min;
+    return s;
+  }
 
   const m = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
   if (!m) return raw;
@@ -205,7 +214,39 @@ function pickMajority(results) {
   return { result: merged, confidence: 'low', label: '❌' };
 }
 
+// ─── keyword pre-screen ────────────────────────────────────────────────────
+
+/**
+ * Fast local check before spending 3× model calls.
+ * Returns true if the message has ZERO scheduling keywords.
+ * Greetings, single words, random sentences → true → short-circuit to unknown.
+ */
+const SCHEDULING_KEYWORDS = [
+  // time
+  'am','pm','morning','afternoon','evening','night',
+  '1','2','3','4','5','6','7','8','9','10','11','12',
+  'today','tomorrow','yesterday','monday','tuesday','wednesday',
+  'thursday','friday','saturday','sunday','this','next','week',
+  'jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec',
+  // intent
+  'guest','guests','appointment','doctor','trip','event','visit','party',
+  'meeting','call','class','exam','test','busy','free','block','add','cancel',
+  'skip','done','finished','completed','did','show','status','progress','behind',
+  'schedule','timetable','plan','quant','english','reasoning','gs','gk','pyq',
+  'revision','workout','dinner','lunch','breakfast','sleep',
+];
+
+function hasSchedulingIntent(text) {
+  const words = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/);
+  return words.some(w => SCHEDULING_KEYWORDS.includes(w));
+}
+
 // ─── public API ────────────────────────────────────────────────────────────
+
+const UNKNOWN_RESULT = (raw = []) => ({
+  type: 'unknown', date_text: '', start_text: '', end_text: '', item_text: '',
+  confidence: 'low', label: '❌', raw,
+});
 
 /**
  * Parse a natural-language message.
@@ -214,12 +255,14 @@ function pickMajority(results) {
  * @returns {Promise<ParseResult>}
  */
 async function parseMessage(text, refDate) {
-  if (!text || !text.trim()) {
-    return {
-      type: 'unknown', date_text: '', start_text: '', end_text: '', item_text: '',
-      confidence: 'low', label: '❌', raw: [],
-    };
-  }
+  if (!text || !text.trim()) return UNKNOWN_RESULT();
+
+  // ── Pre-screen: skip the model entirely for obvious non-commands ───────────
+  // Short messages (≤ 2 words) with no scheduling keyword are greetings/gibberish.
+  const words = text.trim().split(/\s+/);
+  if (words.length <= 2 && !hasSchedulingIntent(text)) return UNKNOWN_RESULT();
+  // Longer messages still need at least one scheduling keyword
+  if (!hasSchedulingIntent(text)) return UNKNOWN_RESULT();
 
   // Run the model PARSE_RUNS times in parallel
   const runs = await Promise.all(
