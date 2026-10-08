@@ -1,0 +1,35 @@
+﻿{
+  "start_date": "2026-10-08",
+  "subjects": {
+    "quant": {
+      "total_hours_required": 150,
+      "hours_completed": 0,
+      "current_topic": "Number Theory"
+    },
+    "english_neetu_singh": {
+      "total_hours_required": 120,
+      "hours_completed": 0,
+      "current_topic": "Vol 1"
+    },
+    "reasoning": {
+      "total_hours_required": 80,
+      "hours_completed": 0,
+      "current_topic": "PYQs"
+    },
+    "gs_gk": {
+      "total_hours_required": 200,
+      "hours_completed": 0,
+      "current_topic": "Static GK"
+    },
+    "pyq_session": {
+      "total_hours_required": 60,
+      "hours_completed": 0,
+      "current_topic": "Mixed PYQs"
+    },
+    "editorial_ca": {
+      "total_hours_required": 30,
+      "hours_completed": 0,
+      "current_topic": "Daily Editorials"
+    }
+  }
+}

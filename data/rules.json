@@ -1,0 +1,7 @@
+﻿{
+  "cut_priority": ["buffer", "workout_free_time", "editorial_ca", "pyq_session", "reasoning", "gs_gk", "english_neetu_singh", "quant"],
+  "never_cut": ["golden_revision", "sectional_test_analysis", "lunch_rest", "dinner", "sleep", "breakfast", "wake_up", "meditation_planning", "night_wind_down"],
+  "speed_multiplier": 1.0,
+  "sunday_mode": "revision_only",
+  "efficiency_target": 0.85
+}
