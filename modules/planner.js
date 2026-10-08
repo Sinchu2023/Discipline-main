@@ -1,4 +1,4 @@
-﻿/**
+/**
  * modules/planner.js
  * Pure JS planner — no AI, no external dependencies.
  * Reads plan.json, timetable.json, rules.json from /data/
@@ -284,7 +284,7 @@ async function daysBehind() {
 
 // ─── export ────────────────────────────────────────────────────────────────
 
-window.Planner = { buildToday, proposeChange, projectFinish, daysBehind };
+window.Planner = { buildToday, proposeChange, projectFinish, daysBehind, _loadData: loadData };
 
 // ─── self-tests (run in browser console on load) ────────────────────────────
 

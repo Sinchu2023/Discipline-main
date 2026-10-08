@@ -11108,3 +11108,265 @@ window.addEventListener("beforeunload", () => {
 
 
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 5 – AI Chat Box logic
+// Depends on: window.Parser (parser.js), window.Validator (validator.js),
+//             window.Planner (planner.js)
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function initAIChat() {
+  'use strict';
+
+  // ── DOM refs ─────────────────────────────────────────────────────────────
+  const inputEl       = document.getElementById('ai-chat-input');
+  const submitBtn     = document.getElementById('ai-chat-submit');
+  const undoBtn       = document.getElementById('ai-chat-undo');
+  const spinnerEl     = document.getElementById('ai-chat-spinner');
+  const resultEl      = document.getElementById('ai-chat-result');
+  const proposalEl    = document.getElementById('ai-proposal-panel');
+  const diffEl        = document.getElementById('ai-proposal-diff');
+  const summaryEl     = document.getElementById('ai-proposal-summary');
+  const editArea      = document.getElementById('ai-proposal-edit');
+  const applyBtn      = document.getElementById('ai-apply-btn');
+  const editBtn       = document.getElementById('ai-edit-btn');
+  const cancelBtn     = document.getElementById('ai-cancel-btn');
+
+  if (!inputEl) return; // chat box not in DOM yet
+
+  // ── state ─────────────────────────────────────────────────────────────────
+  let _pendingProposal = null;   // { proposed, cut, moved, originalTimetable }
+  let _undoSnapshot    = null;   // timetable state before last Apply
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+
+  function showSpinner(on) {
+    spinnerEl.style.display = on ? 'flex' : 'none';
+  }
+
+  function showResult(text, type = 'ok') {
+    // type: 'ok' | 'warn' | 'error'
+    resultEl.className = 'ai-chat-result result-' + type;
+    resultEl.textContent = text;
+    resultEl.style.display = 'block';
+  }
+
+  function hideResult() {
+    resultEl.style.display = 'none';
+  }
+
+  function showProposal(proposal) {
+    const { proposed, cut, moved, originalTimetable } = proposal;
+    _pendingProposal = proposal;
+
+    // ── Build diff table ───────────────────────────────────────────────────
+    let html = `<div class="ai-diff-row diff-header">
+      <span>Block</span><span>Old time</span><span>New time</span>
+    </div>`;
+
+    // Map original by id for quick lookup
+    const origMap = {};
+    (originalTimetable || []).forEach(b => { origMap[b.id] = b; });
+
+    // Event block (always new)
+    const eventBlock = proposed.find(b => b.id === 'external_event');
+    if (eventBlock) {
+      html += `<div class="ai-diff-row">
+        <span class="ai-diff-name">📅 ${eventBlock.title}</span>
+        <span class="ai-diff-old">—</span>
+        <span class="ai-diff-new">${eventBlock.start}–${eventBlock.end}</span>
+      </div>`;
+    }
+
+    // Moved blocks
+    moved.forEach(m => {
+      html += `<div class="ai-diff-row">
+        <span class="ai-diff-name">↕ ${m.title}</span>
+        <span class="ai-diff-old">${m.from}</span>
+        <span class="ai-diff-new">${m.to}</span>
+      </div>`;
+    });
+
+    // Cut blocks
+    cut.forEach(title => {
+      html += `<div class="ai-diff-row">
+        <span class="ai-diff-name ai-diff-cut">✂ ${title}</span>
+        <span class="ai-diff-cut">removed</span>
+        <span class="ai-diff-cut">—</span>
+      </div>`;
+    });
+
+    if (!eventBlock && moved.length === 0 && cut.length === 0) {
+      html += `<div class="ai-diff-row"><span style="color:var(--text-secondary);grid-column:1/-1">No changes needed.</span></div>`;
+    }
+
+    diffEl.innerHTML = html;
+
+    // ── Summary tags ──────────────────────────────────────────────────────
+    let summaryHtml = '';
+    if (cut.length)   summaryHtml += cut.map(t => `<span class="ai-summary-tag ai-tag-cut">✂ ${t}</span>`).join('');
+    if (moved.length) summaryHtml += moved.map(m => `<span class="ai-summary-tag ai-tag-move">↕ ${m.title} → ${m.to}</span>`).join('');
+    summaryEl.innerHTML = summaryHtml || '<span style="color:var(--text-secondary)">No cuts or moves required.</span>';
+
+    // ── Show panel ────────────────────────────────────────────────────────
+    editArea.style.display = 'none';
+    proposalEl.style.display = 'block';
+  }
+
+  function hideProposal() {
+    proposalEl.style.display = 'none';
+    _pendingProposal = null;
+  }
+
+  // Apply the proposed timetable to the Planner cache and show Undo
+  function applyProposal() {
+    if (!_pendingProposal) return;
+    // Snapshot current timetable for undo
+    _undoSnapshot = _pendingProposal.originalTimetable;
+    // Patch Planner cache so future buildToday calls use the new timetable
+    if (window.Planner && window.Planner._setTimetable) {
+      window.Planner._setTimetable(_pendingProposal.proposed);
+    }
+    showResult('✅ Timetable updated! Click Undo to revert.', 'ok');
+    hideProposal();
+    undoBtn.style.display = 'inline-flex';
+  }
+
+  function undoApply() {
+    if (!_undoSnapshot) return;
+    if (window.Planner && window.Planner._setTimetable) {
+      window.Planner._setTimetable(_undoSnapshot);
+    }
+    _undoSnapshot = null;
+    undoBtn.style.display = 'none';
+    showResult('↩ Reverted to the previous timetable.', 'warn');
+  }
+
+  // ── Main handler ──────────────────────────────────────────────────────────
+
+  async function handleSubmit() {
+    const text = inputEl.value.trim();
+    if (!text) { inputEl.focus(); return; }
+
+    // Guard: make sure modules are loaded
+    if (!window.Parser || !window.Validator || !window.Planner) {
+      showResult('❌ AI modules are still loading. Please wait a moment and try again.', 'error');
+      return;
+    }
+
+    // Reset UI
+    hideResult();
+    hideProposal();
+    submitBtn.disabled = true;
+    showSpinner(true);
+
+    try {
+      // ── 1. Parse ──────────────────────────────────────────────────────────
+      const parsed = await window.Parser.parseMessage(text);
+
+      // ── 2. Validate ───────────────────────────────────────────────────────
+      const validation = await window.Validator.validate(parsed);
+
+      if (!validation.ok) {
+        showResult(parsed.label + ' ' + validation.errors.join('\n'), 'error');
+        return;
+      }
+
+      // ── 3. Route by type ──────────────────────────────────────────────────
+      if (parsed.type === 'add_event') {
+        // Snapshot the current timetable before proposing
+        const { timetable } = await window.Planner._loadData();
+        const proposal = await window.Planner.proposeChange({
+          start: validation.start,
+          end:   validation.end,
+          title: parsed.item_text || text,
+        });
+
+        if (proposal.warning) {
+          showResult('⚠️ ' + proposal.warning, 'warn');
+          return;
+        }
+
+        proposal.originalTimetable = timetable.map(b => Object.assign({}, b));
+        showResult(parsed.label + ' Proposal ready — review below.', 'ok');
+        showProposal(proposal);
+
+      } else if (parsed.type === 'show_today') {
+        const today = new Date().toISOString().slice(0, 10);
+        const blocks = await window.Planner.buildToday(today);
+        const lines = blocks.map(b => `${b.start}–${b.end}  ${b.title}`).join('\n');
+        showResult('📅 Today\'s schedule:\n' + lines, 'ok');
+
+      } else if (parsed.type === 'show_status') {
+        const proj = await window.Planner.projectFinish();
+        const behind = await window.Planner.daysBehind();
+        const lines = Object.entries(proj)
+          .map(([id, d]) => `${id}: ${d.hoursLeft}h left → finishes ${d.finishDate}`)
+          .join('\n');
+        showResult(`📊 ${behind} day(s) behind.\n${lines}`, 'ok');
+
+      } else if (parsed.type === 'mark_done') {
+        showResult(`✅ "${validation.item?.title || parsed.item_text}" marked as done. (Progress tracking coming in Phase 7.)`, 'ok');
+
+      } else if (parsed.type === 'skip_day') {
+        showResult(`⚠️ Skip-day logged for ${validation.date || 'today'}. (Full skip logic coming in Phase 7.)`, 'warn');
+
+      } else {
+        showResult(parsed.label + ' Command understood: ' + parsed.type, 'ok');
+      }
+
+    } catch (err) {
+      const isOllama = err.message?.includes('fetch') || err.message?.includes('Failed');
+      showResult(
+        '❌ ' + (isOllama
+          ? 'Cannot reach Ollama. Make sure it is running: $env:OLLAMA_ORIGINS="*"; ollama serve'
+          : err.message),
+        'error'
+      );
+      console.error('[AI Chat]', err);
+    } finally {
+      submitBtn.disabled = false;
+      showSpinner(false);
+    }
+  }
+
+  // ── Event listeners ───────────────────────────────────────────────────────
+  submitBtn.addEventListener('click', handleSubmit);
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+  undoBtn.addEventListener('click', undoApply);
+
+  applyBtn.addEventListener('click', applyProposal);
+
+  cancelBtn.addEventListener('click', () => {
+    hideProposal();
+    hideResult();
+  });
+
+  editBtn.addEventListener('click', () => {
+    if (editArea.style.display === 'none') {
+      editArea.style.display = 'block';
+      editArea.value = inputEl.value;
+      editArea.focus();
+    } else {
+      // Re-submit with the edited text
+      inputEl.value = editArea.value.trim();
+      editArea.style.display = 'none';
+      hideProposal();
+      handleSubmit();
+    }
+  });
+
+})();
+
+// Add _setTimetable to Planner so Apply/Undo can overwrite the live timetable in memory
+(function addSetTimetable() {
+  if (!window.Planner) { setTimeout(addSetTimetable, 300); return; }
+  window.Planner._setTimetable = function(newTimetable) {
+    const _orig = window.Planner.buildToday;
+    window.Planner._liveOverride = newTimetable;
+    window.Planner.buildToday = async function(date) {
+      return window.Planner._liveOverride || _orig(date);
+    };
+  };
+})();
+

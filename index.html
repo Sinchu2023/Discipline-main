@@ -174,7 +174,81 @@
         </div>
       </section>
 
-      <!-- Main Content -->
+      <!-- ── AI Chat Box (Phase 5) ─────────────────────────────────── -->
+      <section class="ai-chat-section" id="ai-chat-section">
+        <div class="ai-chat-card">
+          <div class="ai-chat-header">
+            <span class="ai-chat-icon">🤖</span>
+            <span class="ai-chat-title">AI Schedule Assistant</span>
+            <span class="ai-chat-hint">e.g. "guests tomorrow 3 to 5" · "I finished Quant"</span>
+          </div>
+
+          <div class="ai-chat-input-row">
+            <input
+              type="text"
+              id="ai-chat-input"
+              class="ai-chat-input"
+              placeholder="Tell me about a change or ask about your schedule…"
+              autocomplete="off"
+              maxlength="200"
+            />
+            <button class="btn btn-primary ai-chat-submit" id="ai-chat-submit">
+              <i class="fas fa-paper-plane"></i> Send
+            </button>
+            <button class="btn ai-chat-undo" id="ai-chat-undo" style="display:none">
+              <i class="fas fa-rotate-left"></i> Undo
+            </button>
+          </div>
+
+          <!-- Spinner -->
+          <div class="ai-chat-spinner" id="ai-chat-spinner" style="display:none">
+            <div class="ai-spinner-ring"></div>
+            <span>Thinking…</span>
+          </div>
+
+          <!-- Result label (✅ / ⚠️ / ❌ + message) -->
+          <div class="ai-chat-result" id="ai-chat-result" style="display:none"></div>
+
+          <!-- Proposal panel -->
+          <div class="ai-proposal-panel" id="ai-proposal-panel" style="display:none">
+            <div class="ai-proposal-header">
+              <span class="ai-proposal-icon">📋</span>
+              I would likely change the timetable.
+              <strong>Proposed timetable:</strong>
+            </div>
+
+            <!-- Diff table -->
+            <div class="ai-proposal-diff" id="ai-proposal-diff"></div>
+
+            <!-- Cut / moved summary -->
+            <div class="ai-proposal-summary" id="ai-proposal-summary"></div>
+
+            <!-- Edit textarea (hidden until Edit is clicked) -->
+            <textarea
+              id="ai-proposal-edit"
+              class="ai-proposal-edit-area"
+              style="display:none"
+              rows="3"
+              placeholder="Describe your adjustment…"
+            ></textarea>
+
+            <div class="ai-proposal-actions">
+              <button class="btn btn-success" id="ai-apply-btn">
+                <i class="fas fa-check"></i> Apply
+              </button>
+              <button class="btn" id="ai-edit-btn">
+                <i class="fas fa-pen"></i> Edit
+              </button>
+              <button class="btn btn-danger" id="ai-cancel-btn">
+                <i class="fas fa-times"></i> Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- ── end AI Chat Box ─────────────────────────────────────────── -->
+
+
       <div class="main-content">
         <!-- Stopwatch Section -->
         <div class="stopwatch-container">
