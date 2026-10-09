@@ -172,11 +172,14 @@ async function callOllama(userText) {
   if (!resp.ok) throw new Error('Ollama error: ' + resp.status);
   const data = await resp.json();
   const content = data.message?.content || data.response || '';
+  const DEFAULTS = { type: 'unknown', date_text: '', start_text: '', end_text: '', item_text: '' };
   try {
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    // Merge with defaults so missing fields never become undefined
+    return { ...DEFAULTS, ...parsed };
   } catch {
     // model returned invalid JSON despite schema constraint — treat as unknown
-    return { type: 'unknown', date_text: '', start_text: '', end_text: '', item_text: '' };
+    return { ...DEFAULTS };
   }
 }
 
