@@ -21,14 +21,14 @@
  * }
  */
 
-const OLLAMA_BASE  = 'http://localhost:11434';
-const PARSE_MODEL  = 'qwen2.5:3b';
-const PARSE_RUNS   = 3;       // majority vote
-const TEMPERATURE  = 0;
+const OLLAMA_BASE = 'http://localhost:11434';
+const PARSE_MODEL = 'qwen2.5:3b';
+const PARSE_RUNS = 3;       // majority vote
+const TEMPERATURE = 0;
 
 // ─── date / time resolution ────────────────────────────────────────────────
 
-const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 /**
  * Resolve relative date words to "YYYY-MM-DD".
@@ -36,14 +36,14 @@ const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','
  */
 function resolveDate(raw, refDate) {
   if (!raw) return '';
-  const ref  = refDate instanceof Date ? refDate : new Date();
-  const s    = raw.trim().toLowerCase();
+  const ref = refDate instanceof Date ? refDate : new Date();
+  const s = raw.trim().toLowerCase();
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;  // already ISO
 
-  if (s === 'today')    return toISO(ref);
-  if (s === 'tomorrow') { const d = new Date(ref); d.setDate(d.getDate()+1); return toISO(d); }
-  if (s === 'yesterday'){ const d = new Date(ref); d.setDate(d.getDate()-1); return toISO(d); }
+  if (s === 'today') return toISO(ref);
+  if (s === 'tomorrow') { const d = new Date(ref); d.setDate(d.getDate() + 1); return toISO(d); }
+  if (s === 'yesterday') { const d = new Date(ref); d.setDate(d.getDate() - 1); return toISO(d); }
 
   // "this friday", "next monday", or just "friday"
   const dayMatch = s.match(/(?:this |next )?(\w+day)/);
@@ -60,9 +60,9 @@ function resolveDate(raw, refDate) {
   // "DD Mon" or "Mon DD" – e.g. "12 oct" or "oct 12"
   const shortDate = s.match(/(\d{1,2})\s+([a-z]{3})|([a-z]{3})\s+(\d{1,2})/);
   if (shortDate) {
-    const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-    const day  = parseInt(shortDate[1] || shortDate[4]);
-    const mon  = months.indexOf(shortDate[2] || shortDate[3]);
+    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const day = parseInt(shortDate[1] || shortDate[4]);
+    const mon = months.indexOf(shortDate[2] || shortDate[3]);
     if (mon !== -1 && day >= 1 && day <= 31) {
       const d = new Date(ref.getFullYear(), mon, day);
       if (isNaN(d.getTime())) return raw;
@@ -91,7 +91,7 @@ function resolveTime(raw) {
     const h = parseInt(s.slice(0, 2));
     const min = s.slice(3);
     // 01:xx – 06:xx with no explicit AM context → assume PM
-    if (h >= 1 && h <= 6) return String(h + 12).padStart(2,'0') + ':' + min;
+    if (h >= 1 && h <= 6) return String(h + 12).padStart(2, '0') + ':' + min;
     return s;
   }
 
@@ -106,13 +106,13 @@ function resolveTime(raw) {
   else if (!period && h >= 1 && h <= 6) h += 12; // no indicator + 1-6 → assume PM
 
   if (h > 23 || min > 59) return raw;
-  return String(h).padStart(2,'0') + ':' + String(min).padStart(2,'0');
+  return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
 }
 
 function toISO(d) {
   return d.getFullYear() + '-' +
-    String(d.getMonth()+1).padStart(2,'0') + '-' +
-    String(d.getDate()).padStart(2,'0');
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
 }
 
 // ─── system prompt ─────────────────────────────────────────────────────────
@@ -145,13 +145,13 @@ async function callOllama(userText) {
   const schema = {
     type: 'object',
     properties: {
-      type:       { type: 'string', enum: ['add_event','mark_done','skip_day','show_today','show_status','unknown'] },
-      date_text:  { type: 'string' },
+      type: { type: 'string', enum: ['add_event', 'mark_done', 'skip_day', 'show_today', 'show_status', 'unknown'] },
+      date_text: { type: 'string' },
       start_text: { type: 'string' },
-      end_text:   { type: 'string' },
-      item_text:  { type: 'string' },
+      end_text: { type: 'string' },
+      item_text: { type: 'string' },
     },
-    required: ['type','date_text','start_text','end_text','item_text'],
+    required: ['type', 'date_text', 'start_text', 'end_text', 'item_text'],
   };
 
   const resp = await fetch(`${OLLAMA_BASE}/api/chat`, {
@@ -160,8 +160,8 @@ async function callOllama(userText) {
     body: JSON.stringify({
       model: PARSE_MODEL,
       messages: [
-        { role: 'system',  content: SYSTEM_PROMPT },
-        { role: 'user',    content: userText },
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userText },
       ],
       format: schema,
       options: { temperature: TEMPERATURE },
@@ -188,11 +188,11 @@ async function callOllama(userText) {
 function pickMajority(results) {
   // All three agree on all fields → confident
   const allSame = results.every(r =>
-    r.type       === results[0].type &&
-    r.date_text  === results[0].date_text &&
+    r.type === results[0].type &&
+    r.date_text === results[0].date_text &&
     r.start_text === results[0].start_text &&
-    r.end_text   === results[0].end_text &&
-    r.item_text  === results[0].item_text
+    r.end_text === results[0].end_text &&
+    r.item_text === results[0].item_text
   );
   if (allSame) return { result: results[0], confidence: 'high', label: '✅' };
 
@@ -200,14 +200,14 @@ function pickMajority(results) {
   function majority(field) {
     const counts = {};
     for (const r of results) counts[r[field]] = (counts[r[field]] || 0) + 1;
-    return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
   }
   const merged = {
-    type:       majority('type'),
-    date_text:  majority('date_text'),
+    type: majority('type'),
+    date_text: majority('date_text'),
     start_text: majority('start_text'),
-    end_text:   majority('end_text'),
-    item_text:  majority('item_text'),
+    end_text: majority('end_text'),
+    item_text: majority('item_text'),
   };
 
   // At least two agree on the type
@@ -226,17 +226,17 @@ function pickMajority(results) {
  */
 const SCHEDULING_KEYWORDS = [
   // time
-  'am','pm','morning','afternoon','evening','night',
-  '1','2','3','4','5','6','7','8','9','10','11','12',
-  'today','tomorrow','yesterday','monday','tuesday','wednesday',
-  'thursday','friday','saturday','sunday','this','next','week',
-  'jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec',
+  'am', 'pm', 'morning', 'afternoon', 'evening', 'night',
+  '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
+  'today', 'tomorrow', 'yesterday', 'monday', 'tuesday', 'wednesday',
+  'thursday', 'friday', 'saturday', 'sunday', 'this', 'next', 'week',
+  'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
   // intent
-  'guest','guests','appointment','doctor','trip','event','visit','party',
-  'meeting','call','class','exam','test','busy','free','block','add','cancel',
-  'skip','done','finished','completed','did','show','status','progress','behind',
-  'schedule','timetable','plan','quant','english','reasoning','gs','gk','pyq',
-  'revision','workout','dinner','lunch','breakfast','sleep',
+  'guest', 'guests', 'appointment', 'doctor', 'trip', 'event', 'visit', 'party',
+  'meeting', 'call', 'class', 'exam', 'test', 'busy', 'free', 'block', 'add', 'cancel',
+  'skip', 'done', 'finished', 'completed', 'did', 'show', 'status', 'progress', 'behind',
+  'schedule', 'timetable', 'plan', 'quant', 'english', 'reasoning', 'gs', 'gk', 'pyq',
+  'revision', 'workout', 'dinner', 'lunch', 'breakfast', 'sleep',
 ];
 
 function hasSchedulingIntent(text) {
@@ -276,9 +276,9 @@ async function parseMessage(text, refDate) {
 
   // Resolve relative dates and time strings
   const ref = refDate || new Date();
-  result.date_text  = resolveDate(result.date_text,  ref);
+  result.date_text = resolveDate(result.date_text, ref);
   result.start_text = resolveTime(result.start_text);
-  result.end_text   = resolveTime(result.end_text);
+  result.end_text = resolveTime(result.end_text);
 
   // If all runs agreed on 'unknown', the model is confidently refusing —
   // that IS the right answer, but the label must be ❌ not ✅.
@@ -288,3 +288,4 @@ async function parseMessage(text, refDate) {
 }
 
 window.Parser = { parseMessage };
+
