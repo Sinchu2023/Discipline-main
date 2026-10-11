@@ -40,6 +40,7 @@
     { test: /show\s+today/i,                                          handle: handleShowToday },
     { test: /show\s+status/i,                                         handle: handleShowStatus },
     { test: /review\s+(my\s+)?routine|what\s+should\s+i\s+improve/i, handle: handleReviewRoutine },
+    { test: /^(ask\s+(my\s+)?notes[:\s]+|notes[:\s]+ask[:\s]+)/i,    handle: () => handleAskNotes() },
   ];
 
   // ─── state ─────────────────────────────────────────────────────────────────
@@ -265,6 +266,36 @@
       }
     } else {
       showResult('📊 Routine review module not loaded yet.', 'warn');
+    }
+  }
+
+  async function handleAskNotes() {
+    const raw = (el.input?.value || '').trim();
+    // Strip the prefix "ask my notes:" / "notes: ask:" etc.
+    const question = raw.replace(/^(ask\s+(my\s+)?notes[:\s]+|notes[:\s]+ask[:\s]+)/i, '').trim();
+    if (!question) {
+      showResult('💬 What do you want to ask? e.g. "ask my notes: what is a Zener diode?"', 'info');
+      return;
+    }
+    if (!window.Notes?.askAI) {
+      showResult('📝 Notes module not loaded.', 'warn');
+      return;
+    }
+    showSpinner(true);
+    try {
+      const { answer, citedIds, validationError, noMatch } = await window.Notes.askAI(question);
+      if (noMatch) {
+        showResult('🔍 No matching notes found. Save some notes about this topic first.', 'warn');
+      } else if (validationError) {
+        showResult('⚠️ ' + escHtml(validationError), 'warn');
+      } else {
+        const citations = citedIds.length ? '<br><small style="opacity:0.6">Based on notes: ' + escHtml(citedIds.join(', ')) + '</small>' : '';
+        showResult(escHtml(answer) + citations, 'success');
+      }
+    } catch (e) {
+      showResult('❌ Notes AI error: ' + escHtml(e.message), 'error');
+    } finally {
+      showSpinner(false);
     }
   }
 

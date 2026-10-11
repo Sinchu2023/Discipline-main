@@ -64,6 +64,10 @@
               <button class="btn" id="copy-timetable-prompt-btn" role="menuitem">
                 <i class="fas fa-clipboard"></i> Copy Timetable Prompt
               </button>
+              <div class="pipeline-menu-divider"></div>
+              <button class="btn" id="export-data-btn" role="menuitem">
+                <i class="fas fa-download"></i> Export Data
+              </button>
               <div class="pipeline-copy-status" id="pipeline-copy-status"></div>
             </div>
           </div>
@@ -180,7 +184,7 @@
           <div class="ai-chat-header">
             <span class="ai-chat-icon">🤖</span>
             <span class="ai-chat-title">AI Schedule Assistant</span>
-            <span class="ai-chat-hint">e.g. "guests tomorrow 3 to 5" · "I finished Quant"</span>
+            <span class="ai-chat-hint">e.g. "guests tomorrow 3 to 5" · "review my routine" · "ask my notes: what is diode?"</span>
           </div>
 
           <div class="ai-chat-input-row">
@@ -248,6 +252,72 @@
       </section>
       <!-- ── end AI Chat Box ─────────────────────────────────────────── -->
 
+      <!-- ── Notes AI (Phase 6) ────────────────────────────────────────── -->
+      <section class="notes-section" id="notes-section">
+        <div class="notes-card">
+          <!-- Header + tab bar -->
+          <div class="notes-header">
+            <span class="notes-icon">📝</span>
+            <span class="notes-title">Study Notes</span>
+            <div class="notes-tabs" role="tablist">
+              <button class="notes-tab notes-tab--active" id="notes-tab-ask"   role="tab" aria-selected="true">Ask AI</button>
+              <button class="notes-tab"                   id="notes-tab-save"  role="tab" aria-selected="false">Save Note</button>
+              <button class="notes-tab"                   id="notes-tab-list"  role="tab" aria-selected="false">My Notes <span class="notes-count" id="notes-count">0</span></button>
+            </div>
+          </div>
+
+          <!-- ── Panel: Ask AI ── -->
+          <div class="notes-panel" id="notes-panel-ask">
+            <div class="notes-ask-row">
+              <input
+                type="text"
+                id="notes-ask-input"
+                class="notes-ask-input"
+                placeholder="Ask something about your notes… e.g. "What did I write about diodes?""
+                autocomplete="off"
+                maxlength="200"
+              />
+              <button class="btn btn-primary notes-ask-btn" id="notes-ask-btn">
+                <i class="fas fa-search"></i> Ask
+              </button>
+            </div>
+            <div class="notes-ask-spinner" id="notes-ask-spinner" style="display:none">
+              <div class="ai-spinner-ring"></div><span>Searching notes…</span>
+            </div>
+            <div class="notes-ask-answer" id="notes-ask-answer" style="display:none"></div>
+            <div class="notes-ask-citations" id="notes-ask-citations" style="display:none"></div>
+          </div>
+
+          <!-- ── Panel: Save Note ── -->
+          <div class="notes-panel" id="notes-panel-save" style="display:none">
+            <textarea
+              id="notes-save-input"
+              class="notes-save-textarea"
+              rows="4"
+              maxlength="2000"
+              placeholder="Paste or type a study note… e.g. "A Zener diode operates in reverse breakdown…""
+            ></textarea>
+            <div class="notes-save-footer">
+              <span class="notes-char-count" id="notes-char-count">0 / 2000</span>
+              <button class="btn btn-success notes-save-btn" id="notes-save-btn">
+                <i class="fas fa-save"></i> Save Note
+              </button>
+            </div>
+            <div class="notes-save-status" id="notes-save-status" style="display:none"></div>
+          </div>
+
+          <!-- ── Panel: My Notes list ── -->
+          <div class="notes-panel" id="notes-panel-list" style="display:none">
+            <div class="notes-list" id="notes-list">
+              <div class="notes-empty">No notes yet. Switch to "Save Note" to add one.</div>
+            </div>
+          </div>
+
+          <!-- Offline / embed status banner -->
+          <div class="notes-status-bar" id="notes-status-bar" style="display:none"></div>
+        </div>
+      </section>
+      <!-- ── end Notes AI ────────────────────────────────────────────────── -->
 
       <div class="main-content">
         <!-- Stopwatch Section -->
@@ -940,6 +1010,10 @@
     <script src="modules/chat.js"></script>
     <!-- Routine Review / Insights (Phase 5b) — pure JS, no AI required -->
     <script src="modules/insights.js"></script>
+    <!-- Notes AI (Phase 6) — IndexedDB + nomic-embed-text + qwen2.5:3b -->
+    <script src="modules/notes.js"></script>
+    <!-- Export (Phase 7) — downloads tracker + notes data as JSON -->
+    <script src="modules/export.js"></script>
   </body>
 </html>
 
