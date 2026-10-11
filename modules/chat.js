@@ -91,7 +91,9 @@
   function showResult(html, type = 'info') {
     if (!el.result) return;
     el.result.innerHTML = html;
-    el.result.className = 'ai-chat-result ai-chat-result--' + type;
+    // Use existing CSS modifier classes (.result-ok / .result-warn / .result-error)
+    const typeMap = { success: 'result-ok', warn: 'result-warn', error: 'result-error', info: '' };
+    el.result.className = 'ai-chat-result ' + (typeMap[type] || '');
     el.result.style.display = 'block';
   }
 
@@ -125,52 +127,44 @@
   function renderProposal(plannerResult) {
     const { proposed, cut, moved, warning } = plannerResult;
 
-    let rows = '';
+    // ── Header row (uses existing .ai-diff-row .diff-header system) ────────
+    let html = `
+      <div class="ai-diff-row diff-header">
+        <span class="ai-diff-name">Item</span>
+        <span class="ai-diff-old">Old slot</span>
+        <span class="ai-diff-new">New slot</span>
+      </div>`;
+
     proposed.forEach(block => {
       const wasMoved = moved.find(m => m.id === block.id);
       const wasCut   = cut.includes(block.title) || cut.includes(block.id);
-      let badge = '', rowClass = '';
-
-      if (wasCut) {
-        badge    = '<span class="diff-badge diff-badge--cut">cut</span>';
-        rowClass = 'diff-row--cut';
-      } else if (wasMoved) {
-        badge    = '<span class="diff-badge diff-badge--moved">moved</span>';
-        rowClass = 'diff-row--moved';
-      } else {
-        badge = '<span class="diff-badge diff-badge--ok">ok</span>';
-      }
 
       const oldSlot = wasMoved
         ? (wasMoved.oldStart + '–' + wasMoved.oldEnd)
         : (block.start + '–' + block.end);
       const newSlot = block.start + '–' + block.end;
 
-      rows += `<tr class="${rowClass}">
-        <td class="diff-item">${escHtml(block.title)}</td>
-        <td class="diff-slot">${escHtml(oldSlot)}</td>
-        <td class="diff-slot">${escHtml(newSlot)}</td>
-        <td class="diff-status">${badge}</td>
-      </tr>`;
+      const nameClass = wasCut ? 'ai-diff-name ai-diff-cut' : 'ai-diff-name';
+      const oldClass  = wasCut ? 'ai-diff-old ai-diff-cut'  : 'ai-diff-old';
+      const newClass  = wasCut ? 'ai-diff-new ai-diff-cut'  :
+                        wasMoved ? 'ai-diff-new'             : 'ai-diff-old';
+
+      html += `
+        <div class="ai-diff-row">
+          <span class="${nameClass}">${escHtml(block.title)}</span>
+          <span class="${oldClass}">${escHtml(oldSlot)}</span>
+          <span class="${newClass}">${escHtml(newSlot)}</span>
+        </div>`;
     });
 
-    if (el.diff) {
-      el.diff.innerHTML = `
-        <table class="diff-table">
-          <thead><tr><th>Item</th><th>Old slot</th><th>New slot</th><th>Status</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-    }
+    if (el.diff) el.diff.innerHTML = html;
 
-    const parts = [];
-    if (cut.length)             parts.push('✂️ Cut: ' + cut.join(', '));
-    if (moved.length)           parts.push('↕️ Moved: ' + moved.map(m => m.title).join(', '));
-    if (warning && warning.length) parts.push('⚠️ ' + warning.join('; '));
-    if (el.summary) {
-      el.summary.innerHTML = parts.length
-        ? '<small>' + parts.map(escHtml).join(' &nbsp;·&nbsp; ') + '</small>'
-        : '';
-    }
+    // ── Summary tags (uses existing .ai-summary-tag system) ────────────────
+    const tags = [];
+    if (cut.length)             tags.push(`<span class="ai-summary-tag ai-tag-cut">✂ Cut: ${escHtml(cut.join(', '))}</span>`);
+    if (moved.length)           tags.push(`<span class="ai-summary-tag ai-tag-move">↕ Moved: ${escHtml(moved.map(m => m.title).join(', '))}</span>`);
+    if (warning && warning.length) tags.push(`<span class="ai-summary-tag">${escHtml(warning.join('; '))}</span>`);
+    if (el.summary) el.summary.innerHTML = tags.join('');
   }
 
   // ─── undo ──────────────────────────────────────────────────────────────────
