@@ -122,7 +122,7 @@ The user will send you a short natural-language message.
 Your job is to extract EXACTLY these fields and return ONLY valid JSON, no extra text:
 
 {
-  "type":       one of ["add_event","mark_done","skip_day","show_today","show_status","unknown"],
+  "type":       one of ["add_event","mark_done","skip_day","show_today","show_status","review_routine","unknown"],
   "date_text":  the date mentioned (e.g. "today", "tomorrow", "friday", "2026-10-09") or "" if absent,
   "start_text": the start time mentioned (e.g. "3pm", "15:00", "3") or "" if absent,
   "end_text":   the end time mentioned (e.g. "5pm", "17:00", "5") or "" if absent,
@@ -135,6 +135,7 @@ Type rules:
 - skip_day  : user wants to skip an entire day or is ill
 - show_today: user asks what is on today / show my schedule
 - show_status: user asks about progress / how far / days behind
+- review_routine: user asks to review their routine or what they should improve
 - unknown   : anything that does not fit the above
 
 Return ONLY the JSON object, no markdown fences, no explanation.`;
@@ -145,7 +146,7 @@ async function callOllama(userText) {
   const schema = {
     type: 'object',
     properties: {
-      type: { type: 'string', enum: ['add_event', 'mark_done', 'skip_day', 'show_today', 'show_status', 'unknown'] },
+      type: { type: 'string', enum: ['add_event', 'mark_done', 'skip_day', 'show_today', 'show_status', 'review_routine', 'unknown'] },
       date_text: { type: 'string' },
       start_text: { type: 'string' },
       end_text: { type: 'string' },
@@ -237,6 +238,8 @@ const SCHEDULING_KEYWORDS = [
   'skip', 'done', 'finished', 'completed', 'did', 'show', 'status', 'progress', 'behind',
   'schedule', 'timetable', 'plan', 'quant', 'english', 'reasoning', 'gs', 'gk', 'pyq',
   'revision', 'workout', 'dinner', 'lunch', 'breakfast', 'sleep',
+  // insights / routine review
+  'review', 'routine', 'improve',
 ];
 
 function hasSchedulingIntent(text) {
