@@ -64,10 +64,6 @@
               <button class="btn" id="copy-timetable-prompt-btn" role="menuitem">
                 <i class="fas fa-clipboard"></i> Copy Timetable Prompt
               </button>
-              <div class="pipeline-menu-divider"></div>
-              <button class="btn" id="export-data-btn" role="menuitem">
-                <i class="fas fa-download"></i> Export Data
-              </button>
               <div class="pipeline-copy-status" id="pipeline-copy-status"></div>
             </div>
           </div>
@@ -178,147 +174,7 @@
         </div>
       </section>
 
-      <!-- ── AI Chat Box (Phase 5) ─────────────────────────────────── -->
-      <section class="ai-chat-section" id="ai-chat-section">
-        <div class="ai-chat-card">
-          <div class="ai-chat-header">
-            <span class="ai-chat-icon">🤖</span>
-            <span class="ai-chat-title">AI Schedule Assistant</span>
-            <span class="ai-chat-hint">e.g. "guests tomorrow 3 to 5" · "review my routine" · "ask my notes: what is diode?"</span>
-          </div>
-
-          <div class="ai-chat-input-row">
-            <input
-              type="text"
-              id="ai-chat-input"
-              class="ai-chat-input"
-              placeholder="Tell me about a change or ask about your schedule…"
-              autocomplete="off"
-              maxlength="200"
-            />
-            <button class="btn btn-primary ai-chat-submit" id="ai-chat-submit">
-              <i class="fas fa-paper-plane"></i> Send
-            </button>
-            <button class="btn ai-chat-undo" id="ai-chat-undo" style="display:none">
-              <i class="fas fa-rotate-left"></i> Undo
-            </button>
-          </div>
-
-          <!-- Spinner -->
-          <div class="ai-chat-spinner" id="ai-chat-spinner" style="display:none">
-            <div class="ai-spinner-ring"></div>
-            <span>Thinking…</span>
-          </div>
-
-          <!-- Result label (✅ / ⚠️ / ❌ + message) -->
-          <div class="ai-chat-result" id="ai-chat-result" style="display:none"></div>
-
-          <!-- Proposal panel -->
-          <div class="ai-proposal-panel" id="ai-proposal-panel" style="display:none">
-            <div class="ai-proposal-header">
-              <span class="ai-proposal-icon">📋</span>
-              I would likely change the timetable.
-              <strong>Proposed timetable:</strong>
-            </div>
-
-            <!-- Diff table -->
-            <div class="ai-proposal-diff" id="ai-proposal-diff"></div>
-
-            <!-- Cut / moved summary -->
-            <div class="ai-proposal-summary" id="ai-proposal-summary"></div>
-
-            <!-- Edit textarea (hidden until Edit is clicked) -->
-            <textarea
-              id="ai-proposal-edit"
-              class="ai-proposal-edit-area"
-              style="display:none"
-              rows="3"
-              placeholder="Describe your adjustment…"
-            ></textarea>
-
-            <div class="ai-proposal-actions">
-              <button class="btn btn-success" id="ai-apply-btn">
-                <i class="fas fa-check"></i> Apply
-              </button>
-              <button class="btn" id="ai-edit-btn">
-                <i class="fas fa-pen"></i> Edit
-              </button>
-              <button class="btn btn-danger" id="ai-cancel-btn">
-                <i class="fas fa-times"></i> Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-      <!-- ── end AI Chat Box ─────────────────────────────────────────── -->
-
-      <!-- ── Notes AI (Phase 6) ────────────────────────────────────────── -->
-      <section class="notes-section" id="notes-section">
-        <div class="notes-card">
-          <!-- Header + tab bar -->
-          <div class="notes-header">
-            <span class="notes-icon">📝</span>
-            <span class="notes-title">Study Notes</span>
-            <div class="notes-tabs" role="tablist">
-              <button class="notes-tab notes-tab--active" id="notes-tab-ask"   role="tab" aria-selected="true">Ask AI</button>
-              <button class="notes-tab"                   id="notes-tab-save"  role="tab" aria-selected="false">Save Note</button>
-              <button class="notes-tab"                   id="notes-tab-list"  role="tab" aria-selected="false">My Notes <span class="notes-count" id="notes-count">0</span></button>
-            </div>
-          </div>
-
-          <!-- ── Panel: Ask AI ── -->
-          <div class="notes-panel" id="notes-panel-ask">
-            <div class="notes-ask-row">
-              <input
-                type="text"
-                id="notes-ask-input"
-                class="notes-ask-input"
-                placeholder="Ask something about your notes… e.g. "What did I write about diodes?""
-                autocomplete="off"
-                maxlength="200"
-              />
-              <button class="btn btn-primary notes-ask-btn" id="notes-ask-btn">
-                <i class="fas fa-search"></i> Ask
-              </button>
-            </div>
-            <div class="notes-ask-spinner" id="notes-ask-spinner" style="display:none">
-              <div class="ai-spinner-ring"></div><span>Searching notes…</span>
-            </div>
-            <div class="notes-ask-answer" id="notes-ask-answer" style="display:none"></div>
-            <div class="notes-ask-citations" id="notes-ask-citations" style="display:none"></div>
-          </div>
-
-          <!-- ── Panel: Save Note ── -->
-          <div class="notes-panel" id="notes-panel-save" style="display:none">
-            <textarea
-              id="notes-save-input"
-              class="notes-save-textarea"
-              rows="4"
-              maxlength="2000"
-              placeholder="Paste or type a study note… e.g. "A Zener diode operates in reverse breakdown…""
-            ></textarea>
-            <div class="notes-save-footer">
-              <span class="notes-char-count" id="notes-char-count">0 / 2000</span>
-              <button class="btn btn-success notes-save-btn" id="notes-save-btn">
-                <i class="fas fa-save"></i> Save Note
-              </button>
-            </div>
-            <div class="notes-save-status" id="notes-save-status" style="display:none"></div>
-          </div>
-
-          <!-- ── Panel: My Notes list ── -->
-          <div class="notes-panel" id="notes-panel-list" style="display:none">
-            <div class="notes-list" id="notes-list">
-              <div class="notes-empty">No notes yet. Switch to "Save Note" to add one.</div>
-            </div>
-          </div>
-
-          <!-- Offline / embed status banner -->
-          <div class="notes-status-bar" id="notes-status-bar" style="display:none"></div>
-        </div>
-      </section>
-      <!-- ── end Notes AI ────────────────────────────────────────────────── -->
-
+      <!-- Main Content -->
       <div class="main-content">
         <!-- Stopwatch Section -->
         <div class="stopwatch-container">
@@ -1001,19 +857,6 @@
     <script type="module" src="firebase-service.js?v=2026-03-15-phase4"></script>
     <script type="module" src="google-auth.js?v=2026-03-15-phase4"></script>
     <script type="module" src="assets/js/app.js?v=2026-09-19-fix4"></script>
-    <!-- AI Planner module (Phase 3) — pure JS, no framework -->
-    <script src="modules/planner.js"></script>
-    <!-- AI Parser + Validator (Phase 4) — calls Ollama locally -->
-    <script src="modules/parser.js"></script>
-    <script src="modules/validator.js"></script>
-    <!-- AI Chat wiring (Phase 5) — depends on planner, parser, validator -->
-    <script src="modules/chat.js"></script>
-    <!-- Routine Review / Insights (Phase 5b) — pure JS, no AI required -->
-    <script src="modules/insights.js"></script>
-    <!-- Notes AI (Phase 6) — IndexedDB + nomic-embed-text + qwen2.5:3b -->
-    <script src="modules/notes.js"></script>
-    <!-- Export (Phase 7) — downloads tracker + notes data as JSON -->
-    <script src="modules/export.js"></script>
   </body>
 </html>
 
