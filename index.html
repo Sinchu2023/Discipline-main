@@ -214,36 +214,6 @@
             </button>
           </div>
 
-          <!-- Pomodoro Controls -->
-          <div class="pomodoro-container" id="pomodoro-container" style="display: none;">
-            <div class="pomodoro-header">
-              <div class="pomodoro-mode-badge" id="pomodoro-mode-badge">
-                <i class="fas fa-tomato"></i> Pomodoro: <span id="pomodoro-mode-text">Focus</span>
-              </div>
-              <div class="pomodoro-cycle" id="pomodoro-cycle">Cycle 1 / 4</div>
-            </div>
-            <div class="pomodoro-timer-display" id="pomodoro-timer-display">25:00</div>
-            <div class="pomodoro-controls">
-              <button class="btn btn-success" id="pomodoro-start-btn">
-                <i class="fas fa-play"></i> Start
-              </button>
-              <button class="btn btn-danger" id="pomodoro-skip-btn" disabled>
-                <i class="fas fa-forward"></i> Skip
-              </button>
-              <button class="btn btn-warning" id="pomodoro-settings-btn">
-                <i class="fas fa-cog"></i>
-              </button>
-            </div>
-            <div class="pomodoro-progress" id="pomodoro-progress">
-              <div class="pomodoro-progress-fill" id="pomodoro-progress-fill"></div>
-            </div>
-          </div>
-
-          <!-- Pomodoro Toggle Button -->
-          <button class="btn btn-info" id="toggle-pomodoro-btn" style="margin-top: 0.5rem; width: 100%;">
-            <i class="fas fa-tomato"></i> Enable Pomodoro Mode
-          </button>
-
           <!-- Active Task Indicator -->
           <div id="active-task-indicator">
             <div class="active-task-indicator">
@@ -838,73 +808,6 @@
         <div class="modal-content" id="shadow-ranks-content"></div>
         <div class="modal-footer">
           <button class="btn btn-primary" id="close-shadow-ranks">Close</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pomodoro Settings Modal -->
-    <div class="modal-overlay" id="pomodoro-settings-modal">
-      <div class="modal" style="max-width: 480px;">
-        <div class="modal-header">
-          <h2 class="modal-title"><i class="fas fa-tomato"></i> Pomodoro Settings</h2>
-          <button class="btn" id="close-pomodoro-settings-modal" aria-label="Close modal">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-content">
-          <div class="pomodoro-settings-group">
-            <label class="pomodoro-setting-row">
-              <span><i class="fas fa-clock"></i> Focus Duration (min)</span>
-              <input type="number" id="pomodoro-focus-duration" min="1" max="120" value="25" class="pomodoro-setting-input" />
-            </label>
-            <label class="pomodoro-setting-row">
-              <span><i class="fas fa-coffee"></i> Short Break (min)</span>
-              <input type="number" id="pomodoro-short-break" min="1" max="60" value="5" class="pomodoro-setting-input" />
-            </label>
-            <label class="pomodoro-setting-row">
-              <span><i class="fas fa-bed"></i> Long Break (min)</span>
-              <input type="number" id="pomodoro-long-break" min="1" max="120" value="15" class="pomodoro-setting-input" />
-            </label>
-            <label class="pomodoro-setting-row">
-              <span><i class="fas fa-repeat"></i> Cycles Before Long Break</span>
-              <input type="number" id="pomodoro-cycles" min="1" max="10" value="4" class="pomodoro-setting-input" />
-            </label>
-          </div>
-          <div class="pomodoro-settings-group">
-            <label class="pomodoro-toggle-row">
-              <input type="checkbox" id="pomodoro-auto-start-breaks" />
-              <span>Auto-start breaks</span>
-            </label>
-            <label class="pomodoro-toggle-row">
-              <input type="checkbox" id="pomodoro-auto-start-focus" />
-              <span>Auto-start focus sessions</span>
-            </label>
-            <label class="pomodoro-toggle-row">
-              <input type="checkbox" id="pomodoro-sound-enabled" checked />
-              <span>Play notification sound</span>
-            </label>
-            <label class="pomodoro-toggle-row">
-              <input type="checkbox" id="pomodoro-notify-enabled" checked />
-              <span>Browser notifications</span>
-            </label>
-          </div>
-          <div class="pomodoro-presets">
-            <button class="btn btn-sm" id="pomodoro-preset-classic" data-focus="25" data-short="5" data-long="15" data-cycles="4">
-              <i class="fas fa-tomato"></i> Classic (25/5/15)
-            </button>
-            <button class="btn btn-sm" id="pomodoro-preset-extended" data-focus="50" data-short="10" data-long="30" data-cycles="3">
-              <i class="fas fa-hourglass-half"></i> Extended (50/10/30)
-            </button>
-            <button class="btn btn-sm" id="pomodoro-preset-short" data-focus="15" data-short="3" data-long="10" data-cycles="5">
-              <i class="fas fa-bolt"></i> Quick (15/3/10)
-            </button>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-success" id="save-pomodoro-settings">
-            <i class="fas fa-save"></i> Save Settings
-          </button>
-          <button class="btn btn-primary" id="close-pomodoro-settings-modal-btn">Close</button>
         </div>
       </div>
     </div>
