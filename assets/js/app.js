@@ -1411,6 +1411,8 @@ class DisciplineTracker {
     this.syncManager = new SyncManager(this);
     this.cloudManager = new FirebaseCloudManager(this);
     this.stopwatch = new StopwatchManager(this);
+    this.pomodoro = new PomodoroManager(this);
+    this.insights = new InsightsManager(this);
     this.taskManager = new TaskManager(this);
     this.uiManager = new UIManager(this);
     this.shadowEngine = new ShadowEngine(this);
@@ -1469,6 +1471,7 @@ class DisciplineTracker {
       "export-data",
       "import-data",
       "import-file",
+      "export-calendar",
       "report-modal",
       "report-content",
       "close-modal",
@@ -1596,6 +1599,33 @@ class DisciplineTracker {
       "task-response-draft-input",
       "save-tasks-btn",
       "edit-timetable-from-pipeline-btn",
+      // Pomodoro elements
+      "pomodoro-container",
+      "pomodoro-mode-badge",
+      "pomodoro-mode-text",
+      "pomodoro-cycle",
+      "pomodoro-timer-display",
+      "pomodoro-start-btn",
+      "pomodoro-skip-btn",
+      "pomodoro-settings-btn",
+      "pomodoro-progress",
+      "pomodoro-progress-fill",
+      "toggle-pomodoro-btn",
+      "pomodoro-settings-modal",
+      "close-pomodoro-settings-modal",
+      "close-pomodoro-settings-modal-btn",
+      "save-pomodoro-settings",
+      "pomodoro-focus-duration",
+      "pomodoro-short-break",
+      "pomodoro-long-break",
+      "pomodoro-cycles",
+      "pomodoro-auto-start-breaks",
+      "pomodoro-auto-start-focus",
+      "pomodoro-sound-enabled",
+      "pomodoro-notify-enabled",
+      "pomodoro-preset-classic",
+      "pomodoro-preset-extended",
+      "pomodoro-preset-short",
     ].forEach((id) => (elements[id] = document.getElementById(id)));
     return elements;
   }
@@ -2394,6 +2424,447 @@ class StopwatchManager {
     });
   }
 }
+
+/* ============================================================
+   PomodoroManager - Handles 25/5 Pomodoro cycles
+   ============================================================ */
+class PomodoroManager {
+  constructor(app) {
+    this.app = app;
+    this.settings = this.loadSettings();
+    this.state = {
+      isRunning: false,
+      mode: 'focus', // 'focus', 'shortBreak', 'longBreak'
+      cycle: 1,
+      totalCycles: this.settings.cycles,
+      timeRemaining: this.settings.focusDuration * 60,
+      totalTime: this.settings.focusDuration * 60,
+      tickIntervalId: null,
+      currentTaskName: null,
+      autoSwitchEnabled: true,
+    };
+    this.audioContext = null;
+    this.initElements();
+    this.bindEvents();
+    this.updateDisplay();
+  }
+
+  loadSettings() {
+    const defaults = {
+      focusDuration: 25,
+      shortBreak: 5,
+      longBreak: 15,
+      cycles: 4,
+      autoStartBreaks: false,
+      autoStartFocus: false,
+      soundEnabled: true,
+      notifyEnabled: true,
+    };
+    try {
+      const saved = localStorage.getItem('pomodoro_settings');
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
+    }
+  }
+
+  saveSettings() {
+    localStorage.setItem('pomodoro_settings', JSON.stringify(this.settings));
+  }
+
+  initElements() {
+    this.elements = {
+      container: document.getElementById('pomodoro-container'),
+      modeBadge: document.getElementById('pomodoro-mode-badge'),
+      modeText: document.getElementById('pomodoro-mode-text'),
+      cycle: document.getElementById('pomodoro-cycle'),
+      timerDisplay: document.getElementById('pomodoro-timer-display'),
+      startBtn: document.getElementById('pomodoro-start-btn'),
+      skipBtn: document.getElementById('pomodoro-skip-btn'),
+      settingsBtn: document.getElementById('pomodoro-settings-btn'),
+      progressFill: document.getElementById('pomodoro-progress-fill'),
+      toggleBtn: document.getElementById('toggle-pomodoro-btn'),
+      // Settings modal
+      settingsModal: document.getElementById('pomodoro-settings-modal'),
+      closeSettingsBtn: document.getElementById('close-pomodoro-settings-modal'),
+      closeSettingsBtn2: document.getElementById('close-pomodoro-settings-modal-btn'),
+      saveSettingsBtn: document.getElementById('save-pomodoro-settings'),
+      focusDuration: document.getElementById('pomodoro-focus-duration'),
+      shortBreak: document.getElementById('pomodoro-short-break'),
+      longBreak: document.getElementById('pomodoro-long-break'),
+      cycles: document.getElementById('pomodoro-cycles'),
+      autoStartBreaks: document.getElementById('pomodoro-auto-start-breaks'),
+      autoStartFocus: document.getElementById('pomodoro-auto-start-focus'),
+      soundEnabled: document.getElementById('pomodoro-sound-enabled'),
+      notifyEnabled: document.getElementById('pomodoro-notify-enabled'),
+      presetClassic: document.getElementById('pomodoro-preset-classic'),
+      presetExtended: document.getElementById('pomodoro-preset-extended'),
+      presetShort: document.getElementById('pomodoro-preset-short'),
+    };
+  }
+
+  bindEvents() {
+    // Main controls
+    this.elements.startBtn?.addEventListener('click', () => this.toggle());
+    this.elements.skipBtn?.addEventListener('click', () => this.skip());
+    this.elements.settingsBtn?.addEventListener('click', () => this.openSettings());
+    this.elements.toggleBtn?.addEventListener('click', () => this.togglePomodoroMode());
+
+    // Settings modal
+    this.elements.closeSettingsBtn?.addEventListener('click', () => this.closeSettings());
+    this.elements.closeSettingsBtn2?.addEventListener('click', () => this.closeSettings());
+    this.elements.saveSettingsBtn?.addEventListener('click', () => this.saveSettingsFromModal());
+    this.elements.settingsModal?.addEventListener('click', (e) => {
+      if (e.target === this.elements.settingsModal) this.closeSettings();
+    });
+
+    // Presets
+    this.elements.presetClassic?.addEventListener('click', () => this.applyPreset(25, 5, 15, 4));
+    this.elements.presetExtended?.addEventListener('click', () => this.applyPreset(50, 10, 30, 3));
+    this.elements.presetShort?.addEventListener('click', () => this.applyPreset(15, 3, 10, 5));
+
+    // Keyboard shortcut: Space to start/pause when Pomodoro is focused
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !e.target.matches('input, textarea, select')) {
+        const pomodoroContainer = document.getElementById('pomodoro-container');
+        if (pomodoroContainer && pomodoroContainer.style.display !== 'none') {
+          e.preventDefault();
+          this.toggle();
+        }
+      }
+    });
+
+    // Load settings into modal inputs
+    this.populateSettingsModal();
+  }
+
+  populateSettingsModal() {
+    this.elements.focusDuration.value = this.settings.focusDuration;
+    this.elements.shortBreak.value = this.settings.shortBreak;
+    this.elements.longBreak.value = this.settings.longBreak;
+    this.elements.cycles.value = this.settings.cycles;
+    this.elements.autoStartBreaks.checked = this.settings.autoStartBreaks;
+    this.elements.autoStartFocus.checked = this.settings.autoStartFocus;
+    this.elements.soundEnabled.checked = this.settings.soundEnabled;
+    this.elements.notifyEnabled.checked = this.settings.notifyEnabled;
+  }
+
+  applyPreset(focus, short, long, cycles) {
+    this.elements.focusDuration.value = focus;
+    this.elements.shortBreak.value = short;
+    this.elements.longBreak.value = long;
+    this.elements.cycles.value = cycles;
+  }
+
+  saveSettingsFromModal() {
+    this.settings = {
+      focusDuration: parseInt(this.elements.focusDuration.value) || 25,
+      shortBreak: parseInt(this.elements.shortBreak.value) || 5,
+      longBreak: parseInt(this.elements.longBreak.value) || 15,
+      cycles: parseInt(this.elements.cycles.value) || 4,
+      autoStartBreaks: this.elements.autoStartBreaks.checked,
+      autoStartFocus: this.elements.autoStartFocus.checked,
+      soundEnabled: this.elements.soundEnabled.checked,
+      notifyEnabled: this.elements.notifyEnabled.checked,
+    };
+    this.saveSettings();
+    this.reset();
+    this.closeSettings();
+    this.app.showToast('Pomodoro settings saved');
+  }
+
+  openSettings() {
+    this.populateSettingsModal();
+    this.elements.settingsModal.classList.add('open');
+  }
+
+  closeSettings() {
+    this.elements.settingsModal.classList.remove('open');
+  }
+
+  togglePomodoroMode() {
+    const container = this.elements.container;
+    const toggleBtn = this.elements.toggleBtn;
+    if (container.style.display === 'none') {
+      container.style.display = 'block';
+      toggleBtn.innerHTML = '<i class="fas fa-tomato"></i> Disable Pomodoro Mode';
+      toggleBtn.classList.add('btn-warning');
+      toggleBtn.classList.remove('btn-info');
+    } else {
+      this.stop();
+      container.style.display = 'none';
+      toggleBtn.innerHTML = '<i class="fas fa-tomato"></i> Enable Pomodoro Mode';
+      toggleBtn.classList.add('btn-info');
+      toggleBtn.classList.remove('btn-warning');
+    }
+  }
+
+  toggle() {
+    if (this.state.isRunning) {
+      this.pause();
+    } else {
+      this.start();
+    }
+  }
+
+  start() {
+    if (this.state.isRunning) return;
+
+    // If we're at the beginning, ask for task name
+    if (this.state.timeRemaining === this.state.totalTime && !this.state.currentTaskName) {
+      const taskName = this.app.elements['task-input']?.value?.trim();
+      if (taskName) {
+        this.state.currentTaskName = taskName;
+      } else {
+        const name = prompt('Enter task name for this Pomodoro session:');
+        if (!name) return;
+        this.state.currentTaskName = name;
+        this.app.elements['task-input'].value = name;
+      }
+    }
+
+    this.state.isRunning = true;
+    this.elements.startBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+    this.elements.skipBtn.disabled = false;
+    this.startTicking();
+    this.notify('Pomodoro Started', `${this.getModeLabel()} session started`);
+    this.playSound('start');
+  }
+
+  pause() {
+    if (!this.state.isRunning) return;
+    this.state.isRunning = false;
+    this.stopTicking();
+    this.elements.startBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+    this.notify('Pomodoro Paused', `${this.getModeLabel()} session paused`);
+  }
+
+  stop() {
+    this.pause();
+    this.reset();
+  }
+
+  reset() {
+    this.stopTicking();
+    this.state.isRunning = false;
+    this.state.mode = 'focus';
+    this.state.cycle = 1;
+    this.state.totalCycles = this.settings.cycles;
+    this.state.currentTaskName = null;
+    this.setModeTimes();
+    this.updateDisplay();
+    this.elements.startBtn.innerHTML = '<i class="fas fa-play"></i> Start';
+    this.elements.skipBtn.disabled = true;
+  }
+
+  skip() {
+    this.stopTicking();
+    this.completeCurrentMode();
+  }
+
+  startTicking() {
+    if (this.state.tickIntervalId) clearInterval(this.state.tickIntervalId);
+    this.state.tickIntervalId = setInterval(() => this.tick(), 1000);
+  }
+
+  stopTicking() {
+    if (this.state.tickIntervalId) {
+      clearInterval(this.state.tickIntervalId);
+      this.state.tickIntervalId = null;
+    }
+  }
+
+  tick() {
+    if (!this.state.isRunning) return;
+
+    this.state.timeRemaining--;
+    this.updateDisplay();
+
+    if (this.state.timeRemaining <= 0) {
+      this.completeCurrentMode();
+    }
+  }
+
+  completeCurrentMode() {
+    this.playSound('complete');
+    this.stopTicking();
+
+    if (this.state.mode === 'focus') {
+      // Log the completed focus session as a task
+      if (this.state.currentTaskName) {
+        this.logFocusSession();
+      }
+
+      // Determine next break type
+      if (this.state.cycle >= this.state.totalCycles) {
+        this.switchMode('longBreak');
+        this.state.cycle = 1;
+      } else {
+        this.switchMode('shortBreak');
+      }
+
+      this.notify('Focus Complete', `Great work! Time for a ${this.getModeLabel().toLowerCase()}.`);
+      
+      if (this.settings.autoStartBreaks) {
+        this.start();
+      } else {
+        this.elements.startBtn.innerHTML = '<i class="fas fa-play"></i> Start Break';
+        this.elements.skipBtn.disabled = false;
+      }
+    } else {
+      // Break completed, switch to focus
+      this.state.cycle++;
+      this.switchMode('focus');
+      this.notify('Break Complete', 'Break over! Ready to focus?');
+      
+      if (this.settings.autoStartFocus) {
+        this.start();
+      } else {
+        this.elements.startBtn.innerHTML = '<i class="fas fa-play"></i> Start Focus';
+        this.elements.skipBtn.disabled = false;
+      }
+    }
+  }
+
+  logFocusSession() {
+    const duration = this.settings.focusDuration;
+    const endTime = Date.now();
+    const startTime = endTime - duration * 60000;
+    
+    const entry = this.app.normalizeTask({
+      id: `${Date.now()}`,
+      name: this.state.currentTaskName,
+      category: 'Productive Work',
+      subcategory: 'Pomodoro Focus',
+      description: `Pomodoro: ${this.state.currentTaskName} (Cycle ${this.state.cycle}/${this.state.totalCycles})`,
+      startTime,
+      endTime,
+      duration,
+      date: this.app.getDateString(new Date(startTime)),
+    });
+    this.app.taskManager.addTask(entry);
+  }
+
+  switchMode(mode) {
+    this.state.mode = mode;
+    this.setModeTimes();
+    this.updateDisplay();
+  }
+
+  setModeTimes() {
+    let minutes;
+    switch (this.state.mode) {
+      case 'focus':
+        minutes = this.settings.focusDuration;
+        break;
+      case 'shortBreak':
+        minutes = this.settings.shortBreak;
+        break;
+      case 'longBreak':
+        minutes = this.settings.longBreak;
+        break;
+      default:
+        minutes = this.settings.focusDuration;
+    }
+    this.state.timeRemaining = minutes * 60;
+    this.state.totalTime = minutes * 60;
+  }
+
+  getModeLabel() {
+    switch (this.state.mode) {
+      case 'focus': return 'Focus';
+      case 'shortBreak': return 'Short Break';
+      case 'longBreak': return 'Long Break';
+      default: return 'Focus';
+    }
+  }
+
+  updateDisplay() {
+    // Mode badge
+    this.elements.modeText.textContent = this.getModeLabel();
+    this.elements.modeBadge.className = 'pomodoro-mode-badge';
+    if (this.state.mode !== 'focus') {
+      this.elements.modeBadge.classList.add('break-mode');
+    }
+
+    // Cycle display
+    if (this.state.mode === 'focus') {
+      this.elements.cycle.textContent = `Cycle ${this.state.cycle} / ${this.state.totalCycles}`;
+    } else {
+      this.elements.cycle.textContent = this.state.mode === 'longBreak' ? 'Long Break' : 'Short Break';
+    }
+
+    // Timer display
+    const mins = Math.floor(this.state.timeRemaining / 60);
+    const secs = this.state.timeRemaining % 60;
+    this.elements.timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    
+    this.elements.timerDisplay.className = 'pomodoro-timer-display';
+    if (this.state.mode !== 'focus') {
+      this.elements.timerDisplay.classList.add('break-mode');
+    }
+
+    // Progress bar
+    const progress = ((this.state.totalTime - this.state.timeRemaining) / this.state.totalTime) * 100;
+    this.elements.progressFill.style.width = `${progress}%`;
+    this.elements.progressFill.className = 'pomodoro-progress-fill';
+    if (this.state.mode !== 'focus') {
+      this.elements.progressFill.classList.add('break-mode');
+    }
+  }
+
+  playSound(type) {
+    if (!this.settings.soundEnabled) return;
+    
+    try {
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      const ctx = this.audioContext;
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      if (type === 'start') {
+        oscillator.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        oscillator.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+        oscillator.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.5);
+      } else if (type === 'complete') {
+        oscillator.frequency.setValueAtTime(783.99, ctx.currentTime); // G5
+        oscillator.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15); // E5
+        oscillator.frequency.setValueAtTime(523.25, ctx.currentTime + 0.3); // C5
+        gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.6);
+      }
+    } catch (e) {
+      console.warn('Pomodoro sound failed:', e);
+    }
+  }
+
+  notify(title, body) {
+    if (!this.settings.notifyEnabled) return;
+    
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          new Notification(title, { body, icon: '/favicon.ico' });
+        }
+      });
+    }
+  }
+}
+
 class TaskManager {
   constructor(app) {
     this.app = app;
@@ -3542,6 +4013,49 @@ class UIManager {
   hideShadowRanksGuide() {
     this.app.elements["shadow-ranks-modal"].style.display = "none";
   }
+
+  showInsights() {
+    this.app.elements["insights-modal"].style.display = "flex";
+    // Render insights asynchronously to not block UI
+    requestAnimationFrame(() => {
+      this.app.insights.renderInsights("insights-content");
+    });
+  }
+
+  hideInsights() {
+    this.app.elements["insights-modal"].style.display = "none";
+  }
+
+  refreshInsights() {
+    const content = this.app.elements["insights-content"];
+    if (content) {
+      content.innerHTML = `
+        <div class="insights-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);">
+          <div class="ai-spinner-ring" style="margin:0 auto 1rem;"></div>
+          <div>Refreshing analysis...</div>
+        </div>
+      `;
+    }
+    requestAnimationFrame(() => {
+      this.app.insights.generateInsights(true); // force refresh
+      this.app.insights.renderInsights("insights-content");
+    });
+  }
+
+  exportInsights() {
+    const insights = this.app.insights.generateInsights();
+    const blob = new Blob([JSON.stringify(insights, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `discipline-insights-${this.app.getDateString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.app.showToast("Insights exported");
+  }
+
   getSleepJournalDraft() {
     return {
       date: this.app.getDateString(),
@@ -3747,6 +4261,97 @@ class UIManager {
     });
   }
 
+  /**
+   * Export tasks as ICS calendar file (compatible with Google Calendar, Outlook, Apple Calendar)
+   */
+  exportCalendar(rangeDays = 30) {
+    const tasks = this.app.state.tasks || [];
+    if (tasks.length === 0) {
+      alert("No tasks to export. Track some sessions first!");
+      return;
+    }
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
+    cutoffDate.setHours(0, 0, 0, 0);
+
+    // Filter tasks within range
+    const recentTasks = tasks.filter(t => {
+      if (!t.startTime) return false;
+      return new Date(t.startTime) >= cutoffDate;
+    });
+
+    if (recentTasks.length === 0) {
+      alert(`No tasks in the last ${rangeDays} days.`);
+      return;
+    }
+
+    // Generate ICS content
+    const icsLines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Discipline Tracker Pro//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:Discipline Tracker Sessions",
+      "X-WR-TIMEZONE:UTC",
+    ];
+
+    recentTasks.forEach(task => {
+      if (!task.startTime || !task.endTime) return;
+
+      const start = new Date(task.startTime);
+      const end = new Date(task.endTime);
+      const uid = `${task.id || Date.now()}-${Math.random().toString(36).slice(2)}@discipline-tracker`;
+      const summary = task.name || task.description || `${task.category} - ${task.subcategory}`;
+      const description = `Category: ${task.category}\nSubcategory: ${task.subcategory}\nDuration: ${task.duration} minutes\n${task.description || ""}`;
+      const location = ""; // Could add location if tracked
+
+      // Format dates as UTC for ICS
+      const formatICS = (date) => {
+        return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      };
+
+      icsLines.push(
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        `DTSTAMP:${formatICS(new Date())}`,
+        `DTSTART:${formatICS(start)}`,
+        `DTEND:${formatICS(end)}`,
+        `SUMMARY:${this.escapeICS(summary)}`,
+        `DESCRIPTION:${this.escapeICS(description)}`,
+        "END:VEVENT"
+      );
+    });
+
+    icsLines.push("END:VCALENDAR");
+
+    const icsContent = icsLines.join("\r\n");
+    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `discipline-calendar-${this.app.getDateString()}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    this.app.showToast(`Exported ${recentTasks.length} sessions to calendar (.ics)`);
+  }
+
+  /**
+   * Escape text for ICS format
+   */
+  escapeICS(text) {
+    return String(text)
+      .replace(/\\/g, "\\\\")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "");
+  }
+
   triggerImportPicker() {
     const input = this.app.elements["import-file"];
     if (!input) return;
@@ -3895,6 +4500,636 @@ class UIManager {
         "Import failed. Please provide a valid exported JSON/CSV file.",
       );
     }
+  }
+}
+
+/* ============================================================
+   InsightsManager - Local AI-powered insights (FREE, no API)
+   ============================================================ */
+class InsightsManager {
+  constructor(app) {
+    this.app = app;
+    this.insightsCache = null;
+    this.lastComputedDate = null;
+  }
+
+  /**
+   * Generate insights from local data - completely free, runs in browser
+   */
+  generateInsights(forceRefresh = false) {
+    const today = this.app.getDateString();
+    if (!forceRefresh && this.insightsCache && this.lastComputedDate === today) {
+      return this.insightsCache;
+    }
+
+    const tasks = this.app.state.tasks || [];
+    if (tasks.length === 0) {
+      return this.getEmptyInsights();
+    }
+
+    const insights = {
+      weekly: this.analyzeWeeklyPatterns(tasks),
+      productivity: this.analyzeProductivityPatterns(tasks),
+      habits: this.analyzeHabits(tasks),
+      recommendations: this.generateRecommendations(tasks),
+      streaks: this.analyzeStreaks(tasks),
+      comparisons: this.comparePeriods(tasks),
+      generatedAt: new Date().toISOString(),
+    };
+
+    this.insightsCache = insights;
+    this.lastComputedDate = today;
+    return insights;
+  }
+
+  getEmptyInsights() {
+    return {
+      weekly: { message: "No data yet. Start tracking to get insights!" },
+      productivity: { message: "Track some productive sessions first." },
+      habits: { message: "Build a habit history to see patterns." },
+      recommendations: [{ type: "start", text: "Start your first focus session!", priority: "high" }],
+      streaks: { current: 0, best: 0, message: "Begin your streak today!" },
+      comparisons: { message: "Need more data for comparisons." },
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Analyze weekly patterns - which days you're most productive
+   */
+  analyzeWeeklyPatterns(tasks) {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayStats = {};
+    
+    // Initialize
+    dayNames.forEach(d => dayStats[d] = { productive: 0, total: 0, sessions: 0, waste: 0 });
+
+    tasks.forEach(task => {
+      if (!task.startTime) return;
+      const date = new Date(task.startTime);
+      const day = dayNames[date.getDay()];
+      const mins = task.duration || 0;
+      
+      dayStats[day].total += mins;
+      dayStats[day].sessions++;
+      
+      if (PRODUCTIVE_CATEGORIES.has(task.category)) {
+        dayStats[day].productive += mins;
+      } else if (task.category === 'Time Waste / Distraction') {
+        dayStats[day].waste += mins;
+      }
+    });
+
+    // Find best/worst days
+    const daysWithData = Object.entries(dayStats).filter(([_, v]) => v.total > 0);
+    if (daysWithData.length === 0) return { message: "No weekly data yet." };
+
+    const bestDay = daysWithData.reduce((a, b) => a[1].productive > b[1].productive ? a : b);
+    const worstDay = daysWithData.reduce((a, b) => a[1].productive < b[1].productive ? a : b);
+    const mostConsistent = daysWithData.reduce((a, b) => 
+      (a[1].productive / Math.max(a[1].sessions, 1)) > (b[1].productive / Math.max(b[1].sessions, 1)) ? a : b
+    );
+
+    const avgProductive = daysWithData.reduce((sum, [_, v]) => sum + v.productive, 0) / daysWithData.length;
+
+    return {
+      bestDay: { name: bestDay[0], minutes: bestDay[1].productive },
+      worstDay: { name: worstDay[0], minutes: worstDay[1].productive },
+      mostConsistent: { name: mostConsistent[0], avgPerSession: Math.round(mostConsistent[1].productive / Math.max(mostConsistent[1].sessions, 1)) },
+      averageDailyProductive: Math.round(avgProductive),
+      dayBreakdown: dayStats,
+      insight: `You're most productive on ${bestDay[0]}s (${bestDay[1].productive}min avg). ${worstDay[0]}s need attention (${worstDay[1].productive}min).`,
+    };
+  }
+
+  /**
+   * Analyze productivity patterns - time of day, session lengths, categories
+   */
+  analyzeProductivityPatterns(tasks) {
+    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    if (productiveTasks.length === 0) return { message: "No productive sessions recorded." };
+
+    // Hourly distribution
+    const hourlyStats = {};
+    for (let h = 0; h < 24; h++) hourlyStats[h] = { count: 0, minutes: 0 };
+
+    productiveTasks.forEach(task => {
+      if (!task.startTime) return;
+      const hour = new Date(task.startTime).getHours();
+      hourlyStats[hour].count++;
+      hourlyStats[hour].minutes += task.duration || 0;
+    });
+
+    // Find peak hours
+    const hoursWithData = Object.entries(hourlyStats).filter(([_, v]) => v.minutes > 0);
+    const peakHour = hoursWithData.reduce((a, b) => a[1].minutes > b[1].minutes ? a : b);
+    const peakHourCount = hoursWithData.reduce((a, b) => a[1].count > b[1].count ? a : b);
+
+    // Session length analysis
+    const durations = productiveTasks.map(t => t.duration || 0).filter(d => d > 0);
+    const avgSession = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+    const longSessions = durations.filter(d => d >= 60).length;
+    const shortSessions = durations.filter(d => d <= 25).length;
+
+    // Category breakdown
+    const catStats = {};
+    productiveTasks.forEach(t => {
+      const cat = t.category || 'Other';
+      catStats[cat] = (catStats[cat] || 0) + (t.duration || 0);
+    });
+    const topCategory = Object.entries(catStats).sort((a, b) => b[1] - a[1])[0];
+
+    // Weekly trend (last 4 weeks)
+    const weeklyTrend = this.computeWeeklyTrend(productiveTasks);
+
+    return {
+      peakHour: { hour: parseInt(peakHour[0]), minutes: peakHour[1].minutes, label: this.formatHour(peakHour[0]) },
+      peakHourCount: { hour: parseInt(peakHourCount[0]), count: peakHourCount[1].count },
+      avgSessionLength: avgSession,
+      longSessionsCount: longSessions,
+      shortSessionsCount: shortSessions,
+      topCategory: topCategory ? { name: topCategory[0], minutes: topCategory[1] } : null,
+      weeklyTrend,
+      hourlyDistribution: hourlyStats,
+      insight: `Your peak focus time is ${this.formatHour(peakHour[0])} (${peakHour[1].minutes}min). Average session: ${avgSession}min. ${longSessions} deep work sessions (60+min).`,
+    };
+  }
+
+  formatHour(h) {
+    const hour = parseInt(h);
+    if (hour === 0) return '12 AM';
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return '12 PM';
+    return `${hour - 12} PM`;
+  }
+
+  computeWeeklyTrend(productiveTasks) {
+    const weeks = {};
+    productiveTasks.forEach(task => {
+      if (!task.startTime) return;
+      const date = new Date(task.startTime);
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const key = this.app.getDateString(weekStart);
+      weeks[key] = (weeks[key] || 0) + (task.duration || 0);
+    });
+
+    const sortedWeeks = Object.entries(weeks).sort((a, b) => new Date(a[0]) - new Date(b[0]));
+    if (sortedWeeks.length < 2) return { trend: 'insufficient', change: 0 };
+
+    const recent = sortedWeeks.slice(-2);
+    const change = recent[1][1] - recent[0][1];
+    const pctChange = recent[0][1] > 0 ? Math.round((change / recent[0][1]) * 100) : 0;
+
+    return {
+      trend: change > 30 ? 'improving' : change < -30 ? 'declining' : 'stable',
+      change,
+      pctChange,
+      weeks: sortedWeeks.map(([week, mins]) => ({ week, minutes: mins })),
+    };
+  }
+
+  /**
+   * Analyze habits - consistency, streaks, recurring patterns
+   */
+  analyzeHabits(tasks) {
+    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    if (productiveTasks.length === 0) return { message: "No habit data yet." };
+
+    // Daily consistency
+    const dailyMinutes = {};
+    productiveTasks.forEach(t => {
+      if (!t.date) return;
+      dailyMinutes[t.date] = (dailyMinutes[t.date] || 0) + (t.duration || 0);
+    });
+
+    const daysWithWork = Object.keys(dailyMinutes).length;
+    const totalDays = this.getDaysSinceFirstTask(productiveTasks);
+    const consistency = totalDays > 0 ? Math.round((daysWithWork / totalDays) * 100) : 0;
+
+    // Current streak
+    let currentStreak = 0;
+    const today = this.app.getDateString();
+    let checkDate = new Date(today + 'T12:00:00');
+    
+    while (dailyMinutes[this.app.getDateString(checkDate)] > 0) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    // Best streak
+    let bestStreak = 0;
+    let tempStreak = 0;
+    const sortedDates = Object.keys(dailyMinutes).sort();
+    let prevDate = null;
+    
+    sortedDates.forEach(dateStr => {
+      const date = new Date(dateStr + 'T12:00:00');
+      if (prevDate && (date - prevDate) === 86400000) {
+        tempStreak++;
+      } else {
+        tempStreak = 1;
+      }
+      bestStreak = Math.max(bestStreak, tempStreak);
+      prevDate = date;
+    });
+
+    // Recurring tasks (same category at similar times)
+    const recurringPatterns = this.findRecurringPatterns(productiveTasks);
+
+    return {
+      consistency: `${consistency}%`,
+      daysActive: daysWithWork,
+      totalDaysTracked: totalDays,
+      currentStreak,
+      bestStreak,
+      recurringPatterns,
+      insight: `${consistency}% daily consistency. Current streak: ${currentStreak} days. Best: ${bestStreak} days.`,
+    };
+  }
+
+  getDaysSinceFirstTask(tasks) {
+    if (tasks.length === 0) return 0;
+    const dates = tasks.map(t => t.startTime).filter(Boolean).map(t => new Date(t));
+    const first = new Date(Math.min(...dates));
+    const today = new Date();
+    first.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return Math.max(1, Math.ceil((today - first) / 86400000));
+  }
+
+  findRecurringPatterns(tasks) {
+    // Group by category + hour
+    const patterns = {};
+    tasks.forEach(t => {
+      if (!t.startTime) return;
+      const hour = new Date(t.startTime).getHours();
+      const key = `${t.category}|${hour}`;
+      patterns[key] = (patterns[key] || 0) + 1;
+    });
+
+    return Object.entries(patterns)
+      .filter(([_, count]) => count >= 3)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([key, count]) => {
+        const [cat, hour] = key.split('|');
+        return { category: cat, hour: parseInt(hour), count, label: `${cat} at ${this.formatHour(hour)} (${count}x)` };
+      });
+  }
+
+  /**
+   * Generate actionable recommendations
+   */
+  generateRecommendations(tasks) {
+    const recs = [];
+    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    const wasteTasks = tasks.filter(t => t.category === 'Time Waste / Distraction');
+    
+    const totalProductive = productiveTasks.reduce((s, t) => s + (t.duration || 0), 0);
+    const totalWaste = wasteTasks.reduce((s, t) => s + (t.duration || 0), 0);
+    const wasteRatio = totalProductive > 0 ? totalWaste / totalProductive : 0;
+
+    // High waste ratio
+    if (wasteRatio > 0.5) {
+      recs.push({
+        type: 'warning',
+        text: `Distraction time (${this.app.formatDuration(totalWaste)}) exceeds 50% of productive time. Try Pomodoro blocks with phone away.`,
+        priority: 'high',
+      });
+    }
+
+    // Inconsistent days
+    const weekly = this.analyzeWeeklyPatterns(tasks);
+    if (weekly.dayBreakdown) {
+      const lowDays = Object.entries(weekly.dayBreakdown)
+        .filter(([_, v]) => v.productive < weekly.averageDailyProductive * 0.3 && v.total > 0)
+        .map(([d]) => d);
+      if (lowDays.length > 0) {
+        recs.push({
+          type: 'improvement',
+          text: `Low productivity on ${lowDays.join(', ')}. Schedule a fixed 90-min block on these days.`,
+          priority: 'medium',
+        });
+      }
+    }
+
+    // Session length
+    const prodPatterns = this.analyzeProductivityPatterns(tasks);
+    if (prodPatterns.avgSessionLength < 30 && productiveTasks.length > 5) {
+      recs.push({
+        type: 'improvement',
+        text: `Average session is only ${prodPatterns.avgSessionLength}min. Try 50-min deep work blocks (Pomodoro extended).`,
+        priority: 'medium',
+      });
+    }
+
+    // No morning work
+    const morningWork = productiveTasks.filter(t => {
+      if (!t.startTime) return false;
+      const h = new Date(t.startTime).getHours();
+      return h >= 5 && h <= 10;
+    }).length;
+    if (morningWork === 0 && productiveTasks.length > 5) {
+      recs.push({
+        type: 'suggestion',
+        text: 'No morning sessions detected. Your brain is freshest 5-10 AM. Try one 90-min block.',
+        priority: 'high',
+      });
+    }
+
+    // Good streak encouragement
+    const habits = this.analyzeHabits(tasks);
+    if (habits.currentStreak >= 7) {
+      recs.push({
+        type: 'success',
+        text: `🔥 ${habits.currentStreak}-day streak! You're building serious momentum. Protect it.`,
+        priority: 'low',
+      });
+    }
+
+    // Sleep tracking
+    const sleepTasks = tasks.filter(t => t.category === 'Sleep');
+    if (sleepTasks.length === 0) {
+      recs.push({
+        type: 'suggestion',
+        text: 'No sleep tracked. Sleep is when memory consolidates. Track it to optimize recovery.',
+        priority: 'medium',
+      });
+    }
+
+    // Default if no specific issues
+    if (recs.length === 0) {
+      recs.push({
+        type: 'success',
+        text: 'Great balance! Keep consistency. Consider adding a weekly review session.',
+        priority: 'low',
+      });
+    }
+
+    return recs.sort((a, b) => { 
+      const p = { high: 0, medium: 1, low: 2 };
+      return p[a.priority] - p[b.priority]; 
+    });
+  }
+
+  /**
+   * Analyze streaks
+   */
+  analyzeStreaks(tasks) {
+    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    const dailyMinutes = {};
+    productiveTasks.forEach(t => {
+      if (!t.date) return;
+      dailyMinutes[t.date] = (dailyMinutes[t.date] || 0) + (t.duration || 0);
+    });
+
+    const sortedDates = Object.keys(dailyMinutes).sort();
+    let current = 0, best = 0, temp = 0;
+    const today = this.app.getDateString();
+    let checkDate = new Date(today + 'T12:00:00');
+    
+    // Current streak (from today backwards)
+    while (dailyMinutes[this.app.getDateString(checkDate)] > 0) {
+      current++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    // Best streak
+    let prevDate = null;
+    sortedDates.forEach(dateStr => {
+      const date = new Date(dateStr + 'T12:00:00');
+      if (prevDate && (date - prevDate) === 86400000) {
+        temp++;
+      } else {
+        temp = 1;
+      }
+      best = Math.max(best, temp);
+      prevDate = date;
+    });
+
+    return {
+      current,
+      best,
+      message: current > 0 ? `${current} day streak active!` : 'Start a streak today!',
+    };
+  }
+
+  /**
+   * Compare current period with previous
+   */
+  comparePeriods(tasks) {
+    const now = new Date();
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - now.getDay());
+    thisWeekStart.setHours(0, 0, 0, 0);
+    
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+
+    const thisWeekKey = this.app.getDateString(thisWeekStart);
+    const lastWeekKey = this.app.getDateString(lastWeekStart);
+
+    const getWeekStats = (weekStart) => {
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      return tasks.filter(t => {
+        if (!t.startTime) return false;
+        const d = new Date(t.startTime);
+        return d >= weekStart && d <= weekEnd;
+      }).reduce((acc, t) => {
+        acc.total += t.duration || 0;
+        if (PRODUCTIVE_CATEGORIES.has(t.category)) acc.productive += t.duration || 0;
+        if (t.category === 'Time Waste / Distraction') acc.waste += t.duration || 0;
+        if (t.category === 'Sleep') acc.sleep += t.duration || 0;
+        return acc;
+      }, { total: 0, productive: 0, waste: 0, sleep: 0 });
+    };
+
+    const thisWeek = getWeekStats(thisWeekStart);
+    const lastWeek = getWeekStats(lastWeekStart);
+
+    const prodChange = lastWeek.productive > 0 
+      ? Math.round(((thisWeek.productive - lastWeek.productive) / lastWeek.productive) * 100)
+      : (thisWeek.productive > 0 ? 100 : 0);
+
+    return {
+      thisWeek,
+      lastWeek,
+      productiveChange: prodChange,
+      insight: prodChange > 0 
+        ? `↑ ${prodChange}% more productive than last week (${this.app.formatDuration(thisWeek.productive)} vs ${this.app.formatDuration(lastWeek.productive)})`
+        : `↓ ${Math.abs(prodChange)}% less productive than last week. Identify what changed.`,
+    };
+  }
+
+  /**
+   * Render insights to a container element
+   */
+  renderInsights(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const insights = this.generateInsights();
+    container.innerHTML = this.buildInsightsHTML(insights);
+  }
+
+  buildInsightsHTML(insights) {
+    const sections = [];
+
+    // Weekly Pattern Card
+    if (insights.weekly.bestDay) {
+      sections.push(`
+        <div class="insight-card">
+          <h4><i class="fas fa-calendar-week"></i> Weekly Pattern</h4>
+          <div class="insight-highlight">
+            <span class="insight-good">🏆 Best: ${insights.weekly.bestDay.name} (${insights.weekly.bestDay.minutes}min)</span>
+            <span class="insight-bad">📉 Weak: ${insights.weekly.worstDay.name} (${insights.weekly.worstDay.minutes}min)</span>
+          </div>
+          <p class="insight-text">${insights.weekly.insight}</p>
+          <div class="insight-mini-chart">${this.renderDayBars(insights.weekly.dayBreakdown)}</div>
+        </div>
+      `);
+    }
+
+    // Productivity Patterns
+    if (insights.productivity.peakHour) {
+      sections.push(`
+        <div class="insight-card">
+          <h4><i class="fas fa-chart-line"></i> Focus Patterns</h4>
+          <div class="insight-highlight">
+            <span>⏰ Peak: ${insights.productivity.peakHour.label}</span>
+            <span>⏱️ Avg Session: ${insights.productivity.avgSessionLength}min</span>
+            <span>🏋️ Deep Work: ${insights.productivity.longSessionsCount} sessions (60+min)</span>
+          </div>
+          <p class="insight-text">${insights.productivity.insight}</p>
+          <div class="insight-trend ${insights.productivity.weeklyTrend.trend}">${this.formatTrend(insights.productivity.weeklyTrend)}</div>
+        </div>
+      `);
+    }
+
+    // Habits & Consistency
+    if (insights.habits.currentStreak !== undefined) {
+      sections.push(`
+        <div class="insight-card">
+          <h4><i class="fas fa-fire"></i> Consistency</h4>
+          <div class="insight-stats">
+            <div class="stat"><strong>${insights.habits.currentStreak}</strong><span>Current Streak</span></div>
+            <div class="stat"><strong>${insights.habits.bestStreak}</strong><span>Best Streak</span></div>
+            <div class="stat"><strong>${insights.habits.consistency}</strong><span>Daily Consistency</span></div>
+          </div>
+          <p class="insight-text">${insights.habits.insight}</p>
+          ${insights.habits.recurringPatterns.length > 0 ? `
+            <div class="insight-patterns">
+              <strong>Recurring Patterns:</strong>
+              ${insights.habits.recurringPatterns.map(p => `<span class="pattern-tag">${p.label}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `);
+    }
+
+    // Recommendations
+    if (insights.recommendations.length > 0) {
+      sections.push(`
+        <div class="insight-card recommendations">
+          <h4><i class="fas fa-lightbulb"></i> AI Recommendations</h4>
+          ${insights.recommendations.map(r => `
+            <div class="recommendation ${r.type} ${r.priority}">
+              <span class="rec-icon">${this.getRecIcon(r.type)}</span>
+              <span class="rec-text">${r.text}</span>
+              <span class="rec-priority">${r.priority}</span>
+            </div>
+          `).join('')}
+        </div>
+      `);
+    }
+
+    // Period Comparison
+    if (insights.comparisons.productiveChange !== undefined) {
+      sections.push(`
+        <div class="insight-card comparison ${insights.comparisons.productiveChange >= 0 ? 'positive' : 'negative'}">
+          <h4><i class="fas fa-exchange-alt"></i> Week-over-Week</h4>
+          <div class="insight-big-number ${insights.comparisons.productiveChange >= 0 ? 'good' : 'bad'}">
+            ${insights.comparisons.productiveChange >= 0 ? '+' : ''}${insights.comparisons.productiveChange}%
+          </div>
+          <p class="insight-text">${insights.comparisons.insight}</p>
+          <div class="comparison-bars">
+            <div class="bar"><span>This Week</span><strong>${this.app.formatDuration(insights.comparisons.thisWeek.productive)}</strong></div>
+            <div class="bar"><span>Last Week</span><strong>${this.app.formatDuration(insights.comparisons.lastWeek.productive)}</strong></div>
+          </div>
+        </div>
+      `);
+    }
+
+    return `
+      <style>
+        .insight-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+        .insight-card h4 { margin: 0 0 0.75rem; color: var(--text-accent); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
+        .insight-highlight { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; font-size: 0.85rem; }
+        .insight-good { color: #4ade80; } .insight-bad { color: #f87171; }
+        .insight-text { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; margin: 0; }
+        .insight-mini-chart { display: flex; gap: 4px; height: 40px; align-items: flex-end; margin-top: 0.5rem; }
+        .day-bar { flex: 1; background: rgba(255,255,255,0.1); border-radius: 2px 2px 0 0; transition: height 0.3s; min-height: 4px; }
+        .day-bar.productive { background: linear-gradient(to top, #28a745, #4ade80); }
+        .day-bar-label { font-size: 0.6rem; color: var(--text-secondary); text-align: center; margin-top: 2px; }
+        .insight-stats { display: flex; gap: 1rem; justify-content: space-around; margin: 0.75rem 0; }
+        .insight-stats .stat { text-align: center; }
+        .insight-stats strong { display: block; font-size: 1.5rem; color: var(--text-accent); }
+        .insight-stats span { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .insight-patterns { margin-top: 0.5rem; font-size: 0.8rem; }
+        .pattern-tag { display: inline-block; background: rgba(0,123,255,0.2); color: #a5b4fc; padding: 2px 8px; border-radius: 999px; margin: 2px 4px 2px 0; font-size: 0.75rem; }
+        .recommendations .recommendation { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border-radius: 8px; margin: 0.5rem 0; border-left: 3px solid var(--primary); }
+        .recommendation.warning { border-left-color: #ffc107; }
+        .recommendation.success { border-left-color: #28a745; }
+        .recommendation.improvement { border-left-color: #17a2b8; }
+        .recommendation.suggestion { border-left-color: #6f42c1; }
+        .rec-icon { font-size: 1.1rem; margin-top: 2px; }
+        .rec-text { flex: 1; font-size: 0.85rem; line-height: 1.4; }
+        .rec-priority { font-size: 0.65rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); }
+        .recommendation.high .rec-priority { background: rgba(220,53,69,0.2); color: #f87171; }
+        .recommendation.medium .rec-priority { background: rgba(255,193,7,0.2); color: #ffc107; }
+        .recommendation.low .rec-priority { background: rgba(40,167,69,0.2); color: #4ade80; }
+        .insight-trend { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-top: 0.5rem; }
+        .insight-trend.improving { background: rgba(40,167,69,0.2); color: #4ade80; }
+        .insight-trend.declining { background: rgba(220,53,69,0.2); color: #f87171; }
+        .insight-trend.stable { background: rgba(255,193,7,0.2); color: #ffc107; }
+        .comparison-bars { display: flex; gap: 1rem; margin-top: 0.75rem; }
+        .comparison-bars .bar { flex: 1; text-align: center; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 8px; }
+        .comparison-bars .bar span { display: block; font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .insight-big-number { font-size: 2.5rem; font-weight: 800; text-align: center; margin: 0.5rem 0; line-height: 1; }
+        .insight-big-number.good { color: #4ade80; } .insight-big-number.bad { color: #f87171; }
+      </style>
+      ${sections.join('')}
+    `;
+  }
+
+  renderDayBars(dayBreakdown) {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const maxMinutes = Math.max(...Object.values(dayBreakdown).map(v => v.productive), 1);
+    
+    return dayNames.map(day => {
+      const data = dayBreakdown[day];
+      const height = data ? Math.max(4, (data.productive / maxMinutes) * 100) : 4;
+      const isProd = data && data.productive > 0;
+      return `
+        <div class="day-bar ${isProd ? 'productive' : ''}" style="height: ${height}%;" title="${day}: ${data?.productive || 0}min"></div>
+      `;
+    }).join('');
+  }
+
+  formatTrend(trend) {
+    const icons = { improving: '📈', declining: '📉', stable: '➡️', insufficient: '❓' };
+    const labels = { improving: 'Improving', declining: 'Declining', stable: 'Stable', insufficient: 'Need more data' };
+    return `${icons[trend.trend]} ${labels[trend.trend]} ${trend.pctChange !== 0 ? `(${trend.pctChange >= 0 ? '+' : ''}${trend.pctChange}%)` : ''}`;
+  }
+
+  getRecIcon(type) {
+    const icons = { warning: '⚠️', success: '✅', improvement: '💡', suggestion: '🎯' };
+    return icons[type] || '💡';
   }
 }
 
@@ -10335,6 +11570,9 @@ class EventManager {
     this.app.elements["export-data"].addEventListener("click", () =>
       (this.app.uiManager.exportData(), this.app.cloudManager.closeProfileMenu()),
     );
+    this.app.elements["export-calendar"].addEventListener("click", () =>
+      (this.app.uiManager.exportCalendar(), this.app.cloudManager.closeProfileMenu()),
+    );
     this.app.elements["import-data"].addEventListener("click", () =>
       (this.app.uiManager.triggerImportPicker(), this.app.cloudManager.closeProfileMenu()),
     );
@@ -10394,6 +11632,21 @@ class EventManager {
       "click",
       () => this.app.uiManager.hideShadowRanksGuide(),
     );
+    this.app.elements["view-insights"]?.addEventListener("click", () =>
+      this.app.uiManager.showInsights(),
+    );
+    this.app.elements["close-insights"]?.addEventListener("click", () =>
+      this.app.uiManager.hideInsights(),
+    );
+    this.app.elements["close-insights-modal"]?.addEventListener("click", () =>
+      this.app.uiManager.hideInsights(),
+    );
+    this.app.elements["refresh-insights"]?.addEventListener("click", () =>
+      this.app.uiManager.refreshInsights(),
+    );
+    this.app.elements["export-insights"]?.addEventListener("click", () =>
+      this.app.uiManager.exportInsights(),
+    );
     this.app.elements["print-report"].addEventListener("click", () =>
       window.print(),
     );
@@ -10445,6 +11698,10 @@ class EventManager {
     this.app.elements["shadow-ranks-modal"]?.addEventListener("click", (e) => {
       if (e.target === this.app.elements["shadow-ranks-modal"])
         this.app.uiManager.hideShadowRanksGuide();
+    });
+    this.app.elements["insights-modal"]?.addEventListener("click", (e) => {
+      if (e.target === this.app.elements["insights-modal"])
+        this.app.uiManager.hideInsights();
     });
     this.app.elements["trainer-modal"].addEventListener("click", (e) => {
       if (e.target === this.app.elements["trainer-modal"])
