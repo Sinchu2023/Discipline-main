@@ -1598,6 +1598,13 @@ class DisciplineTracker {
       "task-response-draft-input",
       "save-tasks-btn",
       "edit-timetable-from-pipeline-btn",
+      "view-insights",
+      "insights-modal",
+      "insights-content",
+      "close-insights",
+      "close-insights-modal",
+      "refresh-insights",
+      "export-insights",
     ].forEach((id) => (elements[id] = document.getElementById(id)));
     return elements;
   }
@@ -1698,6 +1705,42 @@ class DisciplineTracker {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+  showToast(message, duration = 3000) {
+    let toast = document.getElementById("app-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "app-toast";
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: rgba(18, 18, 22, 0.95);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        font-size: 0.85rem;
+        font-weight: 500;
+        z-index: 1000000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      `;
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    requestAnimationFrame(() => {
+      toast.style.opacity = "1";
+      toast.style.transform = "translateX(-50%) translateY(0)";
+    });
+    clearTimeout(this._toastTimeout);
+    this._toastTimeout = setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateX(-50%) translateY(20px)";
+    }, duration);
   }
   getJournalEntry(dateStr = this.getDateString()) {
     return this.state.journalEntries?.[dateStr] || null;
@@ -3547,19 +3590,26 @@ class UIManager {
   }
 
   showInsights() {
-    this.app.elements["insights-modal"].style.display = "flex";
+    // Close other menus to prevent overlap
+    this.app.cloudManager?.closeProfileMenu?.();
+    this.app.cloudManager?.closePipelineMenu?.();
+    
+    const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
+    if (!modal) return;
+    modal.style.display = "flex";
     // Render insights asynchronously to not block UI
     requestAnimationFrame(() => {
-      this.app.insights.renderInsights("insights-content");
+      this.app.insights?.renderInsights("insights-content");
     });
   }
 
   hideInsights() {
-    this.app.elements["insights-modal"].style.display = "none";
+    const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
+    if (modal) modal.style.display = "none";
   }
 
   refreshInsights() {
-    const content = this.app.elements["insights-content"];
+    const content = this.app.elements["insights-content"] || document.getElementById("insights-content");
     if (content) {
       content.innerHTML = `
         <div class="insights-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);">
@@ -3569,8 +3619,8 @@ class UIManager {
       `;
     }
     requestAnimationFrame(() => {
-      this.app.insights.generateInsights(true); // force refresh
-      this.app.insights.renderInsights("insights-content");
+      this.app.insights?.generateInsights(true); // force refresh
+      this.app.insights?.renderInsights("insights-content");
     });
   }
 
@@ -4054,12 +4104,13 @@ class InsightsManager {
       return this.insightsCache;
     }
 
-    const tasks = this.app.state.tasks || [];
+    const tasks = (this.app.state?.tasks || []).filter((t) => this.app.isTaskAfterStatsReset(t));
     if (tasks.length === 0) {
       return this.getEmptyInsights();
     }
 
     const insights = {
+      empty: false,
       weekly: this.analyzeWeeklyPatterns(tasks),
       productivity: this.analyzeProductivityPatterns(tasks),
       habits: this.analyzeHabits(tasks),
@@ -4076,10 +4127,15 @@ class InsightsManager {
 
   getEmptyInsights() {
     return {
+      empty: true,
       weekly: { message: "No data yet. Start tracking to get insights!" },
       productivity: { message: "Track some productive sessions first." },
       habits: { message: "Build a habit history to see patterns." },
-      recommendations: [{ type: "start", text: "Start your first focus session!", priority: "high" }],
+      recommendations: [
+        { type: "suggestion", text: "Start your first focus session today using the stopwatch or task logger.", priority: "high" },
+        { type: "improvement", text: "Aim for at least one 50-minute deep work block during your peak alertness window (8 AM – 12 PM).", priority: "medium" },
+        { type: "success", text: "Maintain consistent sleep and wake hours to build memory consolidation and stamina.", priority: "low" },
+      ],
       streaks: { current: 0, best: 0, message: "Begin your streak today!" },
       comparisons: { message: "Need more data for comparisons." },
       generatedAt: new Date().toISOString(),
@@ -4097,40 +4153,53 @@ class InsightsManager {
     dayNames.forEach(d => dayStats[d] = { productive: 0, total: 0, sessions: 0, waste: 0 });
 
     tasks.forEach(task => {
-      if (!task.startTime) return;
-      const date = new Date(task.startTime);
+      const ts = Number(task.startTime) || (task.date ? new Date(task.date + 'T12:00:00').getTime() : null);
+      if (!ts) return;
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return;
       const day = dayNames[date.getDay()];
-      const mins = task.duration || 0;
+      const mins = Number(task.duration) || 0;
       
       dayStats[day].total += mins;
       dayStats[day].sessions++;
       
-      if (PRODUCTIVE_CATEGORIES.has(task.category)) {
+      if (this.app.isProductiveCategory(task.category) || task.isProductive) {
         dayStats[day].productive += mins;
-      } else if (task.category === 'Time Waste / Distraction') {
+      } else if (this.app.isDistractionCategory?.(task.category) || task.category === 'Time Waste / Distraction') {
         dayStats[day].waste += mins;
       }
     });
 
-    // Find best/worst days
     const daysWithData = Object.entries(dayStats).filter(([_, v]) => v.total > 0);
     if (daysWithData.length === 0) return { message: "No weekly data yet." };
 
-    const bestDay = daysWithData.reduce((a, b) => a[1].productive > b[1].productive ? a : b);
-    const worstDay = daysWithData.reduce((a, b) => a[1].productive < b[1].productive ? a : b);
-    const mostConsistent = daysWithData.reduce((a, b) => 
-      (a[1].productive / Math.max(a[1].sessions, 1)) > (b[1].productive / Math.max(b[1].sessions, 1)) ? a : b
+    const daysWithProductive = daysWithData.filter(([_, v]) => v.productive > 0);
+    if (daysWithProductive.length === 0) {
+      return {
+        bestDay: null,
+        worstDay: null,
+        mostConsistent: null,
+        averageDailyProductive: 0,
+        dayBreakdown: dayStats,
+        insight: "No productive focus sessions logged across days yet. Log a focus block to set your benchmark!",
+      };
+    }
+
+    const bestDay = daysWithProductive.reduce((a, b) => a[1].productive >= b[1].productive ? a : b);
+    const worstDay = daysWithProductive.reduce((a, b) => a[1].productive <= b[1].productive ? a : b);
+    const mostConsistent = daysWithProductive.reduce((a, b) => 
+      (a[1].productive / Math.max(a[1].sessions, 1)) >= (b[1].productive / Math.max(b[1].sessions, 1)) ? a : b
     );
 
-    const avgProductive = daysWithData.reduce((sum, [_, v]) => sum + v.productive, 0) / daysWithData.length;
+    const avgProductive = daysWithProductive.reduce((sum, [_, v]) => sum + v.productive, 0) / daysWithProductive.length;
 
     return {
       bestDay: { name: bestDay[0], minutes: bestDay[1].productive },
-      worstDay: { name: worstDay[0], minutes: worstDay[1].productive },
+      worstDay: worstDay[0] !== bestDay[0] ? { name: worstDay[0], minutes: worstDay[1].productive } : null,
       mostConsistent: { name: mostConsistent[0], avgPerSession: Math.round(mostConsistent[1].productive / Math.max(mostConsistent[1].sessions, 1)) },
       averageDailyProductive: Math.round(avgProductive),
       dayBreakdown: dayStats,
-      insight: `You're most productive on ${bestDay[0]}s (${bestDay[1].productive}min avg). ${worstDay[0]}s need attention (${worstDay[1].productive}min).`,
+      insight: `You're most productive on ${bestDay[0]}s (${this.app.formatDuration(bestDay[1].productive)}). ${worstDay && worstDay[0] !== bestDay[0] ? `${worstDay[0]}s could use more dedicated focus (${this.app.formatDuration(worstDay[1].productive)}).` : 'Keep building consistency across other days!'}`,
     };
   }
 
@@ -4138,7 +4207,7 @@ class InsightsManager {
    * Analyze productivity patterns - time of day, session lengths, categories
    */
   analyzeProductivityPatterns(tasks) {
-    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    const productiveTasks = tasks.filter(t => (this.app.isProductiveCategory(t.category) || t.isProductive) && (Number(t.duration) || 0) > 0);
     if (productiveTasks.length === 0) return { message: "No productive sessions recorded." };
 
     // Hourly distribution
@@ -4146,32 +4215,33 @@ class InsightsManager {
     for (let h = 0; h < 24; h++) hourlyStats[h] = { count: 0, minutes: 0 };
 
     productiveTasks.forEach(task => {
-      if (!task.startTime) return;
-      const hour = new Date(task.startTime).getHours();
+      const ts = Number(task.startTime);
+      if (!ts) return;
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return;
+      const hour = d.getHours();
       hourlyStats[hour].count++;
-      hourlyStats[hour].minutes += task.duration || 0;
+      hourlyStats[hour].minutes += Number(task.duration) || 0;
     });
 
-    // Find peak hours
     const hoursWithData = Object.entries(hourlyStats).filter(([_, v]) => v.minutes > 0);
-    const peakHour = hoursWithData.reduce((a, b) => a[1].minutes > b[1].minutes ? a : b);
-    const peakHourCount = hoursWithData.reduce((a, b) => a[1].count > b[1].count ? a : b);
+    if (hoursWithData.length === 0) return { message: "No productive sessions recorded." };
 
-    // Session length analysis
-    const durations = productiveTasks.map(t => t.duration || 0).filter(d => d > 0);
+    const peakHour = hoursWithData.reduce((a, b) => a[1].minutes >= b[1].minutes ? a : b);
+    const peakHourCount = hoursWithData.reduce((a, b) => a[1].count >= b[1].count ? a : b);
+
+    const durations = productiveTasks.map(t => Number(t.duration) || 0).filter(d => d > 0);
     const avgSession = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
     const longSessions = durations.filter(d => d >= 60).length;
     const shortSessions = durations.filter(d => d <= 25).length;
 
-    // Category breakdown
     const catStats = {};
     productiveTasks.forEach(t => {
       const cat = t.category || 'Other';
-      catStats[cat] = (catStats[cat] || 0) + (t.duration || 0);
+      catStats[cat] = (catStats[cat] || 0) + (Number(t.duration) || 0);
     });
     const topCategory = Object.entries(catStats).sort((a, b) => b[1] - a[1])[0];
 
-    // Weekly trend (last 4 weeks)
     const weeklyTrend = this.computeWeeklyTrend(productiveTasks);
 
     return {
@@ -4183,12 +4253,13 @@ class InsightsManager {
       topCategory: topCategory ? { name: topCategory[0], minutes: topCategory[1] } : null,
       weeklyTrend,
       hourlyDistribution: hourlyStats,
-      insight: `Your peak focus time is ${this.formatHour(peakHour[0])} (${peakHour[1].minutes}min). Average session: ${avgSession}min. ${longSessions} deep work sessions (60+min).`,
+      insight: `Your peak focus window is around ${this.formatHour(peakHour[0])} (${this.app.formatDuration(peakHour[1].minutes)} logged). Average session: ${avgSession}m with ${longSessions} deep work blocks (60+ min).`,
     };
   }
 
   formatHour(h) {
-    const hour = parseInt(h);
+    const hour = parseInt(h, 10);
+    if (isNaN(hour)) return '12 AM';
     if (hour === 0) return '12 AM';
     if (hour < 12) return `${hour} AM`;
     if (hour === 12) return '12 PM';
@@ -4198,21 +4269,23 @@ class InsightsManager {
   computeWeeklyTrend(productiveTasks) {
     const weeks = {};
     productiveTasks.forEach(task => {
-      if (!task.startTime) return;
-      const date = new Date(task.startTime);
+      const ts = Number(task.startTime) || (task.date ? new Date(task.date + 'T12:00:00').getTime() : null);
+      if (!ts) return;
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return;
       const weekStart = new Date(date);
       weekStart.setDate(date.getDate() - date.getDay());
       weekStart.setHours(0, 0, 0, 0);
       const key = this.app.getDateString(weekStart);
-      weeks[key] = (weeks[key] || 0) + (task.duration || 0);
+      weeks[key] = (weeks[key] || 0) + (Number(task.duration) || 0);
     });
 
     const sortedWeeks = Object.entries(weeks).sort((a, b) => new Date(a[0]) - new Date(b[0]));
-    if (sortedWeeks.length < 2) return { trend: 'insufficient', change: 0 };
+    if (sortedWeeks.length < 2) return { trend: 'insufficient', change: 0, pctChange: 0 };
 
     const recent = sortedWeeks.slice(-2);
     const change = recent[1][1] - recent[0][1];
-    const pctChange = recent[0][1] > 0 ? Math.round((change / recent[0][1]) * 100) : 0;
+    const pctChange = recent[0][1] > 0 ? Math.round((change / recent[0][1]) * 100) : (recent[1][1] > 0 ? 100 : 0);
 
     return {
       trend: change > 30 ? 'improving' : change < -30 ? 'declining' : 'stable',
@@ -4226,39 +4299,39 @@ class InsightsManager {
    * Analyze habits - consistency, streaks, recurring patterns
    */
   analyzeHabits(tasks) {
-    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    const productiveTasks = tasks.filter(t => (this.app.isProductiveCategory(t.category) || t.isProductive) && (Number(t.duration) || 0) > 0);
     if (productiveTasks.length === 0) return { message: "No habit data yet." };
 
-    // Daily consistency
     const dailyMinutes = {};
     productiveTasks.forEach(t => {
-      if (!t.date) return;
-      dailyMinutes[t.date] = (dailyMinutes[t.date] || 0) + (t.duration || 0);
+      const dateKey = t.date || (t.startTime ? this.app.getDateString(new Date(Number(t.startTime))) : null);
+      if (!dateKey) return;
+      dailyMinutes[dateKey] = (dailyMinutes[dateKey] || 0) + (Number(t.duration) || 0);
     });
 
     const daysWithWork = Object.keys(dailyMinutes).length;
     const totalDays = this.getDaysSinceFirstTask(productiveTasks);
-    const consistency = totalDays > 0 ? Math.round((daysWithWork / totalDays) * 100) : 0;
+    const consistency = totalDays > 0 ? Math.min(100, Math.round((daysWithWork / totalDays) * 100)) : 0;
 
-    // Current streak
-    let currentStreak = 0;
-    const today = this.app.getDateString();
-    let checkDate = new Date(today + 'T12:00:00');
-    
-    while (dailyMinutes[this.app.getDateString(checkDate)] > 0) {
-      currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
+    let currentStreak = Number(this.app.state?.streak) || 0;
+    if (currentStreak === 0) {
+      let checkDate = new Date();
+      let count = 0;
+      while (dailyMinutes[this.app.getDateString(checkDate)] > 0) {
+        count++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+      currentStreak = count;
     }
 
-    // Best streak
-    let bestStreak = 0;
+    let bestStreak = currentStreak;
     let tempStreak = 0;
     const sortedDates = Object.keys(dailyMinutes).sort();
     let prevDate = null;
     
     sortedDates.forEach(dateStr => {
       const date = new Date(dateStr + 'T12:00:00');
-      if (prevDate && (date - prevDate) === 86400000) {
+      if (prevDate && Math.round((date - prevDate) / 86400000) === 1) {
         tempStreak++;
       } else {
         tempStreak = 1;
@@ -4267,7 +4340,6 @@ class InsightsManager {
       prevDate = date;
     });
 
-    // Recurring tasks (same category at similar times)
     const recurringPatterns = this.findRecurringPatterns(productiveTasks);
 
     return {
@@ -4277,13 +4349,14 @@ class InsightsManager {
       currentStreak,
       bestStreak,
       recurringPatterns,
-      insight: `${consistency}% daily consistency. Current streak: ${currentStreak} days. Best: ${bestStreak} days.`,
+      insight: `${consistency}% daily consistency over ${totalDays} day${totalDays === 1 ? '' : 's'} tracked. Active streak: ${currentStreak} day${currentStreak === 1 ? '' : 's'}.`,
     };
   }
 
   getDaysSinceFirstTask(tasks) {
     if (tasks.length === 0) return 0;
-    const dates = tasks.map(t => t.startTime).filter(Boolean).map(t => new Date(t));
+    const dates = tasks.map(t => Number(t.startTime) || (t.date ? new Date(t.date + 'T12:00:00').getTime() : null)).filter(Boolean);
+    if (!dates.length) return 1;
     const first = new Date(Math.min(...dates));
     const today = new Date();
     first.setHours(0, 0, 0, 0);
@@ -4292,22 +4365,25 @@ class InsightsManager {
   }
 
   findRecurringPatterns(tasks) {
-    // Group by category + hour
     const patterns = {};
     tasks.forEach(t => {
-      if (!t.startTime) return;
-      const hour = new Date(t.startTime).getHours();
-      const key = `${t.category}|${hour}`;
+      const ts = Number(t.startTime);
+      if (!ts) return;
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return;
+      const hour = d.getHours();
+      const cat = t.category || 'General Focus';
+      const key = `${cat}|${hour}`;
       patterns[key] = (patterns[key] || 0) + 1;
     });
 
     return Object.entries(patterns)
-      .filter(([_, count]) => count >= 3)
+      .filter(([_, count]) => count >= 2)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([key, count]) => {
         const [cat, hour] = key.split('|');
-        return { category: cat, hour: parseInt(hour), count, label: `${cat} at ${this.formatHour(hour)} (${count}x)` };
+        return { category: cat, hour: parseInt(hour, 10), count, label: `${cat} around ${this.formatHour(hour)} (${count}x)` };
       });
   }
 
@@ -4316,32 +4392,32 @@ class InsightsManager {
    */
   generateRecommendations(tasks) {
     const recs = [];
-    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
-    const wasteTasks = tasks.filter(t => t.category === 'Time Waste / Distraction');
+    const productiveTasks = tasks.filter(t => (this.app.isProductiveCategory(t.category) || t.isProductive) && (Number(t.duration) || 0) > 0);
+    const wasteTasks = tasks.filter(t => this.app.isDistractionCategory?.(t.category) || t.category === 'Time Waste / Distraction');
     
-    const totalProductive = productiveTasks.reduce((s, t) => s + (t.duration || 0), 0);
-    const totalWaste = wasteTasks.reduce((s, t) => s + (t.duration || 0), 0);
+    const totalProductive = productiveTasks.reduce((s, t) => s + (Number(t.duration) || 0), 0);
+    const totalWaste = wasteTasks.reduce((s, t) => s + (Number(t.duration) || 0), 0);
     const wasteRatio = totalProductive > 0 ? totalWaste / totalProductive : 0;
 
     // High waste ratio
-    if (wasteRatio > 0.5) {
+    if (wasteRatio > 0.4) {
       recs.push({
         type: 'warning',
-        text: `Distraction time (${this.app.formatDuration(totalWaste)}) exceeds 50% of productive time. Try Pomodoro blocks with phone away.`,
+        text: `Distraction time (${this.app.formatDuration(totalWaste)}) is high relative to focus time (${this.app.formatDuration(totalProductive)}). Consider structured phone-free focus sprints.`,
         priority: 'high',
       });
     }
 
     // Inconsistent days
     const weekly = this.analyzeWeeklyPatterns(tasks);
-    if (weekly.dayBreakdown) {
+    if (weekly.dayBreakdown && weekly.averageDailyProductive > 0) {
       const lowDays = Object.entries(weekly.dayBreakdown)
-        .filter(([_, v]) => v.productive < weekly.averageDailyProductive * 0.3 && v.total > 0)
+        .filter(([_, v]) => v.productive < weekly.averageDailyProductive * 0.4 && v.total > 0)
         .map(([d]) => d);
       if (lowDays.length > 0) {
         recs.push({
           type: 'improvement',
-          text: `Low productivity on ${lowDays.join(', ')}. Schedule a fixed 90-min block on these days.`,
+          text: `Output drops on ${lowDays.join(', ')}. Schedule a dedicated 60-min deep work block on those days.`,
           priority: 'medium',
         });
       }
@@ -4349,44 +4425,45 @@ class InsightsManager {
 
     // Session length
     const prodPatterns = this.analyzeProductivityPatterns(tasks);
-    if (prodPatterns.avgSessionLength < 30 && productiveTasks.length > 5) {
+    if (prodPatterns.avgSessionLength && prodPatterns.avgSessionLength < 30 && productiveTasks.length > 3) {
       recs.push({
         type: 'improvement',
-        text: `Average session is only ${prodPatterns.avgSessionLength}min. Try 50-min deep work blocks (Pomodoro extended).`,
+        text: `Average focus session is only ${prodPatterns.avgSessionLength}m. Aim for 50-90m uninterrupted focus blocks to reach flow state.`,
         priority: 'medium',
       });
     }
 
-    // No morning work
+    // Morning work
     const morningWork = productiveTasks.filter(t => {
-      if (!t.startTime) return false;
-      const h = new Date(t.startTime).getHours();
+      const ts = Number(t.startTime);
+      if (!ts) return false;
+      const h = new Date(ts).getHours();
       return h >= 5 && h <= 10;
     }).length;
-    if (morningWork === 0 && productiveTasks.length > 5) {
+    if (morningWork === 0 && productiveTasks.length > 3) {
       recs.push({
         type: 'suggestion',
-        text: 'No morning sessions detected. Your brain is freshest 5-10 AM. Try one 90-min block.',
-        priority: 'high',
+        text: 'No morning focus recorded. Willpower and cognitive energy are highest before noon. Try completing your top priority task before 11 AM.',
+        priority: 'medium',
       });
     }
 
-    // Good streak encouragement
+    // Streak encouragement
     const habits = this.analyzeHabits(tasks);
-    if (habits.currentStreak >= 7) {
+    if (habits.currentStreak >= 3) {
       recs.push({
         type: 'success',
-        text: `🔥 ${habits.currentStreak}-day streak! You're building serious momentum. Protect it.`,
+        text: `🔥 ${habits.currentStreak}-day streak active! Consistency compounds exponentially. Protect tomorrow's session.`,
         priority: 'low',
       });
     }
 
     // Sleep tracking
-    const sleepTasks = tasks.filter(t => t.category === 'Sleep');
+    const sleepTasks = tasks.filter(t => t.category === 'Sleep' || t.category === 'Rest & Recovery');
     if (sleepTasks.length === 0) {
       recs.push({
         type: 'suggestion',
-        text: 'No sleep tracked. Sleep is when memory consolidates. Track it to optimize recovery.',
+        text: 'Sleep tracking is not logged yet. Consistent 7+ hour sleep directly dictates tomorrow focus depth and retention.',
         priority: 'medium',
       });
     }
@@ -4395,14 +4472,14 @@ class InsightsManager {
     if (recs.length === 0) {
       recs.push({
         type: 'success',
-        text: 'Great balance! Keep consistency. Consider adding a weekly review session.',
+        text: 'Solid baseline! Keep logging consistently and maintain deliberate focus blocks.',
         priority: 'low',
       });
     }
 
     return recs.sort((a, b) => { 
       const p = { high: 0, medium: 1, low: 2 };
-      return p[a.priority] - p[b.priority]; 
+      return (p[a.priority] || 1) - (p[b.priority] || 1); 
     });
   }
 
@@ -4410,29 +4487,23 @@ class InsightsManager {
    * Analyze streaks
    */
   analyzeStreaks(tasks) {
-    const productiveTasks = tasks.filter(t => PRODUCTIVE_CATEGORIES.has(t.category));
+    const productiveTasks = tasks.filter(t => (this.app.isProductiveCategory(t.category) || t.isProductive) && (Number(t.duration) || 0) > 0);
     const dailyMinutes = {};
     productiveTasks.forEach(t => {
-      if (!t.date) return;
-      dailyMinutes[t.date] = (dailyMinutes[t.date] || 0) + (t.duration || 0);
+      const dateKey = t.date || (t.startTime ? this.app.getDateString(new Date(Number(t.startTime))) : null);
+      if (!dateKey) return;
+      dailyMinutes[dateKey] = (dailyMinutes[dateKey] || 0) + (Number(t.duration) || 0);
     });
 
     const sortedDates = Object.keys(dailyMinutes).sort();
-    let current = 0, best = 0, temp = 0;
-    const today = this.app.getDateString();
-    let checkDate = new Date(today + 'T12:00:00');
-    
-    // Current streak (from today backwards)
-    while (dailyMinutes[this.app.getDateString(checkDate)] > 0) {
-      current++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-
-    // Best streak
+    let current = Number(this.app.state?.streak) || 0;
+    let best = current;
+    let temp = 0;
     let prevDate = null;
+
     sortedDates.forEach(dateStr => {
       const date = new Date(dateStr + 'T12:00:00');
-      if (prevDate && (date - prevDate) === 86400000) {
+      if (prevDate && Math.round((date - prevDate) / 86400000) === 1) {
         temp++;
       } else {
         temp = 1;
@@ -4460,23 +4531,22 @@ class InsightsManager {
     const lastWeekStart = new Date(thisWeekStart);
     lastWeekStart.setDate(thisWeekStart.getDate() - 7);
 
-    const thisWeekKey = this.app.getDateString(thisWeekStart);
-    const lastWeekKey = this.app.getDateString(lastWeekStart);
-
     const getWeekStats = (weekStart) => {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
       
       return tasks.filter(t => {
-        if (!t.startTime) return false;
-        const d = new Date(t.startTime);
+        const ts = Number(t.startTime) || (t.date ? new Date(t.date + 'T12:00:00').getTime() : null);
+        if (!ts) return false;
+        const d = new Date(ts);
         return d >= weekStart && d <= weekEnd;
       }).reduce((acc, t) => {
-        acc.total += t.duration || 0;
-        if (PRODUCTIVE_CATEGORIES.has(t.category)) acc.productive += t.duration || 0;
-        if (t.category === 'Time Waste / Distraction') acc.waste += t.duration || 0;
-        if (t.category === 'Sleep') acc.sleep += t.duration || 0;
+        const dur = Number(t.duration) || 0;
+        acc.total += dur;
+        if (this.app.isProductiveCategory(t.category) || t.isProductive) acc.productive += dur;
+        if (this.app.isDistractionCategory?.(t.category) || t.category === 'Time Waste / Distraction') acc.waste += dur;
+        if (t.category === 'Sleep' || t.category === 'Rest & Recovery') acc.sleep += dur;
         return acc;
       }, { total: 0, productive: 0, waste: 0, sleep: 0 });
     };
@@ -4484,17 +4554,26 @@ class InsightsManager {
     const thisWeek = getWeekStats(thisWeekStart);
     const lastWeek = getWeekStats(lastWeekStart);
 
-    const prodChange = lastWeek.productive > 0 
-      ? Math.round(((thisWeek.productive - lastWeek.productive) / lastWeek.productive) * 100)
-      : (thisWeek.productive > 0 ? 100 : 0);
+    let prodChange = 0;
+    let insight = "";
+
+    if (thisWeek.productive === 0 && lastWeek.productive === 0) {
+      insight = "No focus sessions logged this week or last week yet.";
+    } else if (lastWeek.productive === 0 && thisWeek.productive > 0) {
+      prodChange = 100;
+      insight = `🚀 Established a strong baseline with ${this.app.formatDuration(thisWeek.productive)} of focus time this week!`;
+    } else if (lastWeek.productive > 0) {
+      prodChange = Math.round(((thisWeek.productive - lastWeek.productive) / lastWeek.productive) * 100);
+      insight = prodChange >= 0 
+        ? `📈 +${prodChange}% more productive than last week (${this.app.formatDuration(thisWeek.productive)} vs ${this.app.formatDuration(lastWeek.productive)})`
+        : `📉 ${Math.abs(prodChange)}% less productive than last week (${this.app.formatDuration(thisWeek.productive)} vs ${this.app.formatDuration(lastWeek.productive)})`;
+    }
 
     return {
       thisWeek,
       lastWeek,
       productiveChange: prodChange,
-      insight: prodChange > 0 
-        ? `↑ ${prodChange}% more productive than last week (${this.app.formatDuration(thisWeek.productive)} vs ${this.app.formatDuration(lastWeek.productive)})`
-        : `↓ ${Math.abs(prodChange)}% less productive than last week. Identify what changed.`,
+      insight,
     };
   }
 
@@ -4512,14 +4591,34 @@ class InsightsManager {
   buildInsightsHTML(insights) {
     const sections = [];
 
+    // Empty state fallback when no productive tasks exist yet
+    if (insights.empty || (!insights.weekly?.bestDay && !insights.productivity?.peakHour && !insights.habits?.daysActive)) {
+      sections.push(`
+        <div class="insight-empty-card" style="text-align:center;padding:2.5rem 1.5rem;background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:14px;margin-bottom:1rem;">
+          <div style="font-size:2.8rem;margin-bottom:0.75rem;">🧠</div>
+          <h3 style="color:var(--text-accent);font-size:1.25rem;margin:0 0 0.5rem;font-weight:700;">AI Insights Active</h3>
+          <p style="color:var(--text-secondary);font-size:0.9rem;max-width:520px;margin:0 auto 1.5rem;line-height:1.5;">
+            Track focus sessions with the stopwatch or log completed tasks. The engine will automatically detect your peak focus hours, best study days, weekly trends, and habit consistency.
+          </p>
+          <div style="display:flex;gap:0.6rem;justify-content:center;flex-wrap:wrap;">
+            <span class="pattern-tag"><i class="fas fa-bolt"></i> Peak Hours</span>
+            <span class="pattern-tag"><i class="fas fa-chart-line"></i> Focus Trends</span>
+            <span class="pattern-tag"><i class="fas fa-fire"></i> Habit Momentum</span>
+            <span class="pattern-tag"><i class="fas fa-shield-alt"></i> Distraction Ratio</span>
+          </div>
+        </div>
+      `);
+    }
+
     // Weekly Pattern Card
-    if (insights.weekly.bestDay) {
+    if (insights.weekly?.bestDay) {
       sections.push(`
         <div class="insight-card">
           <h4><i class="fas fa-calendar-week"></i> Weekly Pattern</h4>
           <div class="insight-highlight">
-            <span class="insight-good">🏆 Best: ${insights.weekly.bestDay.name} (${insights.weekly.bestDay.minutes}min)</span>
-            <span class="insight-bad">📉 Weak: ${insights.weekly.worstDay.name} (${insights.weekly.worstDay.minutes}min)</span>
+            <span class="insight-good">🏆 Best: ${insights.weekly.bestDay.name} (${this.app.formatDuration(insights.weekly.bestDay.minutes)})</span>
+            ${insights.weekly.worstDay ? `<span class="insight-bad">📉 Weak: ${insights.weekly.worstDay.name} (${this.app.formatDuration(insights.weekly.worstDay.minutes)})</span>` : ''}
+            <span>📊 Daily Avg: ${this.app.formatDuration(insights.weekly.averageDailyProductive)}</span>
           </div>
           <p class="insight-text">${insights.weekly.insight}</p>
           <div class="insight-mini-chart">${this.renderDayBars(insights.weekly.dayBreakdown)}</div>
@@ -4528,23 +4627,27 @@ class InsightsManager {
     }
 
     // Productivity Patterns
-    if (insights.productivity.peakHour) {
+    if (insights.productivity?.peakHour) {
       sections.push(`
         <div class="insight-card">
           <h4><i class="fas fa-chart-line"></i> Focus Patterns</h4>
           <div class="insight-highlight">
             <span>⏰ Peak: ${insights.productivity.peakHour.label}</span>
-            <span>⏱️ Avg Session: ${insights.productivity.avgSessionLength}min</span>
-            <span>🏋️ Deep Work: ${insights.productivity.longSessionsCount} sessions (60+min)</span>
+            <span>⏱️ Avg Session: ${insights.productivity.avgSessionLength}m</span>
+            <span>🏋️ Deep Work: ${insights.productivity.longSessionsCount} sessions (60+m)</span>
           </div>
           <p class="insight-text">${insights.productivity.insight}</p>
-          <div class="insight-trend ${insights.productivity.weeklyTrend.trend}">${this.formatTrend(insights.productivity.weeklyTrend)}</div>
+          ${insights.productivity.weeklyTrend?.trend ? `
+            <div class="insight-trend ${insights.productivity.weeklyTrend.trend}">
+              ${this.formatTrend(insights.productivity.weeklyTrend)}
+            </div>
+          ` : ''}
         </div>
       `);
     }
 
     // Habits & Consistency
-    if (insights.habits.currentStreak !== undefined) {
+    if (insights.habits?.daysActive > 0) {
       sections.push(`
         <div class="insight-card">
           <h4><i class="fas fa-fire"></i> Consistency</h4>
@@ -4554,9 +4657,9 @@ class InsightsManager {
             <div class="stat"><strong>${insights.habits.consistency}</strong><span>Daily Consistency</span></div>
           </div>
           <p class="insight-text">${insights.habits.insight}</p>
-          ${insights.habits.recurringPatterns.length > 0 ? `
-            <div class="insight-patterns">
-              <strong>Recurring Patterns:</strong>
+          ${insights.habits.recurringPatterns?.length > 0 ? `
+            <div class="insight-patterns" style="margin-top:0.75rem;">
+              <strong style="display:block;margin-bottom:0.35rem;font-size:0.8rem;color:var(--text-secondary);">Recurring Focus Blocks:</strong>
               ${insights.habits.recurringPatterns.map(p => `<span class="pattern-tag">${p.label}</span>`).join('')}
             </div>
           ` : ''}
@@ -4565,7 +4668,7 @@ class InsightsManager {
     }
 
     // Recommendations
-    if (insights.recommendations.length > 0) {
+    if (insights.recommendations?.length > 0) {
       sections.push(`
         <div class="insight-card recommendations">
           <h4><i class="fas fa-lightbulb"></i> AI Recommendations</h4>
@@ -4581,12 +4684,13 @@ class InsightsManager {
     }
 
     // Period Comparison
-    if (insights.comparisons.productiveChange !== undefined) {
+    if (insights.comparisons?.thisWeek) {
+      const change = insights.comparisons.productiveChange || 0;
       sections.push(`
-        <div class="insight-card comparison ${insights.comparisons.productiveChange >= 0 ? 'positive' : 'negative'}">
+        <div class="insight-card comparison ${change >= 0 ? 'positive' : 'negative'}">
           <h4><i class="fas fa-exchange-alt"></i> Week-over-Week</h4>
-          <div class="insight-big-number ${insights.comparisons.productiveChange >= 0 ? 'good' : 'bad'}">
-            ${insights.comparisons.productiveChange >= 0 ? '+' : ''}${insights.comparisons.productiveChange}%
+          <div class="insight-big-number ${change >= 0 ? 'good' : 'bad'}">
+            ${change >= 0 ? '+' : ''}${change}%
           </div>
           <p class="insight-text">${insights.comparisons.insight}</p>
           <div class="comparison-bars">
@@ -4613,14 +4717,14 @@ class InsightsManager {
         .insight-stats strong { display: block; font-size: 1.5rem; color: var(--text-accent); }
         .insight-stats span { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
         .insight-patterns { margin-top: 0.5rem; font-size: 0.8rem; }
-        .pattern-tag { display: inline-block; background: rgba(0,123,255,0.2); color: #a5b4fc; padding: 2px 8px; border-radius: 999px; margin: 2px 4px 2px 0; font-size: 0.75rem; }
+        .pattern-tag { display: inline-block; background: rgba(0,123,255,0.2); color: #a5b4fc; padding: 3px 10px; border-radius: 999px; margin: 2px 4px 2px 0; font-size: 0.75rem; border: 1px solid rgba(0,123,255,0.3); }
         .recommendations .recommendation { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border-radius: 8px; margin: 0.5rem 0; border-left: 3px solid var(--primary); }
         .recommendation.warning { border-left-color: #ffc107; }
         .recommendation.success { border-left-color: #28a745; }
         .recommendation.improvement { border-left-color: #17a2b8; }
         .recommendation.suggestion { border-left-color: #6f42c1; }
         .rec-icon { font-size: 1.1rem; margin-top: 2px; }
-        .rec-text { flex: 1; font-size: 0.85rem; line-height: 1.4; }
+        .rec-text { flex: 1; font-size: 0.85rem; line-height: 1.4; color: var(--text-primary); }
         .rec-priority { font-size: 0.65rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); }
         .recommendation.high .rec-priority { background: rgba(220,53,69,0.2); color: #f87171; }
         .recommendation.medium .rec-priority { background: rgba(255,193,7,0.2); color: #ffc107; }
@@ -4645,18 +4749,21 @@ class InsightsManager {
     
     return dayNames.map(day => {
       const data = dayBreakdown[day];
-      const height = data ? Math.max(4, (data.productive / maxMinutes) * 100) : 4;
+      const height = data ? Math.max(6, (data.productive / maxMinutes) * 100) : 6;
       const isProd = data && data.productive > 0;
       return `
-        <div class="day-bar ${isProd ? 'productive' : ''}" style="height: ${height}%;" title="${day}: ${data?.productive || 0}min"></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;">
+          <div class="day-bar ${isProd ? 'productive' : ''}" style="width:100%;height:${height}%;" title="${day}: ${this.app.formatDuration(data?.productive || 0)}"></div>
+          <span style="font-size:0.65rem;color:var(--text-secondary);margin-top:4px;">${day}</span>
+        </div>
       `;
     }).join('');
   }
 
   formatTrend(trend) {
     const icons = { improving: '📈', declining: '📉', stable: '➡️', insufficient: '❓' };
-    const labels = { improving: 'Improving', declining: 'Declining', stable: 'Stable', insufficient: 'Need more data' };
-    return `${icons[trend.trend]} ${labels[trend.trend]} ${trend.pctChange !== 0 ? `(${trend.pctChange >= 0 ? '+' : ''}${trend.pctChange}%)` : ''}`;
+    const labels = { improving: 'Improving Focus', declining: 'Declining Focus', stable: 'Consistent Focus', insufficient: 'Collecting Trend Data' };
+    return `${icons[trend.trend] || '📊'} ${labels[trend.trend] || 'Active'} ${trend.pctChange ? `(${trend.pctChange >= 0 ? '+' : ''}${trend.pctChange}%)` : ''}`;
   }
 
   getRecIcon(type) {

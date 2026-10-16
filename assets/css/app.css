@@ -622,7 +622,7 @@
       /* Stats Dashboard */
       .stats-dashboard {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 0.75rem;
         margin-bottom: 0.75rem;
       }
@@ -1309,7 +1309,7 @@
         display: none;
         justify-content: center;
         align-items: center;
-        z-index: 999999;
+        z-index: 1000000;
         padding: 20px;
       }
       .modal {
@@ -1320,6 +1320,7 @@
         max-height: 90vh;
         overflow: hidden;
         border: 1px solid var(--border);
+        z-index: 1;
       }
       .modal-header {
         padding: 2rem;
@@ -2573,7 +2574,7 @@
           grid-template-columns: 1fr;
         }
         .stats-dashboard {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 0.5rem;
         }
         .daily-mission-section .mission-phase-items {
@@ -3879,6 +3880,7 @@ header {
 }
 
 .stats-dashboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 0.4rem !important;
   margin-bottom: 0.35rem !important;
 }
@@ -3902,7 +3904,7 @@ header {
 
 @media (max-width: 768px) {
   .stats-dashboard {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
