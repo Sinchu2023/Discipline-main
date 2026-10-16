@@ -2028,6 +2028,8 @@ class DisciplineTracker {
     this.updateStreak();
     if (this.state.activeTask)
       this.stopwatch.resumeActiveTask(this.state.activeTask);
+    else if (this.elements["active-task-indicator"])
+      this.elements["active-task-indicator"].style.display = "none";
     window.addEventListener("online", () => this.syncManager.syncNow());
     await this.syncManager.syncNow();
     await this.cloudManager.initialize();
@@ -2382,6 +2384,8 @@ class StopwatchManager {
     this.app.elements["stop-btn"].disabled = false;
     this.app.elements["task-input"].disabled = true;
     this.app.elements["active-task-name"].textContent =
+      activeTask.name ||
+      activeTask.description ||
       `${activeTask.category || "Productive Work"} - ${activeTask.subcategory || "General"}`;
     this.app.elements["active-task-start"].textContent =
       this.app.formatTime(activeTask.startTime);
@@ -11723,6 +11727,15 @@ class MasterMessageManager {
 
   // ── Compose messages: grounded, data-driven, mentor tone ────────────────
   composeMessages() {
+    try {
+      return this._composeMessagesInternal();
+    } catch (err) {
+      console.error("[MasterMessageManager] composeMessages error:", err);
+      return ["System analyzing your data... Please log a session to begin."];
+    }
+  }
+
+  _composeMessagesInternal() {
     const now      = new Date();
     const nowMins  = now.getHours() * 60 + now.getMinutes();
     const hour     = now.getHours();
@@ -11941,7 +11954,10 @@ class MasterMessageManager {
   render() {
     const bubblesEl = document.getElementById("master-msg-bubbles");
     const timeEl    = document.getElementById("master-msg-time");
-    if (!bubblesEl) return;
+    if (!bubblesEl) {
+      console.warn("[MasterMessageManager] master-msg-bubbles element not found");
+      return;
+    }
 
     // Stamp this render — stale setTimeout closures will bail out
     this._renderVersion++;
@@ -11954,7 +11970,17 @@ class MasterMessageManager {
     }
 
     bubblesEl.innerHTML = "";
-    const messages = this.composeMessages();
+    let messages = [];
+    try {
+      messages = this.composeMessages();
+    } catch (err) {
+      console.error("[MasterMessageManager] composeMessages error:", err);
+      messages = ["System initializing... Please log a session to begin."];
+    }
+
+    if (!messages.length) {
+      messages = ["No insights available yet. Start tracking to see messages."];
+    }
 
     messages.forEach((msg, i) => {
       setTimeout(() => {

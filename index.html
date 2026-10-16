@@ -215,15 +215,25 @@
           </div>
 
           <!-- Active Task Indicator -->
-          <div id="active-task-indicator">
-            <div class="active-task-indicator">
-              <strong><i class="fas fa-running"></i> Active Task:</strong>
-              <span id="active-task-name"></span>
-              <a href="./fullscreen-timer/index.html" target="_blank" class="btn btn-sm" title="Open Fullscreen Timer">
-                <i class="fas fa-expand"></i>
-              </a>
-              <br />
-              <small>Started at: <span id="active-task-start"></span></small>
+          <div id="active-task-indicator" style="display: none;">
+            <div class="active-task-card">
+              <div class="active-task-header">
+                <div class="active-task-status">
+                  <span class="active-task-pulse-dot"></span>
+                  <span class="active-task-status-label">ACTIVE TASK</span>
+                </div>
+                <a href="./fullscreen-timer/index.html" target="_blank" class="active-task-fullscreen-btn" title="Open Fullscreen Timer">
+                  <i class="fas fa-expand"></i>
+                  <span>Fullscreen</span>
+                </a>
+              </div>
+              <div class="active-task-name-wrap">
+                <span class="active-task-name" id="active-task-name"></span>
+              </div>
+              <div class="active-task-meta">
+                <i class="far fa-clock"></i>
+                <span>Started at <strong id="active-task-start"></strong></span>
+              </div>
             </div>
           </div>
 
