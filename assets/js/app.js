@@ -1910,7 +1910,8 @@ class DisciplineTracker {
     return end;
   }
   isDistractionCategory(category) {
-    return category === "Time Waste / Distraction";
+    if (!category) return false;
+    return String(category).trim() === "Time Waste / Distraction";
   }
   isTaskAfterStatsReset(task) {
     const resetAt = Number(this.state.statsResetAt || 0);
@@ -1993,7 +1994,8 @@ class DisciplineTracker {
     });
   }
   isProductiveCategory(category) {
-    return PRODUCTIVE_CATEGORIES.has(category);
+    if (!category) return false;
+    return PRODUCTIVE_CATEGORIES.has(String(category).trim());
   }
   resolveCategory(inputCategory) {
     const categories = Object.keys(CATEGORY_DEFINITIONS);
@@ -2256,6 +2258,10 @@ class StopwatchManager {
       this.app.elements["active-task-start"].textContent =
         this.app.formatTime(this.startTime);
       this.app.elements["active-task-indicator"].style.display = "block";
+      // Clear task input so it's ready for next entry
+      if (this.app.elements["task-input"]) {
+        this.app.elements["task-input"].value = "";
+      }
       // Fire-and-forget to avoid blocking UI on network
       if (this.app.cloudManager?.setTimerState) {
         setTimeout(() => {
@@ -2302,11 +2308,8 @@ class StopwatchManager {
       ...activeTask,
       startTime: this.startTime,
       endTime,
-      duration: Math.max(
-        1,
-        Math.round(totalElapsed / 60000),
-      ),
-      date: this.app.getDateString(new Date(this.startTime)),
+      duration: Math.round(totalElapsed / 60000) || 1,
+      date: this.app.getDateString(new Date(endTime)),
     });
     this.app.taskManager.addTask(entry);
 
@@ -2889,6 +2892,7 @@ class TaskManager {
     const category = this.app.resolveCategory(
       prompt("Favorite category", "Productive Work"),
     );
+    if (!category) return;
     const subcategory =
       prompt(
         "Favorite subcategory",
@@ -2901,6 +2905,8 @@ class TaskManager {
       this.app.state.favorites,
     );
     this.renderFavorites();
+    // Clear input after adding
+    this.app.elements["task-input"].value = "";
   }
   removeFavorite(index) {
     this.app.state.favorites.splice(index, 1);
@@ -8014,9 +8020,11 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       const taskLabel = item.label || item.topic || "Mission Task";
       // Infer category from task properties: use phase as category hint, or fallback to Productive Work
       const inferredCategory = this.inferCategoryFromMissionItem(item);
+      // Use phase as subcategory if available, else topic
+      const inferredSubcategory = item.phase || item.topic || taskLabel;
       const meta = {
         category: inferredCategory,
-        subcategory: item.topic || taskLabel,
+        subcategory: inferredSubcategory,
         description: taskLabel,
         missionTopic: item.topic || "",
         missionCheckId: checkId,
