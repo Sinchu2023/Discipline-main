@@ -681,6 +681,18 @@
       .task-card.productive {
         border-left: 4px solid var(--success);
       }
+      .task-card.training {
+        border-left: 4px solid var(--warning);
+      }
+      .task-card.study {
+        border-left: 4px solid var(--info);
+      }
+      .task-card.distraction {
+        border-left: 4px solid var(--danger);
+      }
+      .task-card.misc {
+        border-left: 4px solid var(--text-secondary);
+      }
       .task-header {
         display: flex;
         justify-content: space-between;

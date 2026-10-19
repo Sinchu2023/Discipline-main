@@ -2613,6 +2613,20 @@ class TaskManager {
     if (this.app.shadowEngine) this.app.shadowEngine.refresh();
     if (this.app.flowEngine) this.app.flowEngine.refresh();
   }
+
+  // Return CSS class based on task category for proper visual distinction
+  getTaskCategoryClass(category) {
+    switch (category) {
+      case "Sleep": return "sleep";
+      case "Productive Work": return "productive";
+      case "Physical Training": return "training";
+      case "Study / Skill Development": return "study";
+      case "Time Waste / Distraction": return "distraction";
+      case "Miscellaneous": return "misc";
+      default: return "misc";
+    }
+  }
+
   renderTasks() {
     const selectedDate =
       this.app.state.selectedTaskDate || this.app.getDateString();
@@ -2635,7 +2649,9 @@ class TaskManager {
       const isSleep = task.category === "Sleep";
       const editLabel = isSleep ? "Edit Sleep" : "Edit Task";
       const editClass = isSleep ? "edit-sleep-btn" : "edit-task-btn";
-      el.className = `task-card ${isSleep ? "sleep" : "productive"}`;
+      // Use category-based CSS class for proper styling
+      const categoryClass = this.getTaskCategoryClass(task.category);
+      el.className = `task-card ${categoryClass}`;
       el.innerHTML = `<div class="task-header"><div class="task-name">${isSleep ? "[SLEEP]" : "[TASK]"} ${this.app.escapeHtml(task.category)} - ${this.app.escapeHtml(task.subcategory)}</div><div class="task-duration">${this.app.formatDuration(task.duration)}</div></div><div class="task-time">${this.app.formatTime(task.startTime)} - ${this.app.formatTime(task.endTime)}</div><div class="task-time">${this.app.escapeHtml(task.description || "")}</div><div class="task-actions">${!isSleep ? `<button class="btn btn-success restart-task-btn" data-id="${this.app.escapeHtml(task.id)}" title="Start timer for this task"><i class="fas fa-play"></i> Start</button>` : ""}<button class="btn ${editClass}" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-pen"></i> ${editLabel}</button><button class="btn delete-task-btn" data-id="${this.app.escapeHtml(task.id)}"><i class="fas fa-trash"></i> Delete</button></div>`;
       c.appendChild(el);
     });
@@ -7763,6 +7779,53 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
     return `${fmt(startH)} - ${fmt(endH)}`;
   }
 
+  // Infer category from mission item properties (phase, topic, discipline_type, priority)
+  inferCategoryFromMissionItem(item) {
+    // Check for explicit category field first (from custom task definitions)
+    if (item.category) {
+      const cat = String(item.category).trim();
+      // Validate against known categories
+      const validCategories = ["Sleep", "Productive Work", "Physical Training", "Study / Skill Development", "Time Waste / Distraction", "Miscellaneous"];
+      if (validCategories.includes(cat)) return cat;
+      // Try case-insensitive match
+      const match = validCategories.find(c => c.toLowerCase() === cat.toLowerCase());
+      if (match) return match;
+    }
+
+    const topic = (item.topic || "").toLowerCase();
+    const phase = (item.phase || "").toLowerCase();
+    const disciplineType = (item.discipline_type || "").toUpperCase();
+    const priority = (item.priority || "").toUpperCase();
+
+    // Sleep/rest items
+    if (topic.includes("sleep") || topic.includes("rest") || topic.includes("wind down") || (phase === "evening" && topic.includes("rest"))) {
+      return "Sleep";
+    }
+
+    // Break items
+    if (topic.includes("break") || topic.includes("lunch") || topic.includes("dinner") || topic.includes("walk") || topic.includes("hydration") || phase === "breaks") {
+      return "Miscellaneous";
+    }
+
+    // Physical training / workout
+    if (topic.includes("workout") || topic.includes("exercise") || topic.includes("gym") || topic.includes("physical") || topic.includes("training") || (topic.includes("run") && !topic.includes("break"))) {
+      return "Physical Training";
+    }
+
+    // Study / skill development
+    if (topic.includes("study") || topic.includes("learn") || topic.includes("practice") || topic.includes("review") || topic.includes("revision") || topic.includes("read") || topic.includes("course") || phase === "core study" || phase === "morning" || phase === "evening") {
+      return "Study / Skill Development";
+    }
+
+    // Default: if it's a FLEXIBLE task with LOW priority, might be a break
+    if (disciplineType === "FLEXIBLE" && priority === "LOW") {
+      return "Miscellaneous";
+    }
+
+    // Default fallback
+    return "Productive Work";
+  }
+
   // â”€â”€ Phase 0.2: local mission state cache (Map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Never recomputed on checkbox click â€” only rebuilt on topology change.
   _buildMissionCache(tasks, checks, nowH) {
@@ -7949,8 +8012,10 @@ Execute Phase 1 now and close only after logging the full ${this.app.formatDurat
       if (cached.done) return;
       // Build meta for the stopwatch with mission tracking fields
       const taskLabel = item.label || item.topic || "Mission Task";
+      // Infer category from task properties: use phase as category hint, or fallback to Productive Work
+      const inferredCategory = this.inferCategoryFromMissionItem(item);
       const meta = {
-        category: "Productive Work",
+        category: inferredCategory,
         subcategory: item.topic || taskLabel,
         description: taskLabel,
         missionTopic: item.topic || "",
