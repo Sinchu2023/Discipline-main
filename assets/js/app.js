@@ -1,4 +1,4 @@
-﻿window.AppModule = {
+window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
     if (!services?.auth || typeof services.onAuthStateChanged !== "function") {
@@ -4289,7 +4289,7 @@ class InsightsManager {
       topCategory: topCategory ? { name: topCategory[0], minutes: topCategory[1] } : null,
       weeklyTrend,
       hourlyDistribution: hourlyStats,
-      insight: `Your peak focus window is around ${this.formatHour(peakHour[0])} (${this.app.formatDuration(peakHour[1].minutes)} logged). Average session: ${avgSession}m with ${longSessions} deep work blocks (60+ min).`,
+      insight: `Your peak focus window is around ${this.formatHour(peakHour[0])} (${peakHour[1].count} session${peakHour[1].count !== 1 ? 's' : ''}, avg ${this.app.formatDuration(Math.round(peakHour[1].minutes / Math.max(peakHour[1].count, 1)))} each). Average session: ${avgSession}m with ${longSessions} deep work blocks (60+ min).`,
     };
   }
 
@@ -4347,7 +4347,8 @@ class InsightsManager {
 
     const daysWithWork = Object.keys(dailyMinutes).length;
     const totalDays = this.getDaysSinceFirstTask(productiveTasks);
-    const consistency = totalDays > 0 ? Math.min(100, Math.round((daysWithWork / totalDays) * 100)) : 0;
+    // Cap daysWithWork to totalDays before dividing to avoid >100% from timezone date mismatches
+    const consistency = totalDays > 0 ? Math.round((Math.min(daysWithWork, totalDays) / totalDays) * 100) : 0;
 
     let currentStreak = Number(this.app.state?.streak) || 0;
     if (currentStreak === 0) {
@@ -4448,7 +4449,8 @@ class InsightsManager {
     const weekly = this.analyzeWeeklyPatterns(tasks);
     if (weekly.dayBreakdown && weekly.averageDailyProductive > 0) {
       const lowDays = Object.entries(weekly.dayBreakdown)
-        .filter(([_, v]) => v.productive < weekly.averageDailyProductive * 0.4 && v.total > 0)
+        // Compare avgProductive (per-day average) to the overall average — apples to apples
+        .filter(([_, v]) => v.uniqueDates?.size > 0 && v.avgProductive < weekly.averageDailyProductive * 0.4)
         .map(([d]) => d);
       if (lowDays.length > 0) {
         recs.push({
@@ -4533,7 +4535,7 @@ class InsightsManager {
 
     const sortedDates = Object.keys(dailyMinutes).sort();
     let current = Number(this.app.state?.streak) || 0;
-    let best = current;
+    let best = 0; // always compute from history, don't seed from current streak
     let temp = 0;
     let prevDate = null;
 
@@ -4561,9 +4563,11 @@ class InsightsManager {
   comparePeriods(tasks) {
     const now = new Date();
     const thisWeekStart = new Date(now);
-    thisWeekStart.setDate(now.getDate() - now.getDay());
+    // Use Monday as week start (day 1); if today is Sunday (0) treat as day 7
+    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+    thisWeekStart.setDate(now.getDate() - (dayOfWeek - 1));
     thisWeekStart.setHours(0, 0, 0, 0);
-    
+
     const lastWeekStart = new Date(thisWeekStart);
     lastWeekStart.setDate(thisWeekStart.getDate() - 7);
 
@@ -4781,15 +4785,17 @@ class InsightsManager {
 
   renderDayBars(dayBreakdown) {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const maxMinutes = Math.max(...Object.values(dayBreakdown).map(v => v.productive), 1);
-    
+    // Use avgProductive (per-occurrence average) so bars reflect real daily averages, not inflated sums
+    const maxMinutes = Math.max(...Object.values(dayBreakdown).map(v => v.avgProductive || 0), 1);
+
     return dayNames.map(day => {
       const data = dayBreakdown[day];
-      const height = data ? Math.max(6, (data.productive / maxMinutes) * 100) : 6;
-      const isProd = data && data.productive > 0;
+      const avg = data?.avgProductive || 0;
+      const height = data?.uniqueDates?.size > 0 ? Math.max(6, (avg / maxMinutes) * 100) : 6;
+      const isProd = avg > 0;
       return `
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;">
-          <div class="day-bar ${isProd ? 'productive' : ''}" style="width:100%;height:${height}%;" title="${day}: ${this.app.formatDuration(data?.productive || 0)}"></div>
+          <div class="day-bar ${isProd ? 'productive' : ''}" style="width:100%;height:${height}%;" title="${day}: ${this.app.formatDuration(avg)} avg/day"></div>
           <span style="font-size:0.65rem;color:var(--text-secondary);margin-top:4px;">${day}</span>
         </div>
       `;
