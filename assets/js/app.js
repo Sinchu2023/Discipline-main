@@ -1,4 +1,4 @@
-window.AppModule = {
+﻿window.AppModule = {
   runAfterAuth(callback) {
     const services = window.FirebaseServices;
     if (!services?.auth || typeof services.onAuthStateChanged !== "function") {
@@ -4174,9 +4174,9 @@ class InsightsManager {
   analyzeWeeklyPatterns(tasks) {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dayStats = {};
-    
-    // Initialize
-    dayNames.forEach(d => dayStats[d] = { productive: 0, total: 0, sessions: 0, waste: 0 });
+
+    // Initialize — track unique calendar dates per weekday to compute averages correctly
+    dayNames.forEach(d => dayStats[d] = { productive: 0, total: 0, sessions: 0, waste: 0, uniqueDates: new Set() });
 
     tasks.forEach(task => {
       const ts = Number(task.startTime) || (task.date ? new Date(task.date + 'T12:00:00').getTime() : null);
@@ -4185,10 +4185,12 @@ class InsightsManager {
       if (isNaN(date.getTime())) return;
       const day = dayNames[date.getDay()];
       const mins = Number(task.duration) || 0;
-      
+      // Track unique calendar date so we can divide by # of occurrences
+      const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      dayStats[day].uniqueDates.add(dateKey);
       dayStats[day].total += mins;
       dayStats[day].sessions++;
-      
+
       if (this.app.isProductiveCategory(task.category) || task.isProductive) {
         dayStats[day].productive += mins;
       } else if (this.app.isDistractionCategory?.(task.category) || task.category === 'Time Waste / Distraction') {
@@ -4196,10 +4198,17 @@ class InsightsManager {
       }
     });
 
-    const daysWithData = Object.entries(dayStats).filter(([_, v]) => v.total > 0);
+    // Convert raw sums → average per unique calendar day occurrence
+    dayNames.forEach(d => {
+      const occ = dayStats[d].uniqueDates.size;
+      dayStats[d].avgProductive = occ > 0 ? Math.round(dayStats[d].productive / occ) : 0;
+      dayStats[d].avgTotal      = occ > 0 ? Math.round(dayStats[d].total / occ)      : 0;
+    });
+
+    const daysWithData = Object.entries(dayStats).filter(([_, v]) => v.uniqueDates.size > 0);
     if (daysWithData.length === 0) return { message: "No weekly data yet." };
 
-    const daysWithProductive = daysWithData.filter(([_, v]) => v.productive > 0);
+    const daysWithProductive = daysWithData.filter(([_, v]) => v.avgProductive > 0);
     if (daysWithProductive.length === 0) {
       return {
         bestDay: null,
@@ -4211,21 +4220,22 @@ class InsightsManager {
       };
     }
 
-    const bestDay = daysWithProductive.reduce((a, b) => a[1].productive >= b[1].productive ? a : b);
-    const worstDay = daysWithProductive.reduce((a, b) => a[1].productive <= b[1].productive ? a : b);
-    const mostConsistent = daysWithProductive.reduce((a, b) => 
-      (a[1].productive / Math.max(a[1].sessions, 1)) >= (b[1].productive / Math.max(b[1].sessions, 1)) ? a : b
+    // Best/worst based on average per occurrence — no more inflated all-time sums
+    const bestDay  = daysWithProductive.reduce((a, b) => a[1].avgProductive >= b[1].avgProductive ? a : b);
+    const worstDay = daysWithProductive.reduce((a, b) => a[1].avgProductive <= b[1].avgProductive ? a : b);
+    const mostConsistent = daysWithProductive.reduce((a, b) =>
+      (a[1].avgProductive / Math.max(a[1].sessions, 1)) >= (b[1].avgProductive / Math.max(b[1].sessions, 1)) ? a : b
     );
 
-    const avgProductive = daysWithProductive.reduce((sum, [_, v]) => sum + v.productive, 0) / daysWithProductive.length;
+    const avgProductive = daysWithProductive.reduce((sum, [_, v]) => sum + v.avgProductive, 0) / daysWithProductive.length;
 
     return {
-      bestDay: { name: bestDay[0], minutes: bestDay[1].productive },
-      worstDay: worstDay[0] !== bestDay[0] ? { name: worstDay[0], minutes: worstDay[1].productive } : null,
-      mostConsistent: { name: mostConsistent[0], avgPerSession: Math.round(mostConsistent[1].productive / Math.max(mostConsistent[1].sessions, 1)) },
+      bestDay:  { name: bestDay[0],  minutes: bestDay[1].avgProductive },
+      worstDay: worstDay[0] !== bestDay[0] ? { name: worstDay[0], minutes: worstDay[1].avgProductive } : null,
+      mostConsistent: { name: mostConsistent[0], avgPerSession: Math.round(mostConsistent[1].avgProductive / Math.max(mostConsistent[1].sessions, 1)) },
       averageDailyProductive: Math.round(avgProductive),
       dayBreakdown: dayStats,
-      insight: `You're most productive on ${bestDay[0]}s (${this.app.formatDuration(bestDay[1].productive)}). ${worstDay && worstDay[0] !== bestDay[0] ? `${worstDay[0]}s could use more dedicated focus (${this.app.formatDuration(worstDay[1].productive)}).` : 'Keep building consistency across other days!'}`,
+      insight: `You're most productive on ${bestDay[0]}s (${this.app.formatDuration(bestDay[1].avgProductive)} avg/day). ${worstDay && worstDay[0] !== bestDay[0] ? `${worstDay[0]}s could use more focus (${this.app.formatDuration(worstDay[1].avgProductive)} avg/day).` : 'Keep building consistency across other days!'}`,
     };
   }
 
