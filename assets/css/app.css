@@ -386,7 +386,7 @@
         display: grid;
         grid-template-columns: 1fr 400px;
         gap: 2rem;
-        margin-bottom: 0.6rem;
+        margin-bottom: 2rem;
       }
       /* Stopwatch Container */
       .stopwatch-container {
