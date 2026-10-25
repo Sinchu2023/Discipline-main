@@ -2009,6 +2009,18 @@ class DisciplineTracker {
       minute: "2-digit",
     });
   }
+  formatTimeWindow([startH, endH]) {
+    const fmt = (h) => {
+      const normalized = ((h % 24) + 24) % 24;
+      const totalMinutes = Math.round(normalized * 60);
+      const hour = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      const period = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+      return `${hour12}:${mins.toString().padStart(2, "0")} ${period}`;
+    };
+    return `${fmt(startH)} - ${fmt(endH)}`;
+  }
   isProductiveCategory(category) {
     if (!category) return false;
     return PRODUCTIVE_CATEGORIES.has(String(category).trim());
