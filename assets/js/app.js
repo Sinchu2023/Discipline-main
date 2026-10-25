@@ -3651,15 +3651,23 @@ class UIManager {
     const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
     if (!modal) return;
     modal.style.display = "flex";
-    // Render rule-based insights immediately (fast)
-    requestAnimationFrame(() => {
-      this.app.insights?.renderInsights("insights-content");
-    });
-    // Then fetch AI insights asynchronously
-    this.loadAIInsights();
+    
+    // Show loading, then render unified insights (rule-based + AI)
+    const content = this.app.elements["insights-content"] || document.getElementById("insights-content");
+    if (content) {
+      content.innerHTML = `
+        <div class="insights-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);">
+          <div class="ai-spinner-ring" style="margin:0 auto 1rem;"></div>
+          <div>Loading insights...</div>
+        </div>
+      `;
+    }
+    
+    // Fetch and render unified insights (rule-based + AI)
+    this.loadUnifiedInsights();
   }
 
-  async loadAIInsights(forceRefresh = false) {
+  async loadUnifiedInsights(forceRefresh = false) {
     const content = this.app.elements["insights-content"] || document.getElementById("insights-content");
     if (!content) return;
     
@@ -3677,18 +3685,13 @@ class UIManager {
         ruleInsights,
         forceRefresh
       );
-      // Render AI insights (they include rule-based data for fallback rendering)
-      this.app.ollamaInsights.renderAIInsights("insights-content", aiInsights);
+      // Render UNIFIED insights (merged rule-based + AI)
+      this.app.ollamaInsights.renderUnifiedInsights("insights-content", ruleInsights, aiInsights);
     } catch (e) {
-      console.error('Failed to load AI insights:', e);
-      // Fallback to rule-based
+      console.error('Failed to load unified insights:', e);
+      // Fallback to rule-based only
       this.app.insights?.renderInsights("insights-content");
     }
-  }
-
-  hideInsights() {
-    const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
-    if (modal) modal.style.display = "none";
   }
 
   async refreshInsights() {
@@ -3697,14 +3700,11 @@ class UIManager {
       content.innerHTML = `
         <div class="insights-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);">
           <div class="ai-spinner-ring" style="margin:0 auto 1rem;"></div>
-          <div>Analyzing with local AI...</div>
+          <div>Refreshing with local AI...</div>
         </div>
       `;
     }
-    // Force refresh rule-based insights
-    this.app.insights?.generateInsights(true);
-    // Force refresh AI insights (bypass cache)
-    await this.loadAIInsights(true);
+    await this.loadUnifiedInsights(true);
   }
 
   exportInsights() {
@@ -6018,6 +6018,269 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
         this.renderAIInsights(container.id, this.lastRenderedInsights || {});
       });
     }
+  }
+
+  /**
+   * Render UNIFIED insights - merges rule-based data with AI enhancements
+   * Uses same detailed CSS/styling as rule-based, enhanced with AI content
+   */
+  renderUnifiedInsights(containerId, ruleInsights, aiInsights) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    this.lastRenderedInsights = aiInsights;
+
+    const isLocal = aiInsights.source === 'ollama-local';
+    const isCloud = aiInsights.source === 'ollama-cloud';
+    const isOllama = isLocal || isCloud;
+    const isRuleBased = aiInsights.source === 'rule-based';
+    
+    const localConn = this.localConnection;
+    const connStatus = localConn?.getStatus?.() || { connected: false, models: [], checked: false };
+    
+    let aiBadge = '';
+    if (isLocal) {
+      aiBadge = `<span class="ai-badge local">🖥️ Local (${aiInsights.model || 'qwen2.5:3b'})</span>`;
+    } else if (isCloud) {
+      aiBadge = `<span class="ai-badge cloud">☁️ Cloud (${aiInsights.model || 'qwen2.5:3b'})</span>`;
+    } else {
+      aiBadge = `<span class="ai-badge rule">📋 Rule-Based</span>`;
+    }
+
+    const sections = [];
+    sections.push(this.renderConnectionCard(connStatus));
+
+    const summary = aiInsights.summary || ruleInsights.weekly?.insight || '';
+    const borderColor = isLocal ? '#4ade80' : isCloud ? '#a5b4fc' : '#fbbf24';
+    const icon = isLocal ? 'robot' : isCloud ? 'cloud' : 'cogs';
+    sections.push(`
+      <div class="insight-card" style="border-left:3px solid ${borderColor};">
+        <h4 style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.5rem;">
+          <i class="fas fa-${icon}"></i> AI Summary ${aiBadge}
+        </h4>
+        <p style="color:var(--text-primary);font-size:0.9rem;line-height:1.5;margin:0;">${this.app.escapeHtml(summary)}</p>
+      </div>
+    `);
+
+    if (ruleInsights.weekly?.bestDay) {
+      const weekly = ruleInsights.weekly;
+      const aiWeeklyInsight = aiInsights.issues?.find(i => i.includes('day') || i.includes('week')) || weekly.insight;
+      sections.push(`
+        <div class="insight-card">
+          <h4><i class="fas fa-calendar-week"></i> Weekly Pattern</h4>
+          <div class="insight-highlight">
+            <span class="insight-good">🏆 Best: ${weekly.bestDay.name} (${this.app.formatDuration(weekly.bestDay.minutes)})</span>
+            ${weekly.worstDay ? `<span class="insight-bad">📉 Weak: ${weekly.worstDay.name} (${this.app.formatDuration(weekly.worstDay.minutes)})</span>` : ''}
+            <span>📊 Daily Avg: ${this.app.formatDuration(weekly.averageDailyProductive)}</span>
+          </div>
+          <p class="insight-text">${this.app.escapeHtml(aiWeeklyInsight)}</p>
+          <div class="insight-mini-chart">${this.renderDayBars(weekly.dayBreakdown)}</div>
+        </div>
+      `);
+    }
+
+    if (ruleInsights.productivity?.peakHour) {
+      const prod = ruleInsights.productivity;
+      const aiProdInsight = aiInsights.issues?.find(i => i.includes('hour') || i.includes('session') || i.includes('focus')) || prod.insight;
+      sections.push(`
+        <div class="insight-card">
+          <h4><i class="fas fa-chart-line"></i> Focus Patterns</h4>
+          <div class="insight-highlight">
+            <span>⏰ Peak: ${prod.peakHour.label}</span>
+            <span>⏱️ Avg Session: ${prod.avgSessionLength}m</span>
+            <span>🏋️ Deep Work: ${prod.longSessionsCount} sessions (60+m)</span>
+            <span>📂 Top: ${prod.topCategory?.name || '—'} (${this.app.formatDuration(prod.topCategory?.minutes || 0)})</span>
+          </div>
+          <p class="insight-text">${this.app.escapeHtml(aiProdInsight)}</p>
+          ${prod.weeklyTrend?.trend ? `
+            <div class="insight-trend ${prod.weeklyTrend.trend}">
+              ${this.formatTrend(prod.weeklyTrend)}
+            </div>
+          ` : ''}
+        </div>
+      `);
+    }
+
+    if (ruleInsights.habits?.daysActive > 0) {
+      const habits = ruleInsights.habits;
+      const aiHabitInsight = aiInsights.issues?.find(i => i.includes('consistency') || i.includes('streak') || i.includes('habit')) || habits.insight;
+      sections.push(`
+        <div class="insight-card">
+          <h4><i class="fas fa-fire"></i> Consistency</h4>
+          <div class="insight-stats">
+            <div class="stat"><strong>${habits.currentStreak}</strong><span>Current Streak</span></div>
+            <div class="stat"><strong>${habits.bestStreak}</strong><span>Best Streak</span></div>
+            <div class="stat"><strong>${habits.consistency}</strong><span>Daily Consistency</span></div>
+          </div>
+          <p class="insight-text">${this.app.escapeHtml(aiHabitInsight)}</p>
+          ${habits.recurringPatterns?.length > 0 ? `
+            <div class="insight-patterns" style="margin-top:0.75rem;">
+              <strong style="display:block;margin-bottom:0.35rem;font-size:0.8rem;color:var(--text-secondary);">Recurring Focus Blocks:</strong>
+              ${habits.recurringPatterns.map(p => `<span class="pattern-tag">${p.label}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `);
+    }
+
+    const mergedRecs = this.mergeRecommendations(ruleInsights.recommendations || [], aiInsights);
+    if (mergedRecs.length > 0) {
+      sections.push(`
+        <div class="insight-card recommendations">
+          <h4><i class="fas fa-lightbulb"></i> AI Recommendations</h4>
+          ${mergedRecs.map(r => `
+            <div class="recommendation ${r.type} ${r.priority}">
+              <span class="rec-icon">${this.getRecIcon(r.type)}</span>
+              <span class="rec-text">${this.app.escapeHtml(r.text)}</span>
+              <span class="rec-priority">${r.priority}</span>
+            </div>
+          `).join('')}
+        </div>
+      `);
+    }
+
+    if (ruleInsights.timetable?.daysAnalyzed >= 1) {
+      sections.push(this.buildTimetableInsightHTML(ruleInsights.timetable, aiInsights));
+    }
+
+    if (ruleInsights.comparisons?.thisWeek) {
+      const change = ruleInsights.comparisons.productiveChange || 0;
+      sections.push(`
+        <div class="insight-card comparison ${change >= 0 ? 'positive' : 'negative'}">
+          <h4><i class="fas fa-exchange-alt"></i> Week-over-Week</h4>
+          <div class="insight-big-number ${change >= 0 ? 'good' : 'bad'}">
+            ${change >= 0 ? '+' : ''}${change}%
+          </div>
+          <p class="insight-text">${this.app.escapeHtml(ruleInsights.comparisons.insight)}</p>
+          <div class="comparison-bars">
+            <div class="bar"><span>This Week</span><strong>${this.app.formatDuration(ruleInsights.comparisons.thisWeek.productive)}</strong></div>
+            <div class="bar"><span>Last Week</span><strong>${this.app.formatDuration(ruleInsights.comparisons.lastWeek.productive)}</strong></div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (isOllama) {
+      if (aiInsights.adjustments?.length) {
+        sections.push(`
+          <div class="insight-card" style="border-left:3px solid #17a2b8;">
+            <h4><i class="fas fa-sliders-h"></i> AI Schedule Adjustments</h4>
+            <ul style="margin:0;padding-left:1.2rem;color:var(--text-primary);font-size:0.85rem;line-height:1.6;">
+              ${aiInsights.adjustments.map(s => `<li>${this.app.escapeHtml(s)}</li>`).join('')}
+            </ul>
+          </div>
+        `);
+      }
+      if (aiInsights.tomorrowAction) {
+        sections.push(`
+          <div class="insight-card" style="border-left:3px solid #6f42c1;background:rgba(111,66,193,0.05);">
+            <h4><i class="fas fa-bolt"></i> Do This Tomorrow</h4>
+            <p style="margin:0;color:var(--text-primary);font-size:0.9rem;font-weight:600;line-height:1.5;">${this.app.escapeHtml(aiInsights.tomorrowAction)}</p>
+          </div>
+        `);
+      }
+    }
+
+    container.innerHTML = `
+      <style>
+        .insight-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+        .insight-card h4 { margin: 0 0 0.75rem; color: var(--text-accent); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
+        .insight-highlight { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; font-size: 0.85rem; }
+        .insight-good { color: #4ade80; } .insight-bad { color: #f87171; }
+        .insight-text { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; margin: 0; }
+        .insight-mini-chart { display: flex; gap: 4px; height: 40px; align-items: flex-end; margin-top: 0.5rem; }
+        .day-bar { flex: 1; background: rgba(255,255,255,0.1); border-radius: 2px 2px 0 0; transition: height 0.3s; min-height: 4px; }
+        .day-bar.productive { background: linear-gradient(to top, #28a745, #4ade80); }
+        .insight-stats { display: flex; gap: 1rem; justify-content: space-around; margin: 0.75rem 0; }
+        .insight-stats .stat { text-align: center; }
+        .insight-stats strong { display: block; font-size: 1.5rem; color: var(--text-accent); }
+        .insight-stats span { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .insight-patterns { margin-top: 0.5rem; font-size: 0.8rem; }
+        .pattern-tag { display: inline-block; background: rgba(0,123,255,0.2); color: #a5b4fc; padding: 3px 10px; border-radius: 999px; margin: 2px 4px 2px 0; font-size: 0.75rem; border: 1px solid rgba(0,123,255,0.3); }
+        .recommendations .recommendation { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.75rem; background: rgba(255,255,255,0.02); border-radius: 8px; margin: 0.5rem 0; border-left: 3px solid var(--primary); }
+        .recommendation.warning { border-left-color: #ffc107; }
+        .recommendation.success { border-left-color: #28a745; }
+        .recommendation.improvement { border-left-color: #17a2b8; }
+        .recommendation.suggestion { border-left-color: #6f42c1; }
+        .rec-icon { font-size: 1.1rem; margin-top: 2px; }
+        .rec-text { flex: 1; font-size: 0.85rem; line-height: 1.4; color: var(--text-primary); }
+        .rec-priority { font-size: 0.65rem; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); }
+        .recommendation.high .rec-priority { background: rgba(220,53,69,0.2); color: #f87171; }
+        .recommendation.medium .rec-priority { background: rgba(255,193,7,0.2); color: #ffc107; }
+        .recommendation.low .rec-priority { background: rgba(40,167,69,0.2); color: #4ade80; }
+        .insight-trend { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin-top: 0.5rem; }
+        .insight-trend.improving { background: rgba(40,167,69,0.2); color: #4ade80; }
+        .insight-trend.declining { background: rgba(220,53,69,0.2); color: #f87171; }
+        .insight-trend.stable { background: rgba(255,193,7,0.2); color: #ffc107; }
+        .comparison-bars { display: flex; gap: 1rem; margin-top: 0.75rem; }
+        .comparison-bars .bar { flex: 1; text-align: center; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 8px; }
+        .comparison-bars .bar span { display: block; font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .insight-big-number { font-size: 2.5rem; font-weight: 800; text-align: center; margin: 0.5rem 0; line-height: 1; }
+        .insight-big-number.good { color: #4ade80; } .insight-big-number.bad { color: #f87171; }
+        .ai-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 600; }
+        .ai-badge.local { background: rgba(74,222,128,0.2); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+        .ai-badge.cloud { background: rgba(165,180,252,0.2); color: #a5b4fc; border: 1px solid rgba(165,180,252,0.3); }
+        .ai-badge.rule { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+        .conn-status { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .conn-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .conn-dot.connected { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+        .conn-dot.disconnected { background: #f87171; }
+        .conn-dot.checking { background: #fbbf24; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .conn-btn { background: var(--primary); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .conn-btn:hover { opacity: 0.9; }
+        .conn-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .conn-btn.secondary { background: var(--bg-elevated); color: var(--fg); border: 1px solid var(--border); }
+        .model-list { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; }
+        .error-msg { color: #f87171; font-size: 0.8rem; margin-top: 0.5rem; }
+        .ai-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 600; }
+        .ai-badge.local { background: rgba(74,222,128,0.2); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+        .ai-badge.cloud { background: rgba(165,180,252,0.2); color: #a5b4fc; border: 1px solid rgba(165,180,252,0.3); }
+        .ai-badge.rule { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+        .conn-status { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .conn-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .conn-dot.connected { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+        .conn-dot.disconnected { background: #f87171; }
+        .conn-dot.checking { background: #fbbf24; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .conn-btn { background: var(--primary); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .conn-btn:hover { opacity: 0.9; }
+        .conn-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .conn-btn.secondary { background: var(--bg-elevated); color: var(--fg); border: 1px solid var(--border); }
+        .model-list { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; }
+        .error-msg { color: #f87171; font-size: 0.8rem; margin-top: 0.5rem; }
+        .ai-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 600; }
+        .ai-badge.local { background: rgba(74,222,128,0.2); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+        .ai-badge.cloud { background: rgba(165,180,252,0.2); color: #a5b4fc; border: 1px solid rgba(165,180,252,0.3); }
+        .ai-badge.rule { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+      </style>
+      ${sections.join('')}
+    `;
+    this.bindConnectButton(containerId);
+  }
+
+  mergeRecommendations(ruleRecs, aiInsights) {
+    const merged = [...ruleRecs];
+    if (aiInsights.adjustments?.length) {
+      aiInsights.adjustments.forEach(adj => {
+        const exists = merged.some(r => 
+          r.text.toLowerCase().includes(adj.toLowerCase().slice(0, 30)) ||
+          adj.toLowerCase().includes(r.text.toLowerCase().slice(0, 30))
+        );
+        if (!exists) {
+          merged.push({ type: 'improvement', text: adj, priority: 'medium' });
+        }
+      });
+      if (aiInsights.tomorrowAction) {
+        const exists = merged.some(r => r.text.toLowerCase().includes('tomorrow') || r.text.toLowerCase().includes('5:00 AM'));
+        if (!exists) {
+          merged.unshift({ type: 'suggestion', text: `Do This Tomorrow: ${aiInsights.tomorrowAction}`, priority: 'high' });
+        }
+      }
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      return merged.sort((a, b) => (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)).slice(0, 8);
+    }
+    return merged;
   }
 }
 
