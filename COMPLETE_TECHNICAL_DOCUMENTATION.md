@@ -27,6 +27,9 @@
 - Flow protocol engine
 - Graph manager
 - Event wiring and app bootstrap
+- **Insights Manager** (rule-based analytics)
+- **Ollama Insights Engine** (local LLM + cloud fallback)
+- **Local Ollama Connection** (Chrome Private Network Access)
 
 ## Fullscreen Timer (`fullscreen-timer/index.html`)
 - Independent vanilla JS module (no build step, no React)
@@ -39,10 +42,58 @@
 - Anonymous auth fallback for unauthenticated users
 - Offline-capable via Firestore IndexedDB persistence
 
+## AI Insights System
+
+### Unified Insights View
+Single render pass combining:
+- **Rule-based metrics** (deterministic): weekly patterns, focus patterns, habits, streak, timetable adherence, week-over-week
+- **AI enhancements** (context-aware): summary, strengths, issues, schedule adjustments, tomorrow action
+- **Merged recommendations** (deduplicated, priority-sorted, max 8)
+
+### OllamaInsightsEngine (`L5409`)
+- **Local-first**: tries `localhost:11434` via `LocalOllamaConnection`
+- **Cloud fallback**: configured `BASE_URL` (Groq, Together, etc.)
+- **24-hour cache**: per-day cache in `localStorage`
+- **Source tracking**: `ollama-local` | `ollama-cloud` | `rule-based`
+- **Prompt context**: streaks, patterns, timetable adherence, distraction, week-over-week, recurring blocks
+- **Output**: structured JSON (summary, strengths[3], issues[3], adjustments[3], tomorrowAction)
+
+### LocalOllamaConnection (`L5258`)
+- Chrome 142+ **Private Network Access** to `http://localhost:11434`
+- **User gesture required**: "Connect Local AI" button triggers permission prompt
+- **Persisted state**: `localStorage` caches connection + models
+- **CORS**: requires `OLLAMA_ORIGINS` env var (`setx OLLAMA_ORIGINS "https://yourname.github.io,http://localhost:8000"`)
+- **Graceful fallback**: if local unavailable, uses cloud/rule-based
+
+### Configuration (`CONFIG.OLLAMA`)
+```javascript
+OLLAMA: {
+  ENABLED: true,
+  BASE_URL: "https://api.groq.com/openai/v1",  // cloud fallback
+  MODEL: "qwen2.5:3b",
+  TIMEOUT_MS: 120000,
+  TEMPERATURE: 0.3,
+  CACHE_KEY: "discipline_tracker_ollama_insights",
+  CACHE_DURATION_MS: 24 * 60 * 60 * 1000,
+}
+```
+
+### Insights Data Flow
+```
+Open Insights → Loading → Rule-based (instant) + Local Ollama check (parallel)
+                                    │
+                    If connected → POST /api/generate with full context prompt
+                                    │
+                    LLM returns JSON → Merge with rule-based → Render unified
+                                    │
+                    Cache 24h → Refresh button bypasses cache
+```
+
 ## Data Contracts
 - Existing local storage keys are preserved.
 - Existing Firebase document semantics are preserved.
 - Task, roadmap, flow, trainer, and SHADOW state semantics are preserved.
+- New: `ollama_local_connected`, `ollama_local_models` (localStorage)
 
 ## Security Notes
 - Task and favorite labels are escaped before HTML rendering.
@@ -50,6 +101,9 @@
 - Malformed local storage payloads are cleared defensively.
 - Oversized import files are rejected.
 - Non-object JSON import entries are ignored before normalization.
+- **Ollama CORS**: `OLLAMA_ORIGINS` restricts access to your origins only
+- **Private Network Access**: Chrome prompts per-origin, user must click Allow
+- **No API keys in repo**: Local Ollama uses no keys; cloud fallback requires user BYOK (not implemented in repo)
 
 ## Known Architectural Debt
 - `assets/js/app.js` remains large and should be split only by moving complete domain slices, not by introducing duplicate partial runtime modules.

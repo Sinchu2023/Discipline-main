@@ -23,11 +23,14 @@ Discipline tracker web app built with vanilla HTML, CSS, and JavaScript, with sl
 - Firebase auth and cloud sync
 - Import/export support
 - **Fullscreen Timer** (standalone window, Firebase-synced, keyboard shortcuts, monochrome UI)
+- **AI Insights** (unified rule-based + local LLM analysis, timetable adherence, schedule adjustments)
+- **Local Ollama Integration** (Chrome Private Network Access, runs on your hardware, no API keys)
 
 ## Quick Start
 1. Serve the repo over HTTP(S). Do not use `file://` if you need Firebase auth.
 2. Open [index.html](/D:/Programme/Html/Discipline-main/index.html).
 3. Sign in with Google if you want cloud sync.
+4. **For Local AI**: Run `ollama serve`, set `OLLAMA_ORIGINS`, click "Connect Local AI" in Insights.
 
 ## Notes for Development
 - Runtime behavior changes belong in [assets/js/app.js](/D:/Programme/Html/Discipline-main/assets/js/app.js).

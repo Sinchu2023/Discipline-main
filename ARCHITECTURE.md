@@ -209,6 +209,9 @@ All active runtime logic is implemented across 15 modular classes in [assets/js/
 | `ExcelReportGenerator` | `L10516` | Generates multi-sheet Excel reports (Summary, Task History, Analytics) via SheetJS. | `window.XLSX`, `AnalyticsService`. |
 | `MasterMessageManager` | `L10753` | Generates personalized coaching messages, simulates live typing animations, and evaluates timetable adherence against current clock time. | `ShadowEngine`, `TrainerEngine`. |
 | `FullscreenTimer` | `fullscreen-timer/index.html` | Standalone fullscreen timer window; vanilla JS module with Firebase real-time sync, keyboard shortcuts (Space/R/F), monochrome UI, task prompts, and completed-task persistence. | `Firebase Firestore` (timer state doc), `Firebase Auth` (anonymous/Google). |
+| `InsightsManager` | `L4117` | Generates rule-based insights: weekly patterns, focus patterns, habits, streaks, timetable adherence, week-over-week comparison, and recommendations. | `TaskManager`, `TrainerEngine`, `ShadowEngine`. |
+| `OllamaInsightsEngine` | `L5409` | Local LLM-powered deep analysis (once/day). Supports local Ollama (via Chrome Private Network Access) and cloud fallback. 24h cache. Generates summary, strengths, issues, schedule adjustments, tomorrow action. | `InsightsManager`, `LocalOllamaConnection`, `TrainerEngine`. |
+| `LocalOllamaConnection` | `L5258` | Manages Chrome Private Network Access to localhost Ollama. Triggers permission prompt on user gesture, persists connection state, routes generate requests to localhost:11434. | `OllamaInsightsEngine`, `Ollama API (localhost:11434)`. |
 
 ---
 
@@ -380,7 +383,100 @@ flowchart LR
 
 ---
 
-## 9. Historical Refactoring Log & Key Decisions
+## 9. AI Insights Engine & Local Ollama Integration
+
+### 9.1 Unified Insights Architecture
+The AI Insights system merges **rule-based analytics** with **local LLM reasoning** into a single unified view:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    UNIFIED INSIGHTS VIEW                     │
+├─────────────────────────────────────────────────────────────┤
+│  Connection Card (Local Ollama status)                      │
+│  AI Summary (LLM + rule fallback)                           │
+│  Weekly Pattern (rule data + AI insight)                    │
+│  Focus Patterns (rule data + AI insight)                    │
+│  Consistency & Habits (rule data + AI insight)              │
+│  Recommendations (merged rule + AI, deduped, prioritized)   │
+│  Timetable Adherence (rule data + AI adjustments)           │
+│  Week-over-Week (rule data)                                 │
+│  AI Schedule Adjustments (LLM only)                         │
+│  Do This Tomorrow (LLM only)                                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Principles:**
+- **Single render pass** — no race conditions, no duplicate cards
+- **Rule-based as foundation** — all metrics computed deterministically
+- **AI as enhancement** — LLM adds context-aware narrative, specific adjustments
+- **Deduplication** — merged recommendations, priority-sorted, max 8 shown
+- **24-hour cache** — AI results cached per day, refreshed on demand
+
+### 9.2 Local Ollama via Chrome Private Network Access
+The app connects to a locally-running Ollama instance (`http://localhost:11434`) using Chrome 142+ **Private Network Access**:
+
+| Component | Responsibility |
+|-----------|----------------|
+| `LocalOllamaConnection` | Triggers permission prompt on user click, persists connection state in `localStorage`, routes `/api/generate` requests to `localhost:11434` |
+| `OllamaInsightsEngine` | Tries local first, falls back to cloud; 24h cache; supports `ollama-local` / `ollama-cloud` / `rule-based` sources |
+| `InsightsManager` | Pure rule-based analytics (weekly, focus, habits, timetable, streak, comparison) |
+
+**Setup (one-time):**
+```powershell
+# 1. Allow your GitHub Pages origin
+setx OLLAMA_ORIGINS "https://yourname.github.io,http://localhost:8000"
+
+# 2. Restart Ollama (tray → Quit → Start from Start Menu)
+
+# 3. In Chrome on your laptop: click "Connect Local AI" → Allow
+```
+
+**Security:** Only your GitHub Pages origin is allowed via `OLLAMA_ORIGINS`. No ports exposed to internet. Permission prompt required per origin.
+
+### 9.3 Insights Data Flow
+```
+User opens Insights
+       │
+       ▼
+Show loading spinner
+       │
+       ▼
+Fetch rule-based insights (instant)
+       │
+       ▼
+Check saved local Ollama connection (non-blocking)
+       │
+       ▼
+If connected: Call local Ollama with full context prompt
+       │
+       ▼
+LLM returns structured JSON (summary, strengths, issues, adjustments, tomorrowAction)
+       │
+       ▼
+Merge: rule-based metrics + AI narrative + AI adjustments
+       │
+       ▼
+Render UNIFIED view (single pass, no duplicates)
+       │
+       ▼
+Cache AI result for 24h
+```
+
+### 9.4 Data Sent to LLM (Context Prompt)
+The prompt includes:
+- Streaks, consistency, best/worst days, daily averages
+- Peak hour, avg session, deep work count, top category
+- Timetable adherence per slot (target vs actual, trend)
+- Distraction ratio, sleep logging
+- Week-over-week comparison
+- Recurring focus blocks
+- Current timetable (Pipeline schedule)
+
+**Output:** Structured JSON (summary, strengths[3], issues[3], adjustments[3], tomorrowAction)
+
+---
+
+## 10. Historical Refactoring Log & Key Decisions
 
 ### 9.1 Elimination of Parallel Duplicate Sidecars
 - **Historical Problem**: Previous iterations introduced duplicate helper modules under `core/`, `services/`, `ui/`, `analytics/`, `shadow-engine/`, `trainer/`, and `execution/`. Because these sidecars duplicated methods from [assets/js/app.js](file:///d:/Programme/Html/Discipline-main/assets/js/app.js) without being the true runtime target, changes made to one file did not reflect in the application, leading to state desynchronization.
