@@ -1426,7 +1426,8 @@ class DisciplineTracker {
     this.cloudManager = new FirebaseCloudManager(this);
     this.stopwatch = new StopwatchManager(this);
     this.insights = new InsightsManager(this);
-    this.ollamaInsights = new OllamaInsightsEngine(this);
+    this.localOllamaConnection = new LocalOllamaConnection(this);
+    this.ollamaInsights = new OllamaInsightsEngine(this, this.localOllamaConnection);
     this.taskManager = new TaskManager(this);
     this.uiManager = new UIManager(this);
     this.shadowEngine = new ShadowEngine(this);
@@ -3651,6 +3652,11 @@ class UIManager {
     if (!content) return;
     
     try {
+      // Check saved local connection state (non-blocking)
+      if (this.app.localOllamaConnection) {
+        await this.app.localOllamaConnection.checkSavedConnection();
+      }
+      
       // Get rule-based insights first
       const ruleInsights = this.app.insights.generateInsights(forceRefresh);
       // Get AI insights (cached or fresh)
@@ -5256,21 +5262,189 @@ class InsightsManager {
 }
 
 /* ============================================================
+   LocalOllamaConnection - Handles Chrome Private Network Access to localhost Ollama
+   ============================================================ */
+class LocalOllamaConnection {
+  constructor(app) {
+    this.app = app;
+    this.localBaseUrl = 'http://localhost:11434';
+    this.connected = false;
+    this.models = [];
+    this.connectionChecked = false;
+  }
+
+  /**
+   * Test connection to local Ollama - triggers Chrome permission prompt on first call
+   * Must be called from a user gesture (button click)
+   */
+  async testConnection() {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      
+      const res = await fetch(`${this.localBaseUrl}/api/tags`, {
+        signal: controller.signal,
+        // Important: don't send credentials, just trigger CORS preflight
+        mode: 'cors',
+      });
+      clearTimeout(timeout);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      const data = await res.json();
+      this.models = data.models || [];
+      this.connected = true;
+      this.connectionChecked = true;
+      
+      // Save connection state
+      localStorage.setItem('ollama_local_connected', 'true');
+      localStorage.setItem('ollama_local_models', JSON.stringify(this.models));
+      
+      return { success: true, models: this.models };
+    } catch (e) {
+      this.connected = false;
+      this.connectionChecked = true;
+      const errorMsg = e.name === 'AbortError' ? 'Timeout (5s)' : e.message;
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Check if we have a saved connection state (without triggering prompt)
+   */
+  async checkSavedConnection() {
+    const saved = localStorage.getItem('ollama_local_connected') === 'true';
+    if (saved) {
+      try {
+        const models = JSON.parse(localStorage.getItem('ollama_local_models') || '[]');
+        // Quick verify without blocking UI
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(`${this.localBaseUrl}/api/tags`, { 
+          signal: controller.signal,
+          mode: 'cors',
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          this.models = data.models || [];
+          this.connected = true;
+          return true;
+        }
+      } catch {
+        // Ignore - connection lost
+      }
+      // Clear stale state
+      localStorage.removeItem('ollama_local_connected');
+      localStorage.removeItem('ollama_local_models');
+    }
+    return false;
+  }
+
+  /**
+   * Get connection status for UI
+   */
+  getStatus() {
+    return {
+      connected: this.connected,
+      models: this.models,
+      checked: this.connectionChecked,
+    };
+  }
+
+  /**
+   * Call local Ollama generate endpoint
+   */
+  async callLocalOllama(prompt, model, options = {}) {
+    if (!this.connected) {
+      throw new Error('Not connected to local Ollama');
+    }
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
+    
+    try {
+      const res = await fetch(`${this.localBaseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt,
+          stream: false,
+          options: {
+            temperature: options.temperature ?? 0.3,
+            top_p: options.top_p ?? 0.9,
+            num_ctx: options.num_ctx ?? 4096,
+          },
+        }),
+        signal: controller.signal,
+        mode: 'cors',
+      });
+      clearTimeout(timeout);
+      
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Ollama API error: ${res.status} ${err}`);
+      }
+      
+      const data = await res.json();
+      return data.response || '';
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Disconnect and clear saved state
+   */
+  disconnect() {
+    this.connected = false;
+    this.models = [];
+    this.connectionChecked = false;
+    localStorage.removeItem('ollama_local_connected');
+    localStorage.removeItem('ollama_local_models');
+  }
+}
+
+/* ============================================================
    OllamaInsightsEngine - Local LLM-powered deep analysis (once/day)
+   Supports both local (Private Network Access) and cloud modes
    ============================================================ */
 class OllamaInsightsEngine {
-  constructor(app) {
+  constructor(app, localConnection = null) {
     this.app = app;
     this.config = CONFIG.OLLAMA;
     this.cacheKey = this.config.CACHE_KEY;
     this.cacheDuration = this.config.CACHE_DURATION_MS;
+    this.localConnection = localConnection;
   }
 
   /**
-   * Check if Ollama is available and responsive
+   * Check if Ollama is available (local first, then cloud)
    */
   async checkOllamaHealth() {
     if (!this.config.ENABLED) return { available: false, reason: 'Disabled in config' };
+    
+    // Try local connection first if available
+    if (this.localConnection?.connected) {
+      try {
+        const res = await fetch(`${this.localConnection.localBaseUrl}/api/tags`, {
+          mode: 'cors',
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const hasModel = data.models?.some(m => m.name.includes(this.config.MODEL.split(':')[0]));
+          return { available: true, models: data.models, hasModel, source: 'local' };
+        }
+      } catch {
+        // Fall through to cloud
+      }
+    }
+    
+    // Try cloud/base URL
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
@@ -5281,7 +5455,7 @@ class OllamaInsightsEngine {
       if (!res.ok) return { available: false, reason: `HTTP ${res.status}` };
       const data = await res.json();
       const hasModel = data.models?.some(m => m.name.includes(this.config.MODEL.split(':')[0]));
-      return { available: true, models: data.models, hasModel };
+      return { available: true, models: data.models, hasModel, source: 'cloud' };
     } catch (e) {
       return { available: false, reason: e.message };
     }
@@ -5441,8 +5615,11 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
       const response = await this.callOllama(prompt);
       const parsed = this.parseResponse(response);
 
+      // Determine source from health check
+      const source = (health.source === 'local') ? 'ollama-local' : 'ollama-cloud';
+
       const result = {
-        source: 'ollama',
+        source,
         model: this.config.MODEL,
         generatedAt: new Date().toISOString(),
         ...parsed,
@@ -5468,6 +5645,27 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.TIMEOUT_MS);
 
+    // Use local connection if available
+    if (this.localConnection?.connected) {
+      try {
+        const response = await this.localConnection.callLocalOllama(
+          prompt,
+          this.config.MODEL,
+          {
+            temperature: this.config.TEMPERATURE,
+            top_p: this.config.TOP_P,
+            num_ctx: this.config.MAX_CONTEXT_TOKENS,
+          }
+        );
+        clearTimeout(timeout);
+        return response;
+      } catch (localErr) {
+        console.warn('Local Ollama call failed, falling back to cloud:', localErr);
+        // Fall through to cloud
+      }
+    }
+
+    // Cloud fallback
     const res = await fetch(`${this.config.BASE_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5575,25 +5773,47 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
   }
 
   /**
-   * Render AI insights to HTML
+   * Render AI insights to HTML with local connection UI
    */
   renderAIInsights(containerId, aiInsights) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const isOllama = aiInsights.source === 'ollama';
-    const badge = isOllama
-      ? `<span style="background:rgba(165,180,252,0.2);color:#a5b4fc;padding:2px 8px;border-radius:999px;font-size:0.65rem;border:1px solid rgba(165,180,252,0.3);">${aiInsights.model || 'Local LLM'}</span>`
-      : `<span style="background:rgba(251,191,36,0.2);color:#fbbf24;padding:2px 8px;border-radius:999px;font-size:0.65rem;border:1px solid rgba(251,191,36,0.3);">Rule-Based</span>`;
+    // Store for re-render after connect
+    this.lastRenderedInsights = aiInsights;
+
+    const isLocal = aiInsights.source === 'ollama-local';
+    const isCloud = aiInsights.source === 'ollama-cloud';
+    const isOllama = isLocal || isCloud;
+    const isRuleBased = aiInsights.source === 'rule-based';
+    
+    const localConn = this.localConnection;
+    const connStatus = localConn?.getStatus?.() || { connected: false, models: [], checked: false };
+    
+    // Determine badge
+    let badge = '';
+    if (isLocal) {
+      badge = `<span style="background:rgba(74,222,128,0.2);color:#4ade80;padding:2px 8px;border-radius:999px;font-size:0.65rem;border:1px solid rgba(74,222,128,0.3);">${aiInsights.model || 'Local LLM'} 🖥️</span>`;
+    } else if (isCloud) {
+      badge = `<span style="background:rgba(165,180,252,0.2);color:#a5b4fc;padding:2px 8px;border-radius:999px;font-size:0.65rem;border:1px solid rgba(165,180,252,0.3);">${aiInsights.model || 'Cloud LLM'} ☁️</span>`;
+    } else {
+      badge = `<span style="background:rgba(251,191,36,0.2);color:#fbbf24;padding:2px 8px;border-radius:999px;font-size:0.65rem;border:1px solid rgba(251,191,36,0.3);">Rule-Based</span>`;
+    }
 
     const sections = [];
 
+    // Connection Status Card (always shown first)
+    const connSection = this.renderConnectionCard(connStatus);
+    sections.push(connSection);
+
     // Summary
     if (aiInsights.summary) {
+      const borderColor = isLocal ? '#4ade80' : isCloud ? '#a5b4fc' : '#fbbf24';
+      const icon = isLocal ? 'robot' : isCloud ? 'cloud' : 'cogs';
       sections.push(`
-        <div class="insight-card" style="border-left:3px solid ${isOllama ? '#a5b4fc' : '#fbbf24'};">
+        <div class="insight-card" style="border-left:3px solid ${borderColor};">
           <h4 style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.5rem;">
-            <i class="fas fa-${isOllama ? 'robot' : 'cogs'}"></i> AI Summary ${badge}
+            <i class="fas fa-${icon}"></i> AI Summary ${badge}
           </h4>
           <p style="color:var(--text-primary);font-size:0.9rem;line-height:1.5;margin:0;">${this.app.escapeHtml(aiInsights.summary)}</p>
         </div>
@@ -5659,9 +5879,116 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
       <style>
         .insight-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
         .insight-card h4 { margin: 0 0 0.75rem; color: var(--text-accent); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
+        .conn-status { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .conn-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .conn-dot.connected { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+        .conn-dot.disconnected { background: #f87171; }
+        .conn-dot.checking { background: #fbbf24; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .conn-btn { 
+          background: var(--primary); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 8px; 
+          font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;
+        }
+        .conn-btn:hover { opacity: 0.9; }
+        .conn-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .conn-btn.secondary { background: var(--bg-elevated); color: var(--fg); border: 1px solid var(--border); }
+        .model-list { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; }
+        .error-msg { color: #f87171; font-size: 0.8rem; margin-top: 0.5rem; }
       </style>
       ${sections.join('')}
     `;
+
+    // Bind connect button after render
+    this.bindConnectButton(containerId);
+  }
+
+  /**
+   * Render connection status card with connect button
+   */
+  renderConnectionCard(connStatus) {
+    const isConnected = connStatus.connected;
+    const models = connStatus.models || [];
+    const modelNames = models.map(m => m.name).join(', ') || 'none';
+    
+    if (isConnected) {
+      return `
+        <div class="insight-card" style="border-left:3px solid #4ade80;background:rgba(74,222,128,0.05);">
+          <h4 style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.5rem;">
+            <span class="conn-dot connected"></span>
+            <i class="fas fa-desktop"></i> Local AI Connected
+          </h4>
+          <div class="conn-status">
+            <span style="font-weight:600;color:#4ade80;">● Connected to your laptop's Ollama</span>
+          </div>
+          <div class="model-list">Models: ${this.app.escapeHtml(modelNames)}</div>
+          <button class="conn-btn secondary" id="ollama-disconnect-btn" style="margin-top:0.75rem;">
+            <i class="fas fa-unlink"></i> Disconnect
+          </button>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="insight-card" style="border-left:3px solid #fbbf24;background:rgba(251,191,36,0.05);">
+          <h4 style="display:flex;align-items:center;gap:0.5rem;margin:0 0 0.5rem;">
+            <span class="conn-dot disconnected"></span>
+            <i class="fas fa-desktop"></i> Local AI Not Connected
+          </h4>
+          <p style="color:var(--text-secondary);font-size:0.85rem;margin:0 0 0.75rem;">
+            Connect to your laptop's Ollama for unlimited, private AI analysis.
+            <br><strong>Requirements:</strong> Chrome/Edge 142+, Ollama running, <code>OLLAMA_ORIGINS</code> set.
+          </p>
+          <button class="conn-btn" id="ollama-connect-btn">
+            <i class="fas fa-plug"></i> Connect Local AI
+          </button>
+          <div id="ollama-conn-status" style="margin-top:0.5rem;"></div>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Bind connect/disconnect button handlers
+   */
+  bindConnectButton(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const connectBtn = container.querySelector('#ollama-connect-btn');
+    const disconnectBtn = container.querySelector('#ollama-disconnect-btn');
+    const statusDiv = container.querySelector('#ollama-conn-status');
+    const localConn = this.localConnection;
+    
+    if (connectBtn) {
+      connectBtn.addEventListener('click', async () => {
+        connectBtn.disabled = true;
+        connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+        if (statusDiv) statusDiv.innerHTML = '';
+        
+        try {
+          const result = await localConn.testConnection();
+          if (result.success) {
+            if (statusDiv) statusDiv.innerHTML = `<div style="color:#4ade80;">✅ Connected: ${result.models.map(m=>m.name).join(', ')}</div>`;
+            // Re-render to show connected state
+            this.renderAIInsights(container.id, this.lastRenderedInsights || {});
+          } else {
+            if (statusDiv) statusDiv.innerHTML = `<div class="error-msg">❌ ${result.error}</div>`;
+            connectBtn.disabled = false;
+            connectBtn.innerHTML = '<i class="fas fa-plug"></i> Connect Local AI';
+          }
+        } catch (e) {
+          if (statusDiv) statusDiv.innerHTML = `<div class="error-msg">❌ ${e.message}</div>`;
+          connectBtn.disabled = false;
+          connectBtn.innerHTML = '<i class="fas fa-plug"></i> Connect Local AI';
+        }
+      });
+    }
+    
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener('click', () => {
+        localConn.disconnect();
+        this.renderAIInsights(container.id, this.lastRenderedInsights || {});
+      });
+    }
   }
 }
 
