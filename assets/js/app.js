@@ -87,7 +87,7 @@ const CONFIG = {
   OLLAMA: {
     ENABLED: true,
     BASE_URL: "http://localhost:11434",  // Default Ollama endpoint
-    MODEL: "qwen2.5:7b",                 // Model to use (qwen2.5:7b, qwen2.5:14b, etc.)
+    MODEL: "qwen2.5:3b",                 // Model to use (qwen2.5:3b, qwen2.5:7b, qwen2.5:14b, etc.)
     TIMEOUT_MS: 120000,                   // 2 min timeout for generation
     MAX_CONTEXT_TOKENS: 4096,             // Context window for prompt
     TEMPERATURE: 0.3,                     // Low temperature for consistent analysis
