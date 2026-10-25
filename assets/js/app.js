@@ -4143,6 +4143,7 @@ class InsightsManager {
       recommendations: this.generateRecommendations(tasks),
       streaks: this.analyzeStreaks(tasks),
       comparisons: this.comparePeriods(tasks),
+      timetable: this.analyzeTimetableAdherence(tasks),
       generatedAt: new Date().toISOString(),
     };
 
@@ -4723,6 +4724,11 @@ class InsightsManager {
       `);
     }
 
+    // Timetable Adherence
+    if (insights.timetable?.daysAnalyzed >= 1) {
+      sections.push(this.buildTimetableInsightHTML(insights.timetable));
+    }
+
     // Period Comparison
     if (insights.comparisons?.thisWeek) {
       const change = insights.comparisons.productiveChange || 0;
@@ -4811,6 +4817,344 @@ class InsightsManager {
   getRecIcon(type) {
     const icons = { warning: '⚠️', success: '✅', improvement: '💡', suggestion: '🎯' };
     return icons[type] || '💡';
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TIMETABLE ADHERENCE ANALYSIS
+  // Compares Pipeline schedule slots against actual logged task history.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the canonical Pipeline timetable slot definitions.
+   * Times are decimal hours (e.g. 5.5 = 5:30 AM, 16.75 = 4:45 PM).
+   * Update this array if the Pipeline schedule in index.html changes.
+   */
+  getTimetableSlots() {
+    return [
+      // ── Main Study Slots ──────────────────────────────────────────────────
+      { id: 'slot1',  label: 'Slot 1 · QA (5:30–8:30 AM)',       startH: 5.5,   endH: 8.5,   subject: 'Quantitative Aptitude', targetMins: 180, type: 'main',  emoji: '🌅' },
+      { id: 'slot2',  label: 'Slot 2 · QA Cont. (9:00–12:00 PM)', startH: 9.0,   endH: 12.0,  subject: 'Quantitative Aptitude', targetMins: 180, type: 'main',  emoji: '📚' },
+      { id: 'slot3',  label: 'Slot 3 · English (12:45–3:45 PM)',  startH: 12.75, endH: 15.75, subject: 'English Comprehension',  targetMins: 180, type: 'main',  emoji: '📖' },
+      // ── Daily Fixed Subjects ──────────────────────────────────────────────
+      { id: 'fixed1', label: 'Vocab/Idioms (4:45–5:15 PM)',       startH: 16.75, endH: 17.25, subject: 'Vocabulary',            targetMins: 30,  type: 'fixed', emoji: '📝' },
+      { id: 'fixed2', label: 'Current Affairs (5:15–5:45 PM)',    startH: 17.25, endH: 17.75, subject: 'Current Affairs',       targetMins: 30,  type: 'fixed', emoji: '📰' },
+      { id: 'fixed3', label: 'Computer Prof. (5:45–6:15 PM)',     startH: 17.75, endH: 18.25, subject: 'Computer',              targetMins: 30,  type: 'fixed', emoji: '💻' },
+      { id: 'fixed4', label: 'Reasoning Prac. (6:15–6:45 PM)',    startH: 18.25, endH: 18.75, subject: 'Reasoning',             targetMins: 30,  type: 'fixed', emoji: '🧩' },
+      // ── Night Routine ─────────────────────────────────────────────────────
+      { id: 'night1', label: 'Rolling Revision (7:30–8:15 PM)',   startH: 19.5,  endH: 20.25, subject: 'Revision',              targetMins: 45,  type: 'night', emoji: '🔄' },
+      { id: 'night2', label: '3-Day Revision (8:15–9:00 PM)',     startH: 20.25, endH: 21.0,  subject: 'Revision',              targetMins: 45,  type: 'night', emoji: '🔄' },
+      { id: 'night3', label: '6-Day Revision (9:00–9:45 PM)',     startH: 21.0,  endH: 21.75, subject: 'Revision',              targetMins: 45,  type: 'night', emoji: '🔄' },
+      { id: 'night4', label: 'Mixed PYQs (9:45–11:15 PM)',        startH: 21.75, endH: 23.25, subject: 'Practice',              targetMins: 90,  type: 'night', emoji: '📋' },
+      { id: 'night5', label: 'Error Notebook (11:15–11:30 PM)',   startH: 23.25, endH: 23.5,  subject: 'Error Review',          targetMins: 15,  type: 'night', emoji: '❌' },
+    ];
+  }
+
+  /**
+   * Given all tasks and a YYYY-MM-DD date string, returns a map of
+   * slotId → actual productive minutes logged within that slot's window.
+   * Uses ±30 min overlap tolerance for real-world slippage.
+   */
+  matchTasksToSlots(tasks, dateStr) {
+    const slots = this.getTimetableSlots();
+    const TOLERANCE_H = 0.5; // ±30 minutes
+
+    // Gather productive tasks for this date
+    const dayTasks = tasks.filter(t => {
+      const tDate = t.date || (t.startTime ? this.app.getDateString(new Date(Number(t.startTime))) : null);
+      return tDate === dateStr && (this.app.isProductiveCategory(t.category) || t.isProductive);
+    });
+
+    const slotMinutes = {};
+    slots.forEach(s => { slotMinutes[s.id] = 0; });
+
+    dayTasks.forEach(task => {
+      const ts = Number(task.startTime);
+      if (!ts) return;
+      const d = new Date(ts);
+      const taskH = d.getHours() + d.getMinutes() / 60;
+      const dur = Number(task.duration) || 0;
+      if (dur <= 0) return;
+
+      // Find the slot whose window (with tolerance) best contains this task start
+      let bestSlot = null;
+      let bestOverlap = -Infinity;
+      slots.forEach(slot => {
+        const lo = slot.startH - TOLERANCE_H;
+        const hi = slot.endH + TOLERANCE_H;
+        if (taskH >= lo && taskH < hi) {
+          // Prefer the slot whose center is closest to the task start
+          const center = (slot.startH + slot.endH) / 2;
+          const overlap = -Math.abs(taskH - center);
+          if (overlap > bestOverlap) {
+            bestOverlap = overlap;
+            bestSlot = slot.id;
+          }
+        }
+      });
+
+      if (bestSlot) slotMinutes[bestSlot] += dur;
+    });
+
+    return slotMinutes;
+  }
+
+  /**
+   * Determines adherence status label based on percentage.
+   */
+  _slotStatus(pct) {
+    if (pct >= 85) return 'hit';
+    if (pct >= 50) return 'partial';
+    if (pct > 0)  return 'started';
+    return 'missed';
+  }
+
+  /**
+   * Main analysis: looks at the last 14 calendar days, matches tasks to slots,
+   * and produces per-slot aggregates + overall score + adjustment suggestions.
+   */
+  analyzeTimetableAdherence(tasks) {
+    const slots = this.getTimetableSlots();
+    const today = this.app.getActiveDate();
+    const DAYS = 14;
+
+    // Build date strings for the window
+    const dates = [];
+    for (let i = DAYS - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      dates.push(this.app.getDateString(d));
+    }
+
+    // Per-slot accumulation across days
+    const slotHistory = {};
+    slots.forEach(s => {
+      slotHistory[s.id] = { totalActual: 0, totalTarget: 0, hits: 0, partials: 0, misses: 0, daysWithData: 0 };
+    });
+
+    let daysWithAnyTask = 0;
+
+    dates.forEach(dateStr => {
+      const hasTasks = tasks.some(t => {
+        const tDate = t.date || (t.startTime ? this.app.getDateString(new Date(Number(t.startTime))) : null);
+        return tDate === dateStr;
+      });
+      if (!hasTasks) return;
+
+      daysWithAnyTask++;
+      const slotMins = this.matchTasksToSlots(tasks, dateStr);
+
+      slots.forEach(s => {
+        const actual = slotMins[s.id] || 0;
+        const pct = Math.min(100, Math.round((actual / s.targetMins) * 100));
+        const status = this._slotStatus(pct);
+        const h = slotHistory[s.id];
+        h.totalActual += actual;
+        h.totalTarget += s.targetMins;
+        if (actual > 0) h.daysWithData++;
+        if (status === 'hit')     h.hits++;
+        else if (status === 'partial') h.partials++;
+        else if (status === 'started') h.partials++; // count started as partial for miss-rate
+        else h.misses++;
+      });
+    });
+
+    if (daysWithAnyTask === 0) {
+      return { daysAnalyzed: 0, message: 'No task data found in the last 14 days.' };
+    }
+
+    // Compute per-slot summary
+    const perSlot = slots.map(s => {
+      const h = slotHistory[s.id];
+      const denominator = daysWithAnyTask;
+      const avgAdherence = denominator > 0 ? Math.min(100, Math.round((h.totalActual / (s.targetMins * denominator)) * 100)) : 0;
+      const hitRate  = denominator > 0 ? h.hits / denominator : 0;
+      const missRate = denominator > 0 ? h.misses / denominator : 0;
+      const avgActual = denominator > 0 ? Math.round(h.totalActual / denominator) : 0;
+
+      // Simple trend: compare first 7 days vs last 7 days of logged data
+      const midDate = dates[Math.floor(DAYS / 2)];
+      let trendEarly = 0, trendLate = 0;
+      dates.forEach(dateStr => {
+        const hasTasks2 = tasks.some(t => {
+          const tDate = t.date || (t.startTime ? this.app.getDateString(new Date(Number(t.startTime))) : null);
+          return tDate === dateStr;
+        });
+        if (!hasTasks2) return;
+        // We already computed matchTasksToSlots above — re-compute is acceptable at this scale
+        // (max 14 iterations × 12 slots × few dozen tasks each = negligible)
+        const slotMins2 = this.matchTasksToSlots(tasks, dateStr);
+        const val = slotMins2[s.id] || 0;
+        if (dateStr < midDate) trendEarly += val;
+        else trendLate += val;
+      });
+      const trend = trendLate > trendEarly * 1.1 ? 'improving'
+                  : trendLate < trendEarly * 0.9 ? 'declining'
+                  : 'stable';
+
+      return {
+        ...s,
+        avgAdherence,
+        hitRate,
+        missRate,
+        avgActual,
+        trend,
+      };
+    });
+
+    // Overall score: weighted by targetMins (bigger slots count more)
+    const totalTarget = perSlot.reduce((s, sl) => s + sl.targetMins, 0);
+    const overallScore = totalTarget > 0
+      ? Math.round(perSlot.reduce((s, sl) => s + sl.avgAdherence * (sl.targetMins / totalTarget), 0))
+      : 0;
+
+    const suggestions = this.generateTimetableRecommendations(perSlot, daysWithAnyTask);
+
+    return { daysAnalyzed: daysWithAnyTask, overallScore, perSlot, suggestions };
+  }
+
+  /**
+   * Fires rule-based adjustment suggestions from slot adherence data.
+   */
+  generateTimetableRecommendations(perSlot, daysAnalyzed) {
+    const recs = [];
+    const esc = v => this.app.escapeHtml(String(v));
+
+    // Find peak hour from productivity analysis for cross-referencing
+    const tasks = (this.app.state?.tasks || []).filter(t => this.app.isTaskAfterStatsReset(t));
+    const prodPatterns = this.analyzeProductivityPatterns(tasks);
+    const peakLabel = prodPatterns?.peakHour?.label || 'your peak window';
+
+    perSlot.forEach(slot => {
+      const { label, avgAdherence, hitRate, missRate, avgActual, targetMins, trend } = slot;
+      const esc_label = esc(label);
+
+      // Rock-solid anchor slot
+      if (hitRate >= 0.80) {
+        recs.push({ priority: 0, type: 'anchor', text: `✅ <strong>${esc_label}</strong> is your strongest block (${Math.round(hitRate * 100)}% hit rate). Protect this slot above all others — it's your consistency anchor.` });
+      }
+
+      // Critical miss — high miss rate
+      if (missRate > 0.60 && daysAnalyzed >= 5) {
+        recs.push({ priority: 1, type: 'critical', text: `🔴 <strong>${esc_label}</strong> has a ${Math.round(missRate * 100)}% miss rate — you're skipping this slot most days. Consider moving it to <strong>${esc(peakLabel)}</strong> when energy is highest, or break it into two shorter blocks.` });
+      }
+
+      // Declining adherence warning
+      if (trend === 'declining' && avgAdherence < 60 && daysAnalyzed >= 7) {
+        recs.push({ priority: 2, type: 'warning', text: `📉 <strong>${esc_label}</strong> adherence is declining and now at ${avgAdherence}% (avg ${avgActual}m vs ${targetMins}m target). Set a phone alarm at the slot's start time to interrupt whatever you're doing.` });
+      }
+
+      // Partially started — consistently low but not zero
+      if (avgAdherence >= 20 && avgAdherence < 50 && missRate < 0.50 && daysAnalyzed >= 5) {
+        recs.push({ priority: 3, type: 'partial', text: `🟡 <strong>${esc_label}</strong> is consistently under-filled (${avgAdherence}% avg — about ${avgActual}m of ${targetMins}m). Try logging the session before taking any break to lock in the time.` });
+      }
+
+      // Improving — positive reinforcement
+      if (trend === 'improving' && avgAdherence >= 50 && daysAnalyzed >= 7) {
+        recs.push({ priority: 4, type: 'positive', text: `📈 <strong>${esc_label}</strong> is improving — keep the momentum. Your adherence has been rising over the past week.` });
+      }
+    });
+
+    // Group: if ALL night slots have <40% adherence
+    const nightSlots = perSlot.filter(s => s.type === 'night');
+    const nightAvg = nightSlots.length > 0
+      ? Math.round(nightSlots.reduce((s, x) => s + x.avgAdherence, 0) / nightSlots.length)
+      : 100;
+    if (nightAvg < 40 && daysAnalyzed >= 5) {
+      recs.push({ priority: 2, type: 'warning', text: `🌙 Night routine average adherence is only ${nightAvg}%. Consider condensing the 4-block night routine into a single 2.5-hour "Night Block" until you build the habit.` });
+    }
+
+    // Group: if overall score is very low
+    const mainSlots = perSlot.filter(s => s.type === 'main');
+    const mainAvg = mainSlots.length > 0
+      ? Math.round(mainSlots.reduce((s, x) => s + x.avgAdherence, 0) / mainSlots.length)
+      : 100;
+    if (mainAvg < 40 && daysAnalyzed >= 5) {
+      recs.push({ priority: 1, type: 'critical', text: `⚡ Main study slot adherence is critically low (${mainAvg}%). Focus on just <strong>Slot 1</strong> (5:30 AM) until it becomes automatic — then add Slot 2, then Slot 3. One habit at a time.` });
+    }
+
+    // If data is too fresh
+    if (daysAnalyzed < 5) {
+      recs.push({ priority: 5, type: 'info', text: `🔎 Only ${daysAnalyzed} day${daysAnalyzed === 1 ? '' : 's'} of data analyzed. Log for at least 5 days to get accurate timetable recommendations.` });
+    }
+
+    // Deduplicate anchors (only show top 1)
+    let anchorCount = 0;
+    return recs
+      .filter(r => {
+        if (r.type === 'anchor') { anchorCount++; return anchorCount <= 1; }
+        return true;
+      })
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 6);
+  }
+
+  /**
+   * Renders the Timetable Adherence insight card HTML.
+   */
+  buildTimetableInsightHTML(timetable) {
+    const { overallScore, daysAnalyzed, perSlot, suggestions } = timetable;
+
+    const scoreColor = overallScore >= 75 ? '#4ade80' : overallScore >= 50 ? '#fbbf24' : '#f87171';
+    const scoreLabel = overallScore >= 75 ? 'Strong' : overallScore >= 50 ? 'Moderate' : 'Needs Work';
+
+    const statusIcon  = { hit: '✅', partial: '🟡', started: '🟠', missed: '🔴' };
+    const statusLabel = { hit: 'On Track', partial: 'Partial', started: 'Started', missed: 'Missed' };
+    const barColor    = { hit: '#4ade80', partial: '#fbbf24', started: '#fb923c', missed: '#f87171' };
+    const typeOrder   = ['main', 'fixed', 'night'];
+    const typeTitle   = { main: '📚 Main Slots', fixed: '📌 Fixed Subjects', night: '🌙 Night Routine' };
+
+    let slotRows = '';
+    typeOrder.forEach(type => {
+      const group = perSlot.filter(s => s.type === type);
+      if (!group.length) return;
+      slotRows += `<div style="font-size:0.7rem;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.06em;margin:0.75rem 0 0.3rem;font-weight:700;">${this.app.escapeHtml(typeTitle[type])}</div>`;
+      group.forEach(slot => {
+        const status = this._slotStatus(slot.avgAdherence);
+        const barW = Math.max(4, slot.avgAdherence);
+        const trendArrow = slot.trend === 'improving' ? ' ↑' : slot.trend === 'declining' ? ' ↓' : '';
+        const trendColor = slot.trend === 'improving' ? '#4ade80' : slot.trend === 'declining' ? '#f87171' : 'var(--text-secondary)';
+        slotRows += `
+          <div style="display:flex;align-items:center;gap:0.5rem;margin:0.3rem 0;">
+            <span style="font-size:0.85rem;width:1.2rem;flex-shrink:0;">${statusIcon[status]}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                <span style="font-size:0.78rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%;" title="${this.app.escapeHtml(slot.label)}">${this.app.escapeHtml(slot.label)}</span>
+                <span style="font-size:0.72rem;color:${barColor[status]};font-weight:700;white-space:nowrap;">${slot.avgAdherence}%<span style="color:${trendColor};font-size:0.65rem;">${trendArrow}</span></span>
+              </div>
+              <div style="height:6px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;">
+                <div style="height:100%;width:${barW}%;background:${barColor[status]};border-radius:3px;transition:width 0.4s;"></div>
+              </div>
+            </div>
+            <span style="font-size:0.65rem;color:var(--text-secondary);white-space:nowrap;width:3.5rem;text-align:right;">${this.app.formatDuration(slot.avgActual)}/day</span>
+          </div>`;
+      });
+    });
+
+    const suggestionsHTML = suggestions.length > 0
+      ? suggestions.map(s => `<div style="padding:0.55rem 0.75rem;background:rgba(255,255,255,0.025);border-radius:8px;border-left:3px solid ${
+          s.type === 'critical' ? '#f87171'
+          : s.type === 'warning' ? '#fbbf24'
+          : s.type === 'anchor' || s.type === 'positive' ? '#4ade80'
+          : '#a5b4fc'
+        };font-size:0.82rem;line-height:1.45;color:var(--text-primary);">${s.text}</div>`).join('')
+      : `<p style="color:var(--text-secondary);font-size:0.82rem;">No specific adjustments needed — great consistency!</p>`;
+
+    return `
+      <div class="insight-card" style="border-color:rgba(${overallScore >= 75 ? '74,222,128' : overallScore >= 50 ? '251,191,36' : '248,113,113'},0.3);">
+        <h4 style="display:flex;justify-content:space-between;align-items:center;">
+          <span><i class="fas fa-calendar-check"></i> Timetable Adherence</span>
+          <span style="font-size:1rem;font-weight:800;color:${scoreColor};">${overallScore}/100 <span style="font-size:0.65rem;font-weight:400;color:var(--text-secondary);">${this.app.escapeHtml(scoreLabel)}</span></span>
+        </h4>
+        <p style="font-size:0.75rem;color:var(--text-secondary);margin:0 0 0.75rem;">Based on ${daysAnalyzed} day${daysAnalyzed === 1 ? '' : 's'} of logged sessions vs your Pipeline schedule.</p>
+        <div style="background:rgba(255,255,255,0.02);border-radius:8px;padding:0.6rem 0.75rem;margin-bottom:0.85rem;">
+          ${slotRows}
+        </div>
+        <div style="margin-bottom:0.1rem;">
+          <strong style="font-size:0.78rem;color:var(--text-accent);display:block;margin-bottom:0.4rem;"><i class="fas fa-sliders-h"></i> Adjustments</strong>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;">${suggestionsHTML}</div>
+        </div>
+      </div>
+    `;
   }
 }
 

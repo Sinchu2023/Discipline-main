@@ -7,6 +7,7 @@
 - `firebase-service.js`: Firebase bootstrap and helpers.
 - `google-auth.js`: Google auth flow.
 - `update-check.js`: optional deployment banner.
+- `fullscreen-timer/index.html`: standalone fullscreen timer (vanilla JS, Firebase-synced, monochrome UI).
 
 ## Current Architecture
 - The application currently runs from one main runtime file: `assets/js/app.js`.
@@ -26,6 +27,17 @@
 - Flow protocol engine
 - Graph manager
 - Event wiring and app bootstrap
+
+## Fullscreen Timer (`fullscreen-timer/index.html`)
+- Independent vanilla JS module (no build step, no React)
+- Real-time Firebase Firestore sync via `onSnapshot` on `users/{uid}/state/timer`
+- Reads/writes timer state: `running`/`paused`/`stopped`, `startTime`, `elapsedBeforePause`, `activeTask`
+- Restores active timer from cloud on load (handles cross-device continuity)
+- Saves completed tasks to `users/{uid}/tasks/` on stop
+- Monochrome UI (black/white only, supports `prefers-color-scheme`)
+- Keyboard shortcuts: Space (start/pause), R (reset), F (fullscreen toggle)
+- Anonymous auth fallback for unauthenticated users
+- Offline-capable via Firestore IndexedDB persistence
 
 ## Data Contracts
 - Existing local storage keys are preserved.

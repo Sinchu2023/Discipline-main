@@ -9,6 +9,7 @@ Discipline tracker web app built with vanilla HTML, CSS, and JavaScript, with sl
 - `firebase-service.js`: Firebase setup.
 - `google-auth.js`: Google sign-in flow.
 - `update-check.js`: deployment timestamp banner.
+- `fullscreen-timer/index.html`: standalone fullscreen timer (vanilla JS, Firebase-synced, monochrome UI).
 
 ## Features
 - Real-time stopwatch and task logging
@@ -21,6 +22,7 @@ Discipline tracker web app built with vanilla HTML, CSS, and JavaScript, with sl
 - Flow protocol and war-mode tracking
 - Firebase auth and cloud sync
 - Import/export support
+- **Fullscreen Timer** (standalone window, Firebase-synced, keyboard shortcuts, monochrome UI)
 
 ## Quick Start
 1. Serve the repo over HTTP(S). Do not use `file://` if you need Firebase auth.

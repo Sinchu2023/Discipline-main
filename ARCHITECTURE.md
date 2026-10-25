@@ -61,6 +61,10 @@ graph TD
             end
         end
 
+        subgraph FullscreenTimer ["Fullscreen Timer (fullscreen-timer/index.html)"]
+            FS_Timer["FullscreenTimer (Vanilla JS Module)"]
+        end
+
         subgraph LocalStorageTier ["Browser Storage"]
             LocalStorage[("window.localStorage")]
             SessionStorage[("window.sessionStorage")]
@@ -109,6 +113,12 @@ graph TD
     GoogleAuth <--> FirebaseAuth
     FirebaseService <--> Firestore
     FirebaseService <--> IndexedDBStorage
+
+    %% Fullscreen Timer Wiring (independent but Firebase-synced)
+    FS_Timer <--> Firestore
+    FS_Timer -.-> FirebaseAuth
+    FS_Timer -.-> IndexedDBStorage
+    DisciplineTracker -.->|Opens via window.open| FS_Timer
 ```
 
 ---
@@ -198,6 +208,7 @@ All active runtime logic is implemented across 15 modular classes in [assets/js/
 | `EventManager` | `L10218` | Centralizes DOM event binding for buttons, inputs, date pickers, hotkeys, and modals. | `DisciplineTracker.elements`. |
 | `ExcelReportGenerator` | `L10516` | Generates multi-sheet Excel reports (Summary, Task History, Analytics) via SheetJS. | `window.XLSX`, `AnalyticsService`. |
 | `MasterMessageManager` | `L10753` | Generates personalized coaching messages, simulates live typing animations, and evaluates timetable adherence against current clock time. | `ShadowEngine`, `TrainerEngine`. |
+| `FullscreenTimer` | `fullscreen-timer/index.html` | Standalone fullscreen timer window; vanilla JS module with Firebase real-time sync, keyboard shortcuts (Space/R/F), monochrome UI, task prompts, and completed-task persistence. | `Firebase Firestore` (timer state doc), `Firebase Auth` (anonymous/Google). |
 
 ---
 
