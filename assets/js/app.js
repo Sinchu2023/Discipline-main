@@ -6144,7 +6144,7 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
     }
 
     if (ruleInsights.timetable?.daysAnalyzed >= 1) {
-      sections.push(this.buildTimetableInsightHTML(ruleInsights.timetable, aiInsights));
+      sections.push(this.app.insights.buildTimetableInsightHTML(ruleInsights.timetable, aiInsights));
     }
 
     if (ruleInsights.comparisons?.thisWeek) {
