@@ -3642,6 +3642,10 @@ class UIManager {
   hideShadowRanksGuide() {
     this.app.elements["shadow-ranks-modal"].style.display = "none";
   }
+  hideInsights() {
+    const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
+    if (modal) modal.style.display = "none";
+  }
 
   showInsights() {
     // Close other menus to prevent overlap
@@ -6074,8 +6078,8 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
             <span>📊 Daily Avg: ${this.app.formatDuration(weekly.averageDailyProductive)}</span>
           </div>
           <p class="insight-text">${this.app.escapeHtml(aiWeeklyInsight)}</p>
-          <div class="insight-mini-chart">${this.renderDayBars(weekly.dayBreakdown)}</div>
-        </div>
+          <div class="insight-mini-chart">${this.app.insights.renderDayBars(weekly.dayBreakdown)}</div>
+</div>
       `);
     }
 
@@ -6094,7 +6098,7 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
           <p class="insight-text">${this.app.escapeHtml(aiProdInsight)}</p>
           ${prod.weeklyTrend?.trend ? `
             <div class="insight-trend ${prod.weeklyTrend.trend}">
-              ${this.formatTrend(prod.weeklyTrend)}
+              ${this.app.insights.formatTrend(prod.weeklyTrend)}
             </div>
           ` : ''}
         </div>
@@ -6130,7 +6134,7 @@ Be specific. Reference actual numbers from the data. No generic motivational flu
           <h4><i class="fas fa-lightbulb"></i> AI Recommendations</h4>
           ${mergedRecs.map(r => `
             <div class="recommendation ${r.type} ${r.priority}">
-              <span class="rec-icon">${this.getRecIcon(r.type)}</span>
+              <span class="rec-icon">${this.app.insights.getRecIcon(r.type)}</span>
               <span class="rec-text">${this.app.escapeHtml(r.text)}</span>
               <span class="rec-priority">${r.priority}</span>
             </div>
