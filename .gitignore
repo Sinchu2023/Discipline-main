@@ -1,0 +1,42 @@
+# ── Secrets & Credentials ─────────────────────────────────────────────────────
+.env
+.env.*
+.env.local
+.env.production
+*.pem
+*.key
+*.p12
+*.pfx
+service-account*.json
+firebase-adminsdk*.json
+secrets/
+credentials/
+
+# ── Node / npm ─────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ── OS Files ───────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Editor ─────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/*.code-workspace
+.idea/
+*.suo
+*.user
+
+# ── Build outputs ──────────────────────────────────────────────────────────────
+dist/
+build/
+.cache/
+*.min.js.map
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+*.log
+logs/
