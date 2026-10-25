@@ -4864,6 +4864,23 @@ class InsightsManager {
     return icons[type] || '💡';
   }
 
+  /**
+   * Format time window [startH, endH] to readable string (e.g., "5:30 AM - 8:30 AM")
+   * Copied from TrainerEngine.formatTimeWindow for use in InsightsManager
+   */
+  formatTimeWindow([startH, endH]) {
+    const fmt = (h) => {
+      const normalized = ((h % 24) + 24) % 24; // handle times >24 (overnight)
+      const totalMinutes = Math.round(normalized * 60);
+      const hour = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+      return `${hour12}:${mins.toString().padStart(2, '0')} ${period}`;
+    };
+    return `${fmt(startH)} - ${fmt(endH)}`;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // TIMETABLE ADHERENCE ANALYSIS
   // Compares Pipeline schedule slots against actual logged task history.
