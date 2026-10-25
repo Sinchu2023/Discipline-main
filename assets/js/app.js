@@ -3643,30 +3643,46 @@ class UIManager {
     this.app.elements["shadow-ranks-modal"].style.display = "none";
   }
   hideInsights() {
+    // Cancel any in-flight Ollama request to stop laptop heating
+    if (this._insightsAbortController) {
+      this._insightsAbortController.abort();
+      this._insightsAbortController = null;
+    }
     const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
     if (modal) modal.style.display = "none";
+  }
+
+  _setInsightsStatus(html) {
+    // Update the status line inside the loading area (without replacing the whole content)
+    const el = document.getElementById('insights-status-line');
+    if (el) el.innerHTML = html;
   }
 
   showInsights() {
     // Close other menus to prevent overlap
     this.app.cloudManager?.closeProfileMenu?.();
     this.app.cloudManager?.closePipelineMenu?.();
-    
+
     const modal = this.app.elements["insights-modal"] || document.getElementById("insights-modal");
     if (!modal) return;
     modal.style.display = "flex";
-    
-    // Show loading, then render unified insights (rule-based + AI)
+
+    // Show connection-aware loading state immediately
     const content = this.app.elements["insights-content"] || document.getElementById("insights-content");
     if (content) {
+      const connStatus = this.app.localOllamaConnection?.getStatus?.() || {};
+      const connHint = connStatus.connected
+        ? `<span style="color:#4ade80;">🖥️ Local AI connected (${this.app.localOllamaConnection.models.map(m=>m.name).join(', ')})</span>`
+        : `<span style="color:#fbbf24;">📋 Checking Ollama status...</span>`;
       content.innerHTML = `
-        <div class="insights-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);">
+        <div style="text-align:center;padding:2.5rem 1rem;color:var(--text-secondary);">
           <div class="ai-spinner-ring" style="margin:0 auto 1rem;"></div>
-          <div>Loading insights...</div>
+          <div id="insights-status-line" style="font-size:0.9rem;margin-bottom:0.4rem;">${connHint}</div>
+          <div style="font-size:0.75rem;opacity:0.6;">Analyzing your data...</div>
         </div>
       `;
     }
-    
+
     // Fetch and render unified insights (rule-based + AI)
     this.loadUnifiedInsights();
   }
@@ -3674,37 +3690,73 @@ class UIManager {
   async loadUnifiedInsights(forceRefresh = false) {
     const content = this.app.elements["insights-content"] || document.getElementById("insights-content");
     if (!content) return;
-    
+
+    // Abort any previous in-flight request
+    if (this._insightsAbortController) {
+      this._insightsAbortController.abort();
+    }
+    this._insightsAbortController = new AbortController();
+    const signal = this._insightsAbortController.signal;
+
     try {
-      // Check saved local connection state (non-blocking)
-      if (this.app.localOllamaConnection) {
+      // Only ping Ollama if not already connected (avoid redundant network calls)
+      if (this.app.localOllamaConnection && !this.app.localOllamaConnection.connected) {
+        this._setInsightsStatus('📡 Checking local Ollama...');
         await this.app.localOllamaConnection.checkSavedConnection();
       }
-      
-      // Get rule-based insights first
+      if (signal.aborted) return;
+
+      // Get rule-based insights (instant)
+      this._setInsightsStatus('⚙️ Running rule-based analysis...');
       const ruleInsights = this.app.insights.generateInsights(forceRefresh);
+      if (signal.aborted) return;
+
+      // Show live AI generation status
+      const isConnected = this.app.localOllamaConnection?.connected;
+      const model = this.app.ollamaInsights.config.MODEL;
+      if (isConnected) {
+        this._setInsightsStatus(`🤖 Generating with <strong>${model}</strong> (local)... this takes ~15s`);
+      } else {
+        this._setInsightsStatus('📋 Local AI not connected — using rule-based analysis');
+      }
+
       // Get AI insights (cached or fresh)
       const aiInsights = await this.app.ollamaInsights.getInsights(
         this.app.state.tasks || [],
         ruleInsights,
         forceRefresh
       );
+      if (signal.aborted) return;
+
       // Render UNIFIED insights (merged rule-based + AI)
       this.app.ollamaInsights.renderUnifiedInsights("insights-content", ruleInsights, aiInsights);
     } catch (e) {
+      if (e.name === 'AbortError') return; // Silently ignore cancelled requests
       console.error('Failed to load unified insights:', e);
       // Fallback to rule-based only
       this.app.insights?.renderInsights("insights-content");
+    } finally {
+      this._insightsAbortController = null;
     }
   }
 
   async refreshInsights() {
+    // Cancel any in-flight request first
+    if (this._insightsAbortController) {
+      this._insightsAbortController.abort();
+      this._insightsAbortController = null;
+    }
     const content = this.app.elements["insights-content"] || document.getElementById("insights-content");
     if (content) {
+      const model = this.app.ollamaInsights.config.MODEL;
+      const isConnected = this.app.localOllamaConnection?.connected;
       content.innerHTML = `
-        <div class="insights-loading" style="text-align:center;padding:2rem;color:var(--text-secondary);">
+        <div style="text-align:center;padding:2.5rem 1rem;color:var(--text-secondary);">
           <div class="ai-spinner-ring" style="margin:0 auto 1rem;"></div>
-          <div>Refreshing with local AI...</div>
+          <div id="insights-status-line" style="font-size:0.9rem;margin-bottom:0.4rem;">
+            ${isConnected ? `🤖 Starting fresh analysis with <strong>${model}</strong>...` : '📋 Refreshing rule-based analysis...'}
+          </div>
+          <div style="font-size:0.75rem;opacity:0.6;">Bypassing 24h cache — fetching live data</div>
         </div>
       `;
     }
